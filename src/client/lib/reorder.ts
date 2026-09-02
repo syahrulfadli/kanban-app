@@ -1,4 +1,12 @@
-import type { BoardDetail, Card } from "../../shared/types";
+import type { BoardDetail, CardSummary } from "../../shared/types";
+
+/**
+ * Sisipkan kembali sebuah item di posisi asalnya — pemulihan setelah "urungkan".
+ * Kalau daftarnya sudah menyusut, ia mendarat di ujung.
+ */
+export function insertAt<T>(list: T[], item: T, index: number): T[] {
+  return list.toSpliced(Math.min(index, list.length), 0, item);
+}
 
 /**
  * `index` selalu dihitung pada daftar yang SUDAH mengeluarkan item yang dipindah.
@@ -11,7 +19,7 @@ export function moveCardLocal(
   toColumnId: string,
   toIndex: number,
 ): BoardDetail {
-  let moved: Card | undefined;
+  let moved: CardSummary | undefined;
 
   const without = board.columns.map((col) => {
     const found = col.cards.find((card) => card.id === cardId);

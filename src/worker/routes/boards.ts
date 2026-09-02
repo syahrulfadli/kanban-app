@@ -3,10 +3,11 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { asc, desc, eq, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { boards, cards, columns } from "../../db";
+import { boards, cards, columns, labels } from "../../db";
 import type { AppEnv } from "../auth";
 import { assertRole, requireBoard, requireMembership } from "../guards";
 import { notifyBoard } from "../realtime";
+import { extrasFor, loadCardExtras } from "../card-data";
 import type { BoardDetail } from "../../shared/types";
 
 const DEFAULT_COLUMNS = ["To Do", "In Progress", "Done"];
@@ -95,12 +96,26 @@ const app = new Hono<AppEnv>()
           .orderBy(asc(cards.position))
       : [];
 
+    // Label, progress checklist, jumlah followup, dan peserta ikut terangkut di
+    // payload board: kartu harus bisa menggambar semuanya tanpa dibuka dulu.
+    const [extras, boardLabels] = await Promise.all([
+      loadCardExtras(db, { boardId: board.id }),
+      db
+        .select()
+        .from(labels)
+        .where(eq(labels.boardId, board.id))
+        .orderBy(asc(labels.createdAt)),
+    ]);
+
     const detail: BoardDetail = {
       ...board,
       role,
+      labels: boardLabels,
       columns: cols.map((col) => ({
         ...col,
-        cards: allCards.filter((card) => card.columnId === col.id),
+        cards: allCards
+          .filter((card) => card.columnId === col.id)
+          .map((card) => ({ ...card, ...extrasFor(extras, card.id) })),
       })),
     };
 

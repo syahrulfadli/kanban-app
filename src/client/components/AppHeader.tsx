@@ -1,29 +1,27 @@
-import { signOut, useSession } from "../lib/auth-client";
 import { navigate, paths } from "../lib/route";
 
-export function AppHeader({ children }: { children?: React.ReactNode }) {
-  const { data: session } = useSession();
+/* Breadcrumb. Tidak lagi berupa pane kaca: bilah bertepi sendiri membelah
+   halaman jadi dua bidang, sedangkan jalur navigasi ini bagian dari isi
+   halaman. Jadi latarnya dibiarkan tembus dan hanya tinggal jaraknya.
 
+   Identitas dan tombol keluar pindah ke menu profil di kapsul bawah. */
+export function AppHeader({ children }: { children?: React.ReactNode }) {
   return (
-    <header className="flex items-center gap-3 border-b border-border-subtle px-4 py-3">
+    <header className="flex shrink-0 items-center gap-2 px-5 pt-5 pb-3">
       <button
         onClick={() => navigate(paths.workspaces)}
-        className="text-sm font-semibold hover:underline"
+        className="flex shrink-0 items-center gap-2 text-sm font-semibold tracking-tight"
       >
+        {/* Tiga kolom kecil — lambang papan kanban. */}
+        <svg viewBox="0 0 24 24" className="size-4 text-accent" aria-hidden>
+          <rect x="2.5" y="4" width="5" height="16" rx="1.5" fill="currentColor" opacity="0.9" />
+          <rect x="9.5" y="4" width="5" height="11" rx="1.5" fill="currentColor" opacity="0.6" />
+          <rect x="16.5" y="4" width="5" height="7" rx="1.5" fill="currentColor" opacity="0.35" />
+        </svg>
         Kanban
       </button>
 
       {children}
-
-      <div className="ml-auto flex items-center gap-3">
-        <span className="hidden text-sm text-slate-500 sm:inline">{session?.user.name}</span>
-        <button
-          onClick={() => void signOut().then(() => navigate(paths.workspaces))}
-          className="rounded px-2 py-1 text-sm text-slate-500 hover:bg-slate-500/10"
-        >
-          Keluar
-        </button>
-      </div>
     </header>
   );
 }

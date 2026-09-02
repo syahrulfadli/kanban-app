@@ -16,7 +16,7 @@ export function AddItemForm({ placeholder, submitLabel, onSubmit }: Props) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="w-full rounded-lg px-2 py-1.5 text-left text-sm text-slate-500 hover:bg-slate-500/10"
+        className="w-full rounded-lg px-2.5 py-2 text-left text-sm text-muted transition-colors hover:bg-line-soft hover:text-ink"
       >
         {submitLabel}
       </button>
@@ -42,7 +42,7 @@ export function AddItemForm({ placeholder, submitLabel, onSubmit }: Props) {
         e.preventDefault();
         void submit();
       }}
-      className="flex flex-col gap-1.5"
+      className="flex flex-col gap-2"
     >
       <textarea
         autoFocus
@@ -57,21 +57,13 @@ export function AddItemForm({ placeholder, submitLabel, onSubmit }: Props) {
           }
           if (e.key === "Escape") setOpen(false);
         }}
-        className="w-full resize-none rounded-lg border border-border-subtle bg-surface-raised p-2 text-sm outline-none focus:border-blue-500"
+        className="field resize-none"
       />
       <div className="flex gap-1.5">
-        <button
-          type="submit"
-          disabled={busy}
-          className="rounded-md bg-blue-600 px-3 py-1 text-sm text-white disabled:opacity-50"
-        >
+        <button type="submit" disabled={busy} className="btn btn-primary">
           Tambah
         </button>
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          className="rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-slate-500/10"
-        >
+        <button type="button" onClick={() => setOpen(false)} className="btn btn-ghost">
           Batal
         </button>
       </div>

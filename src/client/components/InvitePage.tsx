@@ -5,7 +5,11 @@ import { navigate, paths } from "../lib/route";
 import { useSession } from "../lib/auth-client";
 import type { InvitePreview } from "../../shared/types";
 
-const ROLE_LABEL = { owner: "Pemilik", admin: "Admin", member: "Anggota" } as const;
+const ROLE_LABEL = {
+  owner: "Pemilik",
+  admin: "Admin",
+  member: "Anggota",
+} as const;
 
 export function InvitePage({ token }: { token: string }) {
   const { data: session, isPending } = useSession();
@@ -22,15 +26,15 @@ export function InvitePage({ token }: { token: string }) {
       );
   }, [token]);
 
-  if (isPending) return <p className="p-8 text-sm text-slate-500">Memuat…</p>;
+  if (isPending) return <p className="p-8 text-sm text-muted">Memuat…</p>;
 
   if (error) {
     return (
       <div className="mx-auto max-w-sm p-8 text-center">
-        <p className="text-sm text-red-500">{error}</p>
+        <p className="text-sm text-danger">{error}</p>
         <button
           onClick={() => navigate(paths.workspaces)}
-          className="mt-4 text-sm text-blue-600 hover:underline"
+          className="mt-4 text-sm text-accent-ink hover:underline"
         >
           Ke halaman utama
         </button>
@@ -38,18 +42,18 @@ export function InvitePage({ token }: { token: string }) {
     );
   }
 
-  if (!preview) return <p className="p-8 text-sm text-slate-500">Memuat undangan…</p>;
+  if (!preview) return <p className="p-8 text-sm text-muted">Memuat undangan…</p>;
 
   // Belum login: tampilkan konteks undangan dulu, baru form auth.
   if (!session) {
     return (
-      <div>
-        <div className="mx-auto max-w-sm px-6 pt-8">
-          <p className="rounded-lg border border-border-subtle bg-surface-raised p-4 text-sm">
+      <div className="flex flex-1 flex-col">
+        <div className="mx-auto w-full max-w-sm px-6 pt-8">
+          <p className="glass glass-plate rounded-2xl p-4 text-sm">
             Anda diundang ke workspace <strong>{preview.workspaceName}</strong> sebagai{" "}
             {ROLE_LABEL[preview.role]}.
             <br />
-            <span className="text-slate-500">
+            <span className="text-muted">
               Masuk atau daftar dengan {preview.email} untuk menerimanya.
             </span>
           </p>
@@ -74,30 +78,30 @@ export function InvitePage({ token }: { token: string }) {
   const emailMatches = session.user.email.toLowerCase() === preview.email;
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center p-6 text-center">
-      <h1 className="text-xl font-semibold">Undangan workspace</h1>
-      <p className="mt-2 text-sm text-slate-500">
-        Anda diundang ke <strong className="text-slate-900 dark:text-slate-100">
-          {preview.workspaceName}
-        </strong>{" "}
-        sebagai {ROLE_LABEL[preview.role]}.
-      </p>
-
-      {emailMatches ? (
-        <button
-          onClick={() => void accept()}
-          disabled={busy}
-          className="mt-6 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {busy ? "Memproses…" : "Terima undangan"}
-        </button>
-      ) : (
-        <p className="mt-6 rounded-lg bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
-          Undangan ini untuk <strong>{preview.email}</strong>, sedangkan Anda masuk sebagai{" "}
-          <strong>{session.user.email}</strong>. Keluar dulu, lalu masuk dengan akun yang
-          diundang.
+    <div className="flex flex-1 items-center justify-center p-6">
+      <div className="glass glass-frost w-full max-w-sm rounded-3xl p-7 text-center">
+        <h1 className="text-xl font-semibold tracking-tight">Undangan workspace</h1>
+        <p className="mt-2 text-sm text-muted">
+          Anda diundang ke <strong className="text-ink">{preview.workspaceName}</strong>{" "}
+          sebagai {ROLE_LABEL[preview.role]}.
         </p>
-      )}
+
+        {emailMatches ? (
+          <button
+            onClick={() => void accept()}
+            disabled={busy}
+            className="btn btn-primary mt-6 w-full py-2.5"
+          >
+            {busy ? "Memproses…" : "Terima undangan"}
+          </button>
+        ) : (
+          <p className="mt-6 rounded-xl bg-warn/10 p-3 text-sm text-warn">
+            Undangan ini untuk <strong>{preview.email}</strong>, sedangkan Anda masuk
+            sebagai <strong>{session.user.email}</strong>. Keluar dulu, lalu masuk dengan
+            akun yang diundang.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

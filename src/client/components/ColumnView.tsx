@@ -21,7 +21,7 @@ interface Props {
   onAddCard: (title: string) => Promise<void>;
   onRenameColumn: (title: string) => void;
   onDeleteColumn: () => void;
-  onRenameCard: (cardId: string, title: string) => void;
+  onOpenCard: (cardId: string) => void;
   onDeleteCard: (cardId: string) => void;
 }
 
@@ -30,7 +30,7 @@ export function ColumnView({
   onAddCard,
   onRenameColumn,
   onDeleteColumn,
-  onRenameCard,
+  onOpenCard,
   onDeleteCard,
 }: Props) {
   const ref = useRef<HTMLElement>(null);
@@ -91,16 +91,19 @@ export function ColumnView({
     <section
       ref={ref}
       className={cn(
-        "relative flex max-h-full w-72 shrink-0 flex-col rounded-xl border border-border-subtle bg-surface-raised/60",
+        "glass glass-frost glass-column flex max-h-full w-72 shrink-0 flex-col",
         dragging && "opacity-40",
-        cardOver && "ring-2 ring-blue-500/40",
-        edge === "left" && "before:absolute before:-left-2 before:inset-y-0 before:w-0.5 before:rounded-full before:bg-blue-500",
-        edge === "right" && "after:absolute after:-right-2 after:inset-y-0 after:w-0.5 after:rounded-full after:bg-blue-500",
+        cardOver && "outline-2 outline-offset-2 outline-accent/55",
       )}
     >
+      {/* Penanda sisi drop kolom. Elemen sungguhan, bukan pseudo-element:
+          ::before dan ::after milik kolom sudah dipakai cincin dan kilau kaca. */}
+      {edge === "left" && <span aria-hidden className="drop-edge drop-edge-y -left-2" />}
+      {edge === "right" && <span aria-hidden className="drop-edge drop-edge-y -right-2" />}
+
       <div
         ref={headerRef}
-        className="flex cursor-grab items-center gap-2 px-3 py-2.5 active:cursor-grabbing"
+        className="flex cursor-grab items-center gap-2 px-3.5 pt-3 pb-2.5 active:cursor-grabbing"
       >
         {editing ? (
           <input
@@ -115,34 +118,43 @@ export function ColumnView({
           />
         ) : (
           <h2
-            className="min-w-0 flex-1 truncate text-sm font-semibold"
+            className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight"
             onDoubleClick={() => setEditing(true)}
+            title="Klik dua kali untuk mengganti nama"
           >
             {column.title}
           </h2>
         )}
 
-        <span className="text-xs tabular-nums text-slate-400">{column.cards.length}</span>
+        <span className="chip tabular-nums">{column.cards.length}</span>
 
         <button
           type="button"
           aria-label={`Hapus kolom ${column.title}`}
           onClick={onDeleteColumn}
-          className="size-5 rounded text-slate-400 hover:bg-slate-500/10 hover:text-red-500"
+          className="grid size-6 shrink-0 place-items-center rounded-full text-faint transition-colors hover:bg-danger/10 hover:text-danger"
         >
-          ×
+          <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
+            <path d="M6 6 18 18M18 6 6 18" />
+          </svg>
         </button>
       </div>
 
-      <ul className="flex min-h-2 flex-1 flex-col gap-2 overflow-y-auto px-3 pb-2">
+      <ul className="flex min-h-14 flex-1 flex-col gap-2 overflow-y-auto px-3 pb-2">
         {column.cards.map((card) => (
           <CardItem
             key={card.id}
             card={card}
-            onRename={(title) => onRenameCard(card.id, title)}
+            onOpen={() => onOpenCard(card.id)}
             onDelete={() => onDeleteCard(card.id)}
           />
         ))}
+
+        {column.cards.length === 0 && (
+          <li className="rounded-xl border border-dashed border-line px-3 py-6 text-center text-xs text-faint">
+            Belum ada kartu
+          </li>
+        )}
       </ul>
 
       <div className="px-3 pb-3">

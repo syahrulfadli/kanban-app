@@ -5,14 +5,17 @@ export type Route =
   | { name: "workspaces" }
   | { name: "workspace"; workspaceId: string }
   | { name: "members"; workspaceId: string }
-  | { name: "board"; boardId: string }
+  /** `cardId` ada kalau alamatnya menunjuk satu kartu — dari notifikasi, misalnya. */
+  | { name: "board"; boardId: string; cardId?: string }
   | { name: "invite"; token: string };
 
 function parse(hash: string): Route {
   const path = hash.replace(/^#/, "");
 
-  const board = path.match(/^\/board\/([^/]+)$/);
-  if (board) return { name: "board", boardId: board[1] };
+  /* Bentuk /board/:id/card/:cardId disusun server untuk tautan notifikasi
+     (lihat src/worker/notify.ts) — kalau salah satunya berubah, ubah keduanya. */
+  const board = path.match(/^\/board\/([^/]+)(?:\/card\/([^/]+))?$/);
+  if (board) return { name: "board", boardId: board[1], cardId: board[2] };
 
   const invite = path.match(/^\/invite\/([^/]+)$/);
   if (invite) return { name: "invite", token: invite[1] };

@@ -1,6 +1,16 @@
 import { and, eq } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
-import { boards, cards, columns, workspaceMembers, type Db, type Role } from "../db";
+import {
+  boards,
+  cardComments,
+  cards,
+  checklistItems,
+  columns,
+  labels,
+  workspaceMembers,
+  type Db,
+  type Role,
+} from "../db";
 
 const notFound = () => new HTTPException(404, { message: "Data tidak ditemukan" });
 
@@ -93,4 +103,91 @@ export async function requireCard(db: Db, cardId: string, userId: string) {
 
   if (!row) throw notFound();
   return row;
+}
+
+/** Label + board induk + peran user. */
+export async function requireLabel(db: Db, labelId: string, userId: string) {
+  const row = await db
+    .select({ label: labels, boardId: boards.id, role: workspaceMembers.role })
+    .from(labels)
+    .innerJoin(boards, eq(labels.boardId, boards.id))
+    .innerJoin(
+      workspaceMembers,
+      and(
+        eq(workspaceMembers.workspaceId, boards.workspaceId),
+        eq(workspaceMembers.userId, userId),
+      ),
+    )
+    .where(eq(labels.id, labelId))
+    .get();
+
+  if (!row) throw notFound();
+  return row;
+}
+
+/** Butir checklist + kartu + board induk + peran user. */
+export async function requireChecklistItem(db: Db, itemId: string, userId: string) {
+  const row = await db
+    .select({
+      item: checklistItems,
+      cardId: cards.id,
+      cardTitle: cards.title,
+      boardId: boards.id,
+      role: workspaceMembers.role,
+    })
+    .from(checklistItems)
+    .innerJoin(cards, eq(checklistItems.cardId, cards.id))
+    .innerJoin(columns, eq(cards.columnId, columns.id))
+    .innerJoin(boards, eq(columns.boardId, boards.id))
+    .innerJoin(
+      workspaceMembers,
+      and(
+        eq(workspaceMembers.workspaceId, boards.workspaceId),
+        eq(workspaceMembers.userId, userId),
+      ),
+    )
+    .where(eq(checklistItems.id, itemId))
+    .get();
+
+  if (!row) throw notFound();
+  return row;
+}
+
+/**
+ * Followup + kartu + board induk + peran user.
+ *
+ * Menyunting dan menghapus followup adalah hak penulisnya; admin boleh
+ * menghapus, tapi tidak boleh menaruh kata-kata di mulut orang lain.
+ */
+export async function requireComment(db: Db, commentId: string, userId: string) {
+  const row = await db
+    .select({
+      comment: cardComments,
+      cardId: cards.id,
+      cardTitle: cards.title,
+      boardId: boards.id,
+      role: workspaceMembers.role,
+    })
+    .from(cardComments)
+    .innerJoin(cards, eq(cardComments.cardId, cards.id))
+    .innerJoin(columns, eq(cards.columnId, columns.id))
+    .innerJoin(boards, eq(columns.boardId, boards.id))
+    .innerJoin(
+      workspaceMembers,
+      and(
+        eq(workspaceMembers.workspaceId, boards.workspaceId),
+        eq(workspaceMembers.userId, userId),
+      ),
+    )
+    .where(eq(cardComments.id, commentId))
+    .get();
+
+  if (!row) throw notFound();
+  return row;
+}
+
+export function assertAuthor(authorId: string, userId: string) {
+  if (authorId !== userId) {
+    throw new HTTPException(403, { message: "Hanya penulisnya yang boleh mengubah ini" });
+  }
 }

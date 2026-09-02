@@ -99,11 +99,219 @@ export const cards = sqliteTable(
     title: text("title").notNull(),
     description: text("description"),
     position: real("position").notNull(),
+    /* Penulis dan penyunting terakhir. `set null`, bukan `cascade`: kartu
+       tidak boleh ikut hilang hanya karena pembuatnya keluar dari tim. */
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
   },
   (t) => [index("cards_column_idx").on(t.columnId, t.position)],
 );
+
+/** Warna label — kunci simbolik, bukan hex: peta warnanya milik tema. */
+export const LABEL_COLORS = [
+  "slate",
+  "red",
+  "orange",
+  "amber",
+  "green",
+  "teal",
+  "sky",
+  "violet",
+  "pink",
+] as const;
+export type LabelColor = (typeof LABEL_COLORS)[number];
+
+/**
+ * Jenis perubahan yang tercatat di lini masa kartu. Followup yang ditulis
+ * orang tidak ada di sini — itu tetap `card_comments`; tabel ini hanya
+ * merekam apa yang *terjadi* pada kartu.
+ */
+export const ACTIVITY_KINDS = [
+  "card_created",
+  "title_changed",
+  "description_changed",
+  "card_moved",
+  "label_added",
+  "label_removed",
+  "checklist_added",
+  "checklist_checked",
+  "checklist_unchecked",
+  "checklist_renamed",
+  "checklist_removed",
+  "comment_deleted",
+] as const;
+export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
+
+/**
+ * Potongan konteks satu catatan — sengaja didenormalisasi: label yang sudah
+ * dihapus dan butir checklist yang sudah hilang tetap harus terbaca di lini
+ * masa, jadi namanya disalin saat kejadian, bukan dirujuk.
+ */
+export interface ActivityDetail {
+  from?: string | null;
+  to?: string | null;
+  text?: string;
+  color?: LabelColor;
+}
+
+/** Label dimiliki board, bukan kartu — supaya bisa dipakai ulang lintas kartu. */
+export const labels = sqliteTable(
+  "labels",
+  {
+    id: text("id").primaryKey(),
+    boardId: text("board_id")
+      .notNull()
+      .references(() => boards.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    color: text("color", { enum: LABEL_COLORS }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [index("labels_board_idx").on(t.boardId)],
+);
+
+export const cardLabels = sqliteTable(
+  "card_labels",
+  {
+    cardId: text("card_id")
+      .notNull()
+      .references(() => cards.id, { onDelete: "cascade" }),
+    labelId: text("label_id")
+      .notNull()
+      .references(() => labels.id, { onDelete: "cascade" }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.cardId, t.labelId] }),
+    index("card_labels_label_idx").on(t.labelId),
+  ],
+);
+
+/** Thread followup pada kartu. Datar, bukan berjenjang — satu utas per kartu. */
+export const cardComments = sqliteTable(
+  "card_comments",
+  {
+    id: text("id").primaryKey(),
+    cardId: text("card_id")
+      .notNull()
+      .references(() => cards.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [index("card_comments_card_idx").on(t.cardId, t.createdAt)],
+);
+
+export const checklistItems = sqliteTable(
+  "checklist_items",
+  {
+    id: text("id").primaryKey(),
+    cardId: text("card_id")
+      .notNull()
+      .references(() => cards.id, { onDelete: "cascade" }),
+    text: text("text").notNull(),
+    done: integer("done", { mode: "boolean" }).notNull().default(false),
+    position: real("position").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [index("checklist_card_idx").on(t.cardId, t.position)],
+);
+
+/**
+ * Siapa saja yang pernah menyentuh kartu ini — pembuat, penyunting, pengomentar.
+ * Diturunkan dari aksi, bukan ditugaskan manual: inilah sumber deretan avatar.
+ */
+export const cardParticipants = sqliteTable(
+  "card_participants",
+  {
+    cardId: text("card_id")
+      .notNull()
+      .references(() => cards.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    firstActiveAt: integer("first_active_at", { mode: "timestamp_ms" }).notNull(),
+    lastActiveAt: integer("last_active_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.cardId, t.userId] }),
+    index("card_participants_user_idx").on(t.userId),
+  ],
+);
+
+/**
+ * Jejak setiap perubahan pada kartu — satu baris per kejadian, tidak pernah
+ * disunting. Digabung dengan `card_comments` di klien jadi satu lini masa.
+ *
+ * `set null` pada pelakunya: riwayat kartu tidak boleh berlubang hanya karena
+ * orangnya keluar dari tim.
+ */
+export const cardActivities = sqliteTable(
+  "card_activities",
+  {
+    id: text("id").primaryKey(),
+    cardId: text("card_id")
+      .notNull()
+      .references(() => cards.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    kind: text("kind", { enum: ACTIVITY_KINDS }).notNull(),
+    detail: text("detail", { mode: "json" }).$type<ActivityDetail>(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [index("card_activities_card_idx").on(t.cardId, t.createdAt)],
+);
+
+/**
+ * Satu baris per perangkat yang mengizinkan notifikasi — bukan per user:
+ * orang yang sama boleh memasang aplikasinya di ponsel dan laptop, dan
+ * masing-masing punya kunci enkripsinya sendiri.
+ *
+ * `endpoint` itulah identitas perangkatnya di mata push service, jadi ia yang
+ * dijadikan kunci unik: mendaftar ulang dari perangkat yang sama memperbarui
+ * baris lama, tidak menumpuk baris baru.
+ */
+export const pushSubscriptions = sqliteTable(
+  "push_subscriptions",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull().unique(),
+    /** Kunci publik perangkat (ECDH P-256) dan rahasia autentikasinya. */
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    /** Diperbarui setiap klien mendaftar ulang — penanda perangkat masih hidup. */
+    lastSeenAt: integer("last_seen_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [index("push_subscriptions_user_idx").on(t.userId)],
+);
+
+/**
+ * Kabar apa yang ingin diterima seseorang. Satu baris per user, bukan per
+ * perangkat: yang diatur di sini selera orangnya, dan tidak ada gunanya ponsel
+ * dan laptop milik orang yang sama berbeda pendapat.
+ *
+ * Tidak punya baris berarti semua nilai default; barisnya baru ditulis saat
+ * pilihannya benar-benar diubah.
+ */
+export const notificationPrefs = sqliteTable("notification_prefs", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  /** Followup baru di kartu yang pernah saya sentuh. */
+  comments: integer("comments", { mode: "boolean" }).notNull().default(true),
+  /** Perubahan kartu itu sendiri: judul, deskripsi, label, checklist, pindah kolom. */
+  changes: integer("changes", { mode: "boolean" }).notNull().default(true),
+  /* Kartu baru menyapa seluruh anggota workspace, bukan cuma peserta kartu —
+     di board yang ramai itu bisa jadi berisik, jadi defaultnya mati. */
+  newCards: integer("new_cards", { mode: "boolean" }).notNull().default(false),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});
 
 export type Workspace = typeof workspaces.$inferSelect;
 export type WorkspaceMember = typeof workspaceMembers.$inferSelect;
@@ -111,3 +319,10 @@ export type Invitation = typeof invitations.$inferSelect;
 export type Board = typeof boards.$inferSelect;
 export type Column = typeof columns.$inferSelect;
 export type Card = typeof cards.$inferSelect;
+export type Label = typeof labels.$inferSelect;
+export type CardComment = typeof cardComments.$inferSelect;
+export type ChecklistItem = typeof checklistItems.$inferSelect;
+export type CardParticipant = typeof cardParticipants.$inferSelect;
+export type CardActivity = typeof cardActivities.$inferSelect;
+export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
+export type NotificationPrefs = typeof notificationPrefs.$inferSelect;

@@ -76,7 +76,7 @@ export function MembersPage({ workspaceId }: { workspaceId: string }) {
   return (
     <>
       <AppHeader>
-        <span className="text-slate-400">/</span>
+        <span className="text-faint">/</span>
         <button
           onClick={() => navigate(paths.workspace(workspaceId))}
           className="truncate text-sm font-medium hover:underline"
@@ -85,9 +85,9 @@ export function MembersPage({ workspaceId }: { workspaceId: string }) {
         </button>
       </AppHeader>
 
-      <div className="mx-auto max-w-2xl p-6">
-        <h1 className="text-xl font-semibold">Anggota</h1>
-        {error && <p className="mt-3 text-sm text-red-500">{error}</p>}
+      <div className="mx-auto w-full max-w-2xl px-5 pb-6">
+        <h1 className="text-2xl font-semibold tracking-tight">Anggota</h1>
+        {error && <p className="mt-3 text-sm text-danger">{error}</p>}
 
         <ul className="mt-6 flex flex-col gap-2">
           {members.map((member) => {
@@ -96,13 +96,13 @@ export function MembersPage({ workspaceId }: { workspaceId: string }) {
             return (
               <li
                 key={member.userId}
-                className="flex items-center gap-3 rounded-lg border border-border-subtle bg-surface-raised px-4 py-3"
+                className="glass glass-plate flex items-center gap-3 rounded-2xl px-4 py-3.5"
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">
-                    {member.name} {isSelf && <span className="text-slate-400">(Anda)</span>}
+                    {member.name} {isSelf && <span className="text-faint">(Anda)</span>}
                   </p>
-                  <p className="truncate text-xs text-slate-500">{member.email}</p>
+                  <p className="truncate text-xs text-muted">{member.email}</p>
                 </div>
 
                 {workspace?.role === "owner" && !isSelf ? (
@@ -113,7 +113,7 @@ export function MembersPage({ workspaceId }: { workspaceId: string }) {
                         api.changeRole(workspaceId, member.userId, e.target.value as Role),
                       )
                     }
-                    className="rounded-md border border-border-subtle bg-surface-raised px-2 py-1 text-xs"
+                    className="field w-auto px-2 py-1 text-xs"
                   >
                     {(["owner", "admin", "member"] as const).map((r) => (
                       <option key={r} value={r}>
@@ -122,9 +122,7 @@ export function MembersPage({ workspaceId }: { workspaceId: string }) {
                     ))}
                   </select>
                 ) : (
-                  <span className="rounded-full bg-slate-500/10 px-2 py-0.5 text-xs text-slate-500">
-                    {ROLE_LABEL[member.role]}
-                  </span>
+                  <span className="chip">{ROLE_LABEL[member.role]}</span>
                 )}
 
                 {(canManage || isSelf) && (
@@ -132,7 +130,7 @@ export function MembersPage({ workspaceId }: { workspaceId: string }) {
                     onClick={() =>
                       void act(() => api.removeMember(workspaceId, member.userId))
                     }
-                    className="rounded px-2 py-1 text-xs text-slate-400 hover:bg-slate-500/10 hover:text-red-500"
+                    className="btn btn-ghost px-2.5 py-1 text-xs hover:bg-danger/10 hover:text-danger"
                   >
                     {isSelf ? "Keluar" : "Keluarkan"}
                   </button>
@@ -145,7 +143,7 @@ export function MembersPage({ workspaceId }: { workspaceId: string }) {
         {canManage && (
           <>
             <h2 className="mt-8 text-sm font-semibold">Undang anggota</h2>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-muted">
               Belum ada layanan email — tautan undangan disalin ke clipboard, kirim sendiri
               lewat chat.
             </p>
@@ -157,26 +155,26 @@ export function MembersPage({ workspaceId }: { workspaceId: string }) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="email@rekan.com"
-                className="min-w-0 flex-1 rounded-lg border border-border-subtle bg-surface-raised px-3 py-2 text-sm outline-none focus:border-blue-500"
+                className="field min-w-0 flex-1"
               />
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value as Role)}
-                className="rounded-lg border border-border-subtle bg-surface-raised px-2 text-sm"
+                className="field w-auto"
               >
                 <option value="member">Anggota</option>
                 <option value="admin">Admin</option>
               </select>
               <button
                 type="submit"
-                className="rounded-lg bg-blue-600 px-3 py-2 text-sm text-white"
+                className="btn btn-primary"
               >
                 Undang
               </button>
             </form>
 
             {copied && (
-              <p className="mt-2 rounded-lg bg-green-500/10 px-3 py-2 text-xs break-all text-green-700 dark:text-green-400">
+              <p className="mt-2 rounded-xl bg-ok/10 px-3 py-2 text-xs break-all text-ok">
                 Tautan disalin: {copied}
               </p>
             )}
@@ -188,11 +186,11 @@ export function MembersPage({ workspaceId }: { workspaceId: string }) {
                   .map((invitation) => (
                     <li
                       key={invitation.id}
-                      className="flex items-center gap-2 rounded-lg border border-dashed border-border-subtle px-4 py-2.5"
+                      className="flex items-center gap-2 rounded-2xl border border-dashed border-line px-4 py-2.5"
                     >
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm">{invitation.email}</p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-muted">
                           {ROLE_LABEL[invitation.role]} · menunggu diterima
                         </p>
                       </div>
@@ -203,13 +201,13 @@ export function MembersPage({ workspaceId }: { workspaceId: string }) {
                             ?.writeText(inviteUrl(invitation.token))
                             .then(() => setCopied(inviteUrl(invitation.token)))
                         }
-                        className="rounded px-2 py-1 text-xs text-blue-600 hover:bg-blue-500/10"
+                        className="btn btn-ghost px-2.5 py-1 text-xs text-accent-ink hover:text-accent"
                       >
                         Salin tautan
                       </button>
                       <button
                         onClick={() => void act(() => api.revokeInvitation(invitation.id))}
-                        className="rounded px-2 py-1 text-xs text-slate-400 hover:bg-slate-500/10 hover:text-red-500"
+                        className="btn btn-ghost px-2.5 py-1 text-xs hover:bg-danger/10 hover:text-danger"
                       >
                         Batalkan
                       </button>

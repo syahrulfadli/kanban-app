@@ -5,8 +5,76 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Kanban</title>
     <meta name="description" content="Papan kanban sederhana untuk mengatur pekerjaan." />
+    <meta name="theme-color" content="#E6ECF5" />
+
+    <!-- Dipasang sebagai aplikasi: manifest membawa nama, ikon, dan warna
+         jendelanya. Di iOS ini bukan pemanis — Web Push baru berfungsi setelah
+         aplikasinya ditambahkan ke Layar Utama. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/icon-192.png" type="image/png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Kanban" />
+
+    <!-- Tema dipasang sebelum halaman dilukis. Tanpa ini pengguna tema gelap
+         melihat kilatan putih di setiap muat ulang, karena CSS baru tahu
+         temanya setelah React jalan. Kunci penyimpanannya harus sama dengan
+         STORAGE_KEY di src/client/hooks/useTheme.ts. -->
+    <script>
+      (() => {
+        let pref = "system";
+        try {
+          pref = localStorage.getItem("kanban:theme") || "system";
+        } catch {}
+        const dark =
+          pref === "dark" ||
+          (pref !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+        if (dark) {
+          document.querySelector('meta[name="theme-color"]').content = "#08090C";
+        }
+      })();
+    </script>
   </head>
   <body>
+    <!-- Peta refraksi tepi. feDisplacementMap membengkokkan latar dengan
+         mencuplik ulang pada offset: nilai 128 di sebuah kanal berarti "tidak
+         bergeser", jadi peta ini datar di tengah dan hanya menanjak di pita
+         ~11% dari tepi pane. Tanjakannya mengarah ke dalam, sehingga isi
+         halaman ditarik masuk seperti tepi lensa cembung mengumpulkan apa
+         yang ada di belakangnya.
+
+         Latarnya digeser tiga kali dengan skala sedikit berbeda lalu disusun
+         ulang satu kanal masing-masing — biru membelok paling jauh, merah
+         paling sedikit — supaya tepinya membawa bias warna seperti kaca
+         sungguhan.
+
+         Dipakai .glass-lens, dan hanya oleh dialog: filter ini jauh lebih
+         mahal daripada blur, dan cuma masuk akal di atas isi halaman yang
+         tajam (papan kanban) — bukan di atas ladang cahaya yang sudah kabur. -->
+    <svg width="0" height="0" aria-hidden="true" focusable="false"
+         style="position:absolute;pointer-events:none">
+      <defs>
+        <filter id="glassLens" x="0%" y="0%" width="100%" height="100%" color-interpolation-filters="sRGB">
+          <feImage href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220.0000%22%20stop-color%3D%22rgb%280%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.0165%22%20stop-color%3D%22rgb%280%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.0322%22%20stop-color%3D%22rgb%280%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.0495%22%20stop-color%3D%22rgb%288%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.0660%22%20stop-color%3D%22rgb%2848%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.0825%22%20stop-color%3D%22rgb%2881%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.0990%22%20stop-color%3D%22rgb%28110%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.1100%22%20stop-color%3D%22rgb%28128%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.8900%22%20stop-color%3D%22rgb%28128%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.9010%22%20stop-color%3D%22rgb%28146%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.9175%22%20stop-color%3D%22rgb%28175%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.9340%22%20stop-color%3D%22rgb%28207%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.9505%22%20stop-color%3D%22rgb%28247%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.9678%22%20stop-color%3D%22rgb%28255%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.9835%22%20stop-color%3D%22rgb%28255%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%221.0000%22%20stop-color%3D%22rgb%28255%2C0%2C0%29%22%2F%3E%3C%2FlinearGradient%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20fill%3D%22url%28%23g%29%22%2F%3E%3C%2Fsvg%3E" preserveAspectRatio="none" result="mx"/>
+          <feImage href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220.0000%22%20stop-color%3D%22rgb%280%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.0165%22%20stop-color%3D%22rgb%280%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.0322%22%20stop-color%3D%22rgb%280%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.0495%22%20stop-color%3D%22rgb%280%2C8%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.0660%22%20stop-color%3D%22rgb%280%2C48%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.0825%22%20stop-color%3D%22rgb%280%2C81%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.0990%22%20stop-color%3D%22rgb%280%2C110%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.1100%22%20stop-color%3D%22rgb%280%2C128%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.8900%22%20stop-color%3D%22rgb%280%2C128%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.9010%22%20stop-color%3D%22rgb%280%2C146%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.9175%22%20stop-color%3D%22rgb%280%2C175%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.9340%22%20stop-color%3D%22rgb%280%2C207%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.9505%22%20stop-color%3D%22rgb%280%2C247%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.9678%22%20stop-color%3D%22rgb%280%2C255%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.9835%22%20stop-color%3D%22rgb%280%2C255%2C0%29%22%2F%3E%3Cstop%20offset%3D%221.0000%22%20stop-color%3D%22rgb%280%2C255%2C0%29%22%2F%3E%3C%2FlinearGradient%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20fill%3D%22url%28%23g%29%22%2F%3E%3C%2Fsvg%3E" preserveAspectRatio="none" result="my"/>
+          <feBlend in="mx" in2="my" mode="screen" result="map"/>
+          <feDisplacementMap in="SourceGraphic" in2="map" scale="14.61"
+          xChannelSelector="R" yChannelSelector="G" result="dr"/>
+          <feColorMatrix in="dr" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cr"/>
+          <feDisplacementMap in="SourceGraphic" in2="map" scale="16.23"
+          xChannelSelector="R" yChannelSelector="G" result="dg"/>
+          <feColorMatrix in="dg" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cg"/>
+          <feDisplacementMap in="SourceGraphic" in2="map" scale="17.85"
+          xChannelSelector="R" yChannelSelector="G" result="db"/>
+          <feColorMatrix in="db" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="cb"/>
+          <feBlend in="cr" in2="cg" mode="screen" result="crg"/>
+          <feBlend in="crg" in2="cb" mode="screen"/>
+        </filter>
+      </defs>
+    </svg>
+
     <div id="root"></div>
     <script type="module" src="/src/client/main.tsx"></script>
   </body>

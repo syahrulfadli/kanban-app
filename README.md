@@ -2,6 +2,13 @@
 
 Papan kanban kolaboratif dengan drag & drop, berjalan penuh di free tier Cloudflare.
 
+Kartu bisa dibuka sebagai dialog: label berwarna, checklist dengan progress bar,
+thread followup, serta jejak siapa membuat dan mengubahnya.
+
+Bisa dipasang sebagai aplikasi (PWA) dan mengirim notifikasi push ke perangkat —
+peserta sebuah kartu dikabari saat ada followup baru atau kartunya berubah,
+meski aplikasinya sedang tertutup.
+
 ## Stack
 
 | Layer | Teknologi |
@@ -11,6 +18,7 @@ Papan kanban kolaboratif dengan drag & drop, berjalan penuh di free tier Cloudfl
 | Drag & drop | Pragmatic drag-and-drop (Atlassian) |
 | Backend | Hono di Cloudflare Workers |
 | Realtime | Durable Objects + WebSocket (hibernation) |
+| Notifikasi | Web Push (VAPID + aes128gcm) langsung dari Worker |
 | Auth | Better Auth (email/password + OAuth opsional) |
 | Database | Cloudflare D1 (SQLite) + Drizzle ORM |
 | Validasi | Zod |
@@ -26,11 +34,16 @@ npm install
 cp .dev.vars.example .dev.vars
 # lalu isi BETTER_AUTH_SECRET dengan: openssl rand -base64 32
 
+# Kunci notifikasi push — salin keluarannya ke .dev.vars (opsional)
+npm run vapid:keys
+
 npx wrangler d1 migrations apply kanban-db --local
 npm run dev
 ```
 
 Login email/password langsung berfungsi tanpa konfigurasi OAuth apa pun.
+Tanpa kunci VAPID aplikasinya juga tetap jalan — sakelar notifikasinya saja yang
+tidak muncul.
 
 ## Deploy ke Cloudflare
 
@@ -47,6 +60,10 @@ npm run db:migrate:remote
 # 4. Set secret produksi
 npx wrangler secret put BETTER_AUTH_SECRET     # openssl rand -base64 32
 npx wrangler secret put BETTER_AUTH_URL        # https://<nama>.workers.dev
+
+# Notifikasi push (opsional) — sepasang kunci dari `npm run vapid:keys`
+npx wrangler secret put VAPID_PUBLIC_KEY
+npx wrangler secret put VAPID_PRIVATE_KEY
 
 # 5. Deploy
 npm run deploy
@@ -75,6 +92,7 @@ endpoint `/api/config` yang memberi tahu klien provider mana yang aktif.
 | `npm run db:generate` | Buat file migrasi dari perubahan schema |
 | `npm run db:migrate:local` | Terapkan migrasi ke DB lokal |
 | `npm run db:migrate:remote` | Terapkan migrasi ke DB produksi |
+| `npm run vapid:keys` | Buat sepasang kunci VAPID untuk notifikasi push |
 | `npm run auth:generate` | Regenerate schema Better Auth |
 | `npm run cf-typegen` | Regenerate tipe binding Cloudflare |
 
@@ -125,7 +143,20 @@ board tidak bocor ke orang luar.
 | `POST PATCH DELETE` | `/api/columns`, `/api/columns/:id` | member |
 | `POST` | `/api/columns/:id/move` | member |
 | `POST PATCH DELETE` | `/api/cards`, `/api/cards/:id` | member |
+| `GET` | `/api/cards/:id` | member (isi lengkap kartu untuk dialog) |
 | `POST` | `/api/cards/:id/move` | member |
+| `POST DELETE` | `/api/cards/:id/labels`, `/api/cards/:id/labels/:labelId` | member |
+| `POST` | `/api/cards/:id/comments` | member |
+| `PATCH` | `/api/cards/comments/:id` | penulisnya |
+| `DELETE` | `/api/cards/comments/:id` | penulisnya / admin |
+| `POST` | `/api/cards/:id/checklist` | member |
+| `PATCH DELETE` | `/api/cards/checklist/:id` | member |
+| `POST` | `/api/labels` | member |
+| `PATCH DELETE` | `/api/labels/:id` | member |
+| `GET` | `/api/push` | login (kunci publik + pilihan notifikasi) |
+| `POST` | `/api/push/subscribe`, `/api/push/unsubscribe` | login |
+| `PATCH` | `/api/push/prefs` | login |
+| `POST` | `/api/push/test` | login (notifikasi percobaan ke perangkat ini) |
 
 ### Frontend
 
@@ -134,6 +165,7 @@ board tidak bocor ke orang luar.
 #/w/:workspaceId        daftar board dalam workspace
 #/w/:workspaceId/members anggota & undangan
 #/board/:boardId        papan kanban
+#/board/:boardId/card/:cardId  papan dengan satu kartu terbuka (tujuan notifikasi)
 #/invite/:token         terima undangan
 ```
 
@@ -145,9 +177,11 @@ Kalau halaman bertambah banyak, ganti ke TanStack Router.
 ```
 src/
 ├── client/       React: komponen, hooks, api client
-├── worker/       Hono: routes, auth, ownership guard
+├── worker/       Hono: routes, auth, ownership guard, pengirim push
 ├── db/           Drizzle schema (auth-schema.ts di-generate)
-└── shared/       Tipe & helper posisi (dipakai kedua sisi)
+└── shared/       Tipe, helper posisi, kalimat lini masa (dipakai kedua sisi)
+public/           Manifest PWA, service worker, halaman offline, ikon
+scripts/          Pembuat kunci VAPID & penggambar ikon
 migrations/       SQL migrasi D1
 ```
 
@@ -178,6 +212,103 @@ optimistiknya akan ditimpa hasil tarik-ulang.
 `addEventListener`). Koneksi yang menganggur tidak menahan objek tetap hidup, jadi
 tidak menghabiskan kuota duration — ini yang membuatnya layak di free plan.
 
+**Jangan pernah memakai ulang nama file migrasi.** D1 melacak migrasi yang sudah
+diterapkan berdasarkan **nama file**, bukan isinya. Kalau `migrations/` di-regenerate
+dan menghasilkan nama yang sama dengan yang pernah diterapkan (`0000_init.sql`),
+`db:migrate:remote` akan melewatinya diam-diam — selesai tanpa error, tanpa
+melakukan apa pun. Gejalanya menyesatkan: database lokal benar, produksi masih
+memakai schema lama, dan aplikasi gagal dengan error 500 tanpa pesan.
+
+Untuk mengubah schema, selalu buat migrasi **baru** (`npm run db:generate` tanpa
+menghapus yang lama). Kalau memang perlu mereset, ledger produksi ikut harus
+direset:
+
+```bash
+# Hanya kalau database produksi belum berisi data.
+npx wrangler d1 execute kanban-db --remote --command \
+  "DROP TABLE IF EXISTS cards; DROP TABLE IF EXISTS columns; DROP TABLE IF EXISTS boards; DROP TABLE IF EXISTS d1_migrations;"
+npm run db:migrate:remote
+```
+
+**Simpan BETTER_AUTH_SECRET sebagai secret, bukan environment variable.** Keduanya
+sama-sama terbaca oleh Worker, tapi environment variable tersimpan plaintext dan
+terlihat di dashboard, di `wrangler versions view`, dan lewat API. Siapa pun yang
+bisa membacanya bisa memalsukan sesi login siapa saja. Pakai
+`npx wrangler secret put BETTER_AUTH_SECRET`.
+
+**Muka kartu digambar tanpa membuka kartunya.** `GET /api/boards/:id` sudah membawa
+label, progress checklist, jumlah followup, dan peserta setiap kartu — kalau tidak,
+papan berisi 60 kartu akan menembak 60 request tambahan hanya untuk menggambar
+progress bar. Semuanya diambil dalam empat query tetap yang menyaring lewat subquery
+`card_id IN (SELECT …)`, bukan daftar id yang dibentangkan, supaya jumlah kartu tidak
+pernah menabrak batas parameter terikat D1. Isi penuh kartu (butir checklist, isi
+followup) baru ditarik lewat `GET /api/cards/:id` saat dialognya dibuka.
+
+**Avatar pada kartu diturunkan dari aksi, bukan ditugaskan.** Tabel `card_participants`
+diisi setiap kali seseorang membuat, menyunting, memberi label, mencentang checklist,
+atau menulis followup pada kartu itu. Urutannya memakai `first_active_at` — pembuat
+kartu selalu berdiri paling depan. Menghapus followup terakhir seseorang juga
+melepasnya dari deretan avatar, kecuali ia masih tercatat sebagai pembuat atau
+penyunting terakhir.
+
+**Warna label adalah kunci simbolik, bukan hex.** Yang tersimpan di database cuma
+`"red"`, `"violet"`, dan seterusnya; peta ke warna sesungguhnya tinggal di token CSS
+(`--label-red`) yang punya nada berbeda untuk tema terang dan gelap. Menyimpan hex
+akan mengunci label ke satu tema.
+
+**Web Push dikirim langsung dari Worker, tanpa pustaka.** Dua spesifikasi yang
+dipakai — RFC 8291 (enkripsi isi dengan `aes128gcm`) dan RFC 8292 (VAPID, tanda
+tangan pengirim) — seluruhnya bisa dikerjakan WebCrypto yang sudah ada di runtime
+Workers, jadi tidak ada layanan pihak ketiga, tidak ada biaya, dan tidak ada kunci
+yang dititipkan ke siapa pun. Implementasinya di
+[src/worker/push.ts](src/worker/push.ts), ±240 baris. Hasil enkripsinya cocok
+persis dengan contoh resmi di RFC 8291 §5.
+
+Push service milik Google atau Mozilla hanya meneruskan amplop: isinya dienkripsi
+dengan kunci milik perangkat penerima, dan mereka tidak punya kuncinya.
+
+**Yang dikabari adalah peserta kartu, bukan seluruh anggota board.** Daftar
+penerimanya diambil dari `card_participants` — tabel yang sama yang menggambar
+deretan avatar di muka kartu. Jadi "anggota sebuah kartu" tidak perlu ditugaskan
+manual: siapa pun yang pernah menyentuh kartu itu ikut mendengar kabarnya. Pelakunya
+sendiri selalu dikecualikan. Kanal `newCards` adalah satu-satunya yang menyapa
+seluruh anggota workspace, dan karena itu defaultnya mati.
+
+**Bunyi notifikasi dipinjam dari lini masa kartu.** `describeActivity` di
+[src/shared/activity.ts](src/shared/activity.ts) dipakai dua sisi: klien
+menggambarnya sebagai baris riwayat, server merangkainya jadi kalimat notifikasi.
+Tanpa itu, kejadian yang sama akan diceritakan dengan dua kata kerja berbeda.
+
+**Satu tag per kartu.** Notifikasi memakai `tag: "card:<id>"`, jadi sepuluh perubahan
+beruntun pada satu kartu meninggalkan satu notifikasi di layar kunci, bukan sepuluh.
+Penggabungan ini dilakukan perangkat, gratis, dan tidak perlu state apa pun di server.
+
+**Pengiriman tidak menahan respons.** Semuanya berjalan di `waitUntil` — mencari
+penerima, mengenkripsi, menembak push service. Orang yang menulis followup tidak
+menunggu Google menjawab. Kalau kunci VAPID belum dipasang, tidak ada satu query pun
+yang jalan untuk menemukan itu.
+
+**Langganan mati dibuang saat ketahuan.** Push service menjawab 404 atau 410 untuk
+perangkat yang langganannya sudah dicabut; barisnya dihapus saat itu juga. Tidak ada
+tempat lain yang akan pernah tahu, karena perangkat yang hilang tidak mengirim kabar
+perpisahan. Service worker juga menangani `pushsubscriptionchange` — browser boleh
+mengganti endpoint kapan saja, dan tanpa itu perangkatnya diam-diam berhenti menerima
+apa pun.
+
+**Di iOS, notifikasi baru hidup setelah aplikasinya dipasang.** Safari hanya
+memberikan `PushManager` kepada web app yang sudah ditambahkan ke Layar Utama — itu
+sebabnya manifest dan ikonnya bukan pemanis. Dialog pengaturan mendeteksi kondisi ini
+dan menjelaskan langkahnya, alih-alih menyodorkan sakelar yang tidak akan berfungsi.
+
+**Service worker tidak menyimpan aset aplikasi.** Berkas hasil build punya nama
+ber-hash dan sudah dilayani Cloudflare dengan caching-nya sendiri; menyalinnya lagi ke
+Cache Storage cuma menambah satu tempat lagi yang bisa menyajikan versi basi. Yang
+dicache hanya [public/offline.html](public/offline.html).
+
+**Ikon aplikasi digambar oleh skrip.** [scripts/make-icons.mjs](scripts/make-icons.mjs)
+melukis PNG-nya langsung (rounded rect + zlib + CRC32), tanpa satu pun dependensi
+gambar, dan warnanya diambil dari token `--color-accent` yang sama dengan CSS.
+
 **Schema Better Auth di-generate, jangan diedit manual.** `src/db/auth-schema.ts` dibuat
 oleh `npm run auth:generate`. Versi CLI harus cocok dengan versi `better-auth` di
 `package.json` — CLI yang lebih tua menghasilkan schema tanpa kolom yang dibutuhkan
@@ -197,4 +328,7 @@ per-entitas atau CRDT untuk benar-benar mulus.
 **Presence per-orang.** Sekarang hanya jumlah penonton, belum menampilkan siapa saja
 yang sedang membuka board.
 
-**Lain-lain:** deskripsi & due date kartu, undo, verifikasi email.
+**Kotak notifikasi di dalam aplikasi.** Notifikasi hanya dikirim ke perangkat; tidak
+ada daftar "yang belum dibaca" yang bisa ditengok belakangan dari dalam aplikasi.
+
+**Lain-lain:** due date & penugasan kartu, lampiran, undo, verifikasi email.

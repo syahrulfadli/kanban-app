@@ -1,23 +1,888 @@
 @import "tailwindcss";
 
+/* Tema ditentukan React lewat `data-theme` di <html> (lihat hooks/useTheme).
+   Nilainya selalu sudah diresolusi jadi "light" atau "dark" — pilihan
+   "system" hanya hidup di localStorage, bukan di DOM. Dengan begitu CSS
+   cukup melihat satu atribut, tidak perlu menduplikasi setiap aturan ke
+   dalam `prefers-color-scheme`. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ══════════════════════════════════════════════════════════════════
+   Token — nilai terang. Varian gelap menimpanya di blok [data-theme]
+   di bawah; utility Tailwind ikut berubah karena semuanya membaca
+   custom property yang sama.
+   ══════════════════════════════════════════════════════════════════ */
 @theme {
-  --color-surface: oklch(0.99 0.002 260);
-  --color-surface-raised: oklch(1 0 0);
-  --color-border-subtle: oklch(0.91 0.006 260);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* Tinta */
+  --color-ink: #0B1220;
+  --color-ink-soft: #33415A;
+  --color-muted: #64748B;
+  --color-faint: #94A3B8;
+
+  /* Garis rambut — selalu translusen supaya tetap membaca sebagai kaca */
+  --color-line: rgb(15 23 42 / 0.12);
+  --color-line-soft: rgb(15 23 42 / 0.07);
+
+  /* Aksen — biru air, satu-satunya warna interaktif */
+  --color-accent: #0284C7;
+  --color-accent-ink: #0369A1;
+  --color-accent-soft: rgb(2 132 199 / 0.12);
+  --color-accent-on: #FFFFFF;
+
+  --color-danger: #DC2626;
+  --color-ok: #059669;
+  --color-warn: #B45309;
 }
 
-@media (prefers-color-scheme: dark) {
-  @theme {
-    --color-surface: oklch(0.19 0.012 260);
-    --color-surface-raised: oklch(0.24 0.014 260);
-    --color-border-subtle: oklch(0.32 0.014 260);
+:root {
+  color-scheme: light;
+
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* ── Material liquid glass ──
+     Isian adalah putih translusen, bukan abu-abu: pane menodai apa pun di
+     belakangnya, bukan menggantinya. */
+  --glass-fill: rgb(255 255 255 / 0.42);
+  --glass-fill-hi: rgb(255 255 255 / 0.62);
+  --glass-blur: 16px;
+  --glass-sat: 150%;
+
+  /* Bayangan lebar dan sangat lembut: satu lapis kontak tipis supaya pane
+     tidak melayang tanpa dasar, lalu satu lapis luas beropasitas rendah.
+     Bayangan pekat membuat pane terbaca sebagai kartu buram, bukan kaca. */
+  --glass-depth: 0 1px 2px rgb(15 23 42 / 0.03),
+                 0 12px 32px -16px rgb(15 23 42 / 0.16);
+  /* Bevel setipis mungkin — hanya sedikit cahaya di tepi atas dan cincin
+     Fresnel yang nyaris tak terlihat. Tanpa garis gelap di tepi bawah:
+     itulah yang dulu membuat pane terlihat timbul seperti tombol. */
+  --glass-inner: inset 0 1px 0 rgb(255 255 255 / 0.38),
+                 inset 0 0 0 1px rgb(255 255 255 / 0.14);
+
+  /* Cincin spekular — dibaca berkeliling: bibir yang kena cahaya, pinggiran
+     hangat lalu dingin (kaca memecah cahaya yang lewat), sisi bayangan di
+     seberang sumber, dan kilau lingkungan yang kembali memutar. Semuanya
+     ditahan rendah; yang dicari cuma isyarat tepi, bukan lis mengkilap. */
+  --rim-lit:    rgb(255 255 255 / 0.50);
+  --rim-warm:   rgb(255 206 176 / 0.20);
+  --rim-fade-a: rgb(255 255 255 / 0.08);
+  --rim-shadow: rgb(15 23 42 / 0.07);
+  --rim-fade-b: rgb(255 255 255 / 0.06);
+  --rim-cool:   rgb(176 214 255 / 0.22);
+  --rim-env:    rgb(255 255 255 / 0.28);
+
+  --sheen-near: rgb(255 255 255 / 0.28);
+  --sheen-mid:  rgb(255 255 255 / 0.07);
+
+  /* Isian pelat — permukaan di DALAM gelas (kartu, input). Tidak pernah
+     punya backdrop-filter sendiri, alasannya ada di .glass-frost. */
+  --plate-fill: rgb(255 255 255 / 0.58);
+  --plate-fill-hi: rgb(255 255 255 / 0.78);
+
+  /* Isian menu pop-up. Menu profil bersarang di dalam kapsul ber-frost,
+     dan di dalam backdrop root filter tidak menghitung apa pun — jadi
+     keterbacaannya harus datang dari isiannya sendiri. */
+  --sheet-fill: rgb(255 255 255 / 0.94);
+
+  /* Palet label. Satu token per warna, bukan kelas jadi: chip, titik pemilih
+     warna, dan garis tepi semuanya menurunkan rona dari sumber yang sama —
+     jadi warna label tidak pernah beda antara satu tempat dan tempat lain.
+     Nada terang dipilih cukup pekat untuk terbaca di atas kaca putih. */
+  --label-slate:  #64748B;
+  --label-red:    #DC2626;
+  --label-orange: #EA580C;
+  --label-amber:  #CA8A04;
+  --label-green:  #16A34A;
+  --label-teal:   #0D9488;
+  --label-sky:    #0284C7;
+  --label-violet: #7C3AED;
+  --label-pink:   #DB2777;
+
+  /* Isian dialog. Lebih pekat daripada pane biasa — dialog berdiri di atas
+     papan yang ramai, bukan di atas ladang cahaya — tapi jauh dari buram:
+     yang lewat di belakangnya harus masih terbaca sebagai bentuk, kalau
+     tidak lensa di tepinya tidak punya apa pun untuk dibengkokkan. */
+  --dialog-fill: rgb(255 255 255 / 0.64);
+
+  /* Kartu kanban justru dibuat pekat: isinya padat dan dibaca lama, dan latar
+     yang ikut bergerak di belakang teks sepanjang itu melelahkan. Pelatnya
+     sedikit lebih gelap dari kartunya — di atas permukaan pekat, isian
+     translusen tidak menghasilkan apa-apa. */
+  --card-fill: #FFFFFF;
+  --card-plate: #F1F5F9;
+  --card-plate-hi: #E6EBF2;
+
+  /* Sapuan di belakang dialog. Dulu kelam, dan itu keliru: dialognya
+     mencuplik apa yang ada di bawahnya, jadi kelam itu ikut terhisap ke
+     permukaannya sendiri dan kacanya berubah abu-abu. Sekarang menyapu ke
+     ARAH terang tema — halaman mundur selangkah tanpa ada yang meredup. */
+  --scrim: rgb(255 255 255 / 0.14);
+  /* Kartu kanban tidak mencuplik apa pun, jadi sapuan di belakangnya boleh
+     kembali meredupkan halaman — dan memang harus: permukaan pekat butuh
+     latar yang mundur, bukan latar yang ikut terang. */
+  --scrim-dim: rgb(15 23 42 / 0.16);
+
+  /* Arah cahaya — tracker menimpanya per pane; nilai default inilah yang
+     dipakai kalau tidak ada pointer (sentuh, keyboard, reduced motion). */
+  --glass-ang: 142deg;
+  --glass-hx: 50%;
+  --glass-hy: -10%;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-ink: #F3F6FC;
+  --color-ink-soft: #C7D1E2;
+  --color-muted: #93A0B8;
+  --color-faint: #6B7789;
+
+  --color-line: rgb(255 255 255 / 0.12);
+  --color-line-soft: rgb(255 255 255 / 0.07);
+
+  --color-accent: #38BDF8;
+  --color-accent-ink: #7DD3FC;
+  --color-accent-soft: rgb(56 189 248 / 0.16);
+  --color-accent-on: #04141F;
+
+  --color-danger: #F87171;
+  --color-ok: #34D399;
+  --color-warn: #FBBF24;
+
+  --glass-fill: rgb(255 255 255 / 0.05);
+  --glass-fill-hi: rgb(255 255 255 / 0.09);
+  --glass-blur: 14px;
+  --glass-sat: 130%;
+
+  --glass-depth: 0 1px 2px rgb(0 0 0 / 0.25),
+                 0 12px 32px -16px rgb(0 0 0 / 0.55);
+  --glass-inner: inset 0 1px 0 rgb(255 255 255 / 0.07),
+                 inset 0 0 0 1px rgb(255 255 255 / 0.04);
+
+  --rim-lit:    rgb(255 255 255 / 0.32);
+  --rim-warm:   rgb(255 214 198 / 0.12);
+  --rim-fade-a: rgb(255 255 255 / 0.04);
+  --rim-shadow: rgb(0 0 0 / 0.18);
+  --rim-fade-b: rgb(255 255 255 / 0.03);
+  --rim-cool:   rgb(198 224 255 / 0.11);
+  --rim-env:    rgb(255 255 255 / 0.18);
+
+  --sheen-near: rgb(255 255 255 / 0.07);
+  --sheen-mid:  rgb(255 255 255 / 0.02);
+
+  --plate-fill: rgb(255 255 255 / 0.07);
+  --plate-fill-hi: rgb(255 255 255 / 0.12);
+
+  --sheet-fill: rgb(22 25 32 / 0.95);
+
+  /* Nada label di tema gelap naik beberapa tingkat: warna pekat tenggelam di
+     latar gelap dan chip-nya berhenti terbaca sebagai warna. */
+  --label-slate:  #94A3B8;
+  --label-red:    #F87171;
+  --label-orange: #FB923C;
+  --label-amber:  #FBBF24;
+  --label-green:  #4ADE80;
+  --label-teal:   #2DD4BF;
+  --label-sky:    #38BDF8;
+  --label-violet: #A78BFA;
+  --label-pink:   #F472B6;
+
+  /* Di tema gelap isiannya condong ke warna dasar, bukan ke putih: pelat
+     keputihan akan memutihkan apa pun yang lewat di belakangnya. */
+  --dialog-fill: rgb(20 23 29 / 0.62);
+
+  --card-fill: #171A21;
+  --card-plate: rgb(255 255 255 / 0.06);
+  --card-plate-hi: rgb(255 255 255 / 0.11);
+
+  --scrim: rgb(8 9 12 / 0.30);
+  --scrim-dim: rgb(4 5 7 / 0.44);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Dasar
+   ══════════════════════════════════════════════════════════════════ */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Ladang cahaya di belakang semua kaca. Tanpa ini pane tidak punya apa pun
+   untuk dinodai dan efeknya runtuh jadi kotak abu-abu. `fixed` supaya papan
+   yang digeser horizontal tidak menyeret latarnya ikut bergerak. */
+body {
+  background-color: #E6ECF5;
+  background-image:
+    radial-gradient(58% 44% at 14% 8%,  rgb(125 211 252 / 0.42), transparent 70%),
+    radial-gradient(52% 38% at 86% 20%, rgb(196 181 253 / 0.36), transparent 70%),
+    radial-gradient(64% 46% at 42% 86%, rgb(153 246 228 / 0.34), transparent 72%),
+    radial-gradient(48% 40% at 94% 92%, rgb(254 205 211 / 0.32), transparent 72%);
+  background-attachment: fixed;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+[data-theme="dark"] body {
+  background-color: #08090C;
+  background-image:
+    radial-gradient(58% 44% at 14% 8%,  rgb(126 148 255 / 0.10), transparent 70%),
+    radial-gradient(52% 38% at 86% 20%, rgb(168 124 255 / 0.09), transparent 70%),
+    radial-gradient(64% 46% at 42% 86%, rgb(104 206 194 / 0.08), transparent 72%),
+    radial-gradient(48% 40% at 94% 92%, rgb(255 168 186 / 0.06), transparent 72%);
+}
+
+::selection {
+  background-color: var(--color-accent);
+  color: var(--color-accent-on);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Scrollbar tipis — batang tebal memotong ilusi kaca */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--color-muted) 45%, transparent) transparent;
+}
+
+@layer components {
+  /* ══════════════════════════════════════════════════════════════
+     Liquid glass
+     ══════════════════════════════════════════════════════════════ */
+
+  /* Pane. Semua yang statis tinggal di sini — isian, kedalaman, blur —
+     supaya lapisan ini tetap ter-cache. Tidak ada properti yang mengikuti
+     kursor boleh dipasang di sini: mengubahnya akan membatalkan
+     backdrop-filter tiap frame. Bagian yang bergerak hidup di pseudo-element,
+     yang di-composite sendiri. */
+  .glass {
+    position: relative;
+    isolation: isolate;
+    background-color: var(--glass-fill);
+    border: 0;
+    box-shadow: var(--glass-depth), var(--glass-inner);
+  }
+
+  /* --glass-ang menunjuk MENJAUH dari kursor, karena stop 0% sebuah gradient
+     berada di ujung berlawanan arahnya — jadi 0% mendarat di sisi terang. */
+  .glass::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      var(--glass-ang, 142deg),
+      var(--rim-lit)     0%,
+      var(--rim-warm)   13%,
+      var(--rim-fade-a) 30%,
+      var(--rim-shadow) 52%,
+      var(--rim-fade-b) 70%,
+      var(--rim-cool)   87%,
+      var(--rim-env)   100%
+    );
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /* Kilau yang dilempar cahaya ke permukaan. Lapisannya sendiri di z-index -1
+     supaya duduk di atas isian pane tapi di bawah konten, dan supaya
+     menggesernya hanya melukis ulang gradient ini, bukan seluruh pane. */
+  .glass::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: radial-gradient(
+      140% 110% at var(--glass-hx, 50%) var(--glass-hy, -10%),
+      var(--sheen-near),
+      var(--sheen-mid) 38%,
+      transparent 66%
+    );
+    pointer-events: none;
+  }
+
+  /* Frost sungguhan. Hanya untuk pane TERLUAR.
+
+     backdrop-filter membuat elemen jadi backdrop root untuk seluruh
+     subtree-nya, dan backdrop-filter milik keturunannya cuma bisa mencuplik
+     apa yang dilukis di dalam root itu — praktisnya kosong. Jadi kaca yang
+     bersarang di dalam pane ber-filter akan tampil sebagai bentuk transparan
+     biasa. Karena itu isi gelas (kartu, input, tombol) memakai .glass-plate:
+     isian translusen + cincin, tanpa filter sendiri. */
+  .glass-frost {
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  }
+
+  /* Lensa tepi — kaca yang MEMBENGKOKKAN apa yang lewat di bawah bibirnya,
+     bukan sekadar mengaburkannya: sebuah kartu yang melintas di tepi dialog
+     tampak melengkung dan pecah warnanya, persis seperti tepi kaca sungguhan.
+     Petanya ada di index.html (#glassLens).
+
+     Deklarasi polos ditulis lebih dulu dengan sengaja: mesin yang tidak
+     mengerti bentuk url() di backdrop-filter membuang baris kedua dan tetap
+     mendapat frost, bukan kehilangan materialnya sama sekali.
+
+     Blur-nya kecil. Frost dan refraksi saling meniadakan — blur merata-ratakan
+     justru detail yang sedang dibengkokkan lensa — jadi yang tersisa hanya
+     secukupnya untuk melembutkan jahitan di tepi pane. Hanya dialog yang
+     memakainya: filter ini jauh lebih mahal daripada blur, dan cuma ada
+     gunanya di atas isi halaman yang tajam. */
+  .glass-lens {
+    backdrop-filter: blur(5px) saturate(140%);
+  }
+
+  /* Aturan terpisah, dan sengaja lebih spesifik: ditulis sebagai dua
+     deklarasi di dalam satu blok, minifier akan membuang yang pertama —
+     dan cadangannya ikut hilang. */
+  .glass.glass-lens {
+    backdrop-filter: url(#glassLens) blur(5px) saturate(140%);
+  }
+
+  /* Permukaan di dalam gelas: benda yang mengambang, bukan jendela.
+     Bayangannya jauh lebih ringan dari pane — kartu melayang beberapa
+     milimeter di atas dasar gelas, bukan di atas meja. */
+  .glass-plate {
+    background-color: var(--plate-fill);
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04),
+                0 6px 14px -12px rgb(15 23 42 / 0.22),
+                var(--glass-inner);
+  }
+  [data-theme="dark"] .glass-plate {
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.18),
+                0 8px 18px -14px rgb(0 0 0 / 0.45),
+                var(--glass-inner);
+  }
+
+  /* Pane kecil (pil, sakelar) — cincin dan bevel tetap, kedalaman dikurangi. */
+  .glass-quiet {
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04), var(--glass-inner);
+  }
+  [data-theme="dark"] .glass-quiet {
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.22), var(--glass-inner);
+  }
+
+  /* Lembar pop-up (menu profil). Nyaris pekat, dengan bayangan sedikit lebih
+     tegas dari pane biasa supaya jelas mengambang di atas segalanya. */
+  .sheet {
+    background-color: var(--sheet-fill);
+    box-shadow: 0 2px 6px rgb(15 23 42 / 0.06),
+                0 18px 40px -18px rgb(15 23 42 / 0.35),
+                inset 0 0 0 1px var(--color-line-soft);
+  }
+  [data-theme="dark"] .sheet {
+    box-shadow: 0 2px 6px rgb(0 0 0 / 0.35),
+                0 18px 40px -18px rgb(0 0 0 / 0.75),
+                inset 0 0 0 1px var(--color-line-soft);
+  }
+
+  /* Kenop sakelar tema. Butuh isian sendiri, bukan .glass-plate: dengan bevel
+     setipis sekarang, pelat biasa hilang di dalam kapsul dan pilihan yang
+     sedang aktif jadi tidak terbaca. */
+  .switch-knob {
+    background-color: var(--plate-fill-hi);
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.10),
+                inset 0 0 0 1px var(--color-line-soft);
+  }
+  [data-theme="dark"] .switch-knob {
+    background-color: rgb(255 255 255 / 0.14);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.35),
+                inset 0 0 0 1px rgb(255 255 255 / 0.08);
+  }
+
+  /* Avatar — inisial di atas keping beraksen. */
+  .avatar {
+    display: grid;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 9999px;
+    background-color: var(--color-accent-soft);
+    color: var(--color-accent-ink);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-accent) 25%, transparent);
+  }
+  .glass-plate-hover:hover {
+    background-color: var(--plate-fill-hi);
+  }
+
+  /* ── Kolom kanban ────────────────────────────────────────────────
+     Radius seragam di keempat sisi: kolom adalah pane yang sama dengan
+     pane lain di halaman ini, cuma lebih tinggi. */
+  .glass-column {
+    border-radius: 1rem;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     Kontrol
+     ══════════════════════════════════════════════════════════════ */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    border-radius: 9999px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1;
+    padding: 0.5rem 0.875rem;
+    white-space: nowrap;
+    transition: background-color .2s ease, color .2s ease,
+                box-shadow .25s ease, transform .2s var(--ease-spring);
+  }
+
+  .btn-primary {
+    background-color: var(--color-accent);
+    color: var(--color-accent-on);
+    box-shadow: 0 1px 0 rgb(255 255 255 / 0.25) inset,
+                0 8px 20px -10px color-mix(in oklab, var(--color-accent) 70%, transparent);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background-color: color-mix(in oklab, var(--color-accent) 88%, var(--color-ink));
+    transform: translateY(-1px);
+  }
+  .btn-primary:disabled { opacity: 0.5; }
+
+  /* Aksi merusak. Warnanya diambil dari --color-danger, dan tulisannya dari
+     --color-accent-on — satu-satunya pasangan yang tetap terbaca di kedua
+     tema, karena merah gelap di terang berganti merah muda di gelap. */
+  .btn-danger {
+    background-color: var(--color-danger);
+    color: var(--color-accent-on);
+    box-shadow: 0 1px 0 rgb(255 255 255 / 0.25) inset,
+                0 8px 20px -10px color-mix(in oklab, var(--color-danger) 70%, transparent);
+  }
+  .btn-danger:hover {
+    background-color: color-mix(in oklab, var(--color-danger) 88%, var(--color-ink));
+    transform: translateY(-1px);
+  }
+
+  /* Tombol kaca — pelat, bukan jendela: lihat catatan di .glass-frost. */
+  .btn-glass {
+    color: var(--color-ink);
+    background-color: var(--plate-fill);
+  }
+  .btn-glass:hover { background-color: var(--plate-fill-hi); transform: translateY(-1px); }
+
+  .btn-ghost { color: var(--color-muted); }
+  .btn-ghost:hover {
+    color: var(--color-ink);
+    background-color: var(--color-line-soft);
+  }
+
+  /* Input. Cekung, bukan cembung: cincin dalamnya gelap di atas supaya
+     terbaca sebagai lubang di permukaan kaca. */
+  .field {
+    width: 100%;
+    border-radius: 0.625rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    color: var(--color-ink);
+    background-color: var(--plate-fill);
+    box-shadow: inset 0 1px 2px rgb(15 23 42 / 0.10),
+                inset 0 0 0 1px var(--color-line);
+    outline: none;
+    transition: box-shadow .2s ease, background-color .2s ease;
+  }
+  [data-theme="dark"] .field {
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.35),
+                inset 0 0 0 1px var(--color-line);
+  }
+  .field::placeholder { color: var(--color-faint); }
+  .field:focus {
+    background-color: var(--plate-fill-hi);
+    box-shadow: inset 0 1px 2px rgb(15 23 42 / 0.08),
+                inset 0 0 0 1px var(--color-accent),
+                0 0 0 3px var(--color-accent-soft);
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 9999px;
+    padding: 0.1875rem 0.625rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: var(--color-ink-soft);
+    background-color: var(--plate-fill);
+    box-shadow: inset 0 0 0 1px var(--color-line-soft);
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     Label
+     ══════════════════════════════════════════════════════════════ */
+
+  /* Semua rona diturunkan dari satu --label yang dipasang inline, jadi chip,
+     titik pemilih, dan pratinjau tidak pernah berbeda warna. Isiannya sengaja
+     tipis: label adalah kaca yang diberi warna, bukan stiker yang ditempel. */
+  .label-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125rem;
+    /* Boleh menyusut: tanpa ini flex item menolak turun di bawah lebar
+       isinya dan nama label yang panjang menonjol keluar dari kartu alih-alih
+       terpotong ellipsis. */
+    min-width: 0;
+    max-width: 100%;
+    border-radius: 9999px;
+    padding: 0.125rem 0.5rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1.4;
+    color: color-mix(in oklab, var(--label) 78%, var(--color-ink));
+    background-color: color-mix(in oklab, var(--label) 16%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--label) 34%, transparent);
+  }
+  [data-theme="dark"] .label-chip {
+    color: color-mix(in oklab, var(--label) 82%, var(--color-ink));
+    background-color: color-mix(in oklab, var(--label) 20%, transparent);
+  }
+
+  /* Titik warna di pemilih label. */
+  .label-dot {
+    display: block;
+    border-radius: 9999px;
+    background-color: var(--label);
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.12);
+  }
+
+  /* Warna yang sedang dipilih. Cincinnya sewarna titik itu sendiri, dipisah
+     celah selebar latar sheet — cincin rapat sewarna hanya akan membuat
+     titiknya tampak lebih besar, bukan tampak terpilih. */
+  .label-dot[data-selected="true"] {
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.12),
+                0 0 0 2px var(--sheet-fill),
+                0 0 0 3.5px var(--label);
+  }
+
+  /* Versi ringkas untuk muka kartu: hanya sepotong warna, tanpa teks —
+     dipakai saat labelnya banyak dan judul harus tetap jadi yang terbaca. */
+  .label-bar {
+    height: 0.375rem;
+    min-width: 1.75rem;
+    flex: 1 1 0;
+    max-width: 2.75rem;
+    border-radius: 9999px;
+    background-color: color-mix(in oklab, var(--label) 72%, transparent);
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     Progress checklist
+     ══════════════════════════════════════════════════════════════ */
+
+  /* Alur cekung di permukaan pelat, dengan batang yang naik di atasnya.
+     Sudah terbaca di muka kartu, jauh sebelum kartunya dibuka. */
+  .progress {
+    position: relative;
+    height: 0.3125rem;
+    border-radius: 9999px;
+    overflow: hidden;
+    background-color: color-mix(in oklab, var(--color-ink) 9%, transparent);
+    box-shadow: inset 0 1px 1px rgb(15 23 42 / 0.08);
+  }
+  [data-theme="dark"] .progress {
+    background-color: rgb(255 255 255 / 0.09);
+    box-shadow: inset 0 1px 1px rgb(0 0 0 / 0.35);
+  }
+  .progress-bar {
+    height: 100%;
+    border-radius: 9999px;
+    background-color: var(--color-accent);
+    transition: width .3s var(--ease-spring), background-color .3s ease;
+  }
+  /* Selesai penuh berganti warna ke hijau: kartu yang tuntas harus bisa
+     dikenali dari seberang papan tanpa membaca angkanya. */
+  .progress-bar[data-complete="true"] {
+    background-color: var(--color-ok);
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     Avatar
+     ══════════════════════════════════════════════════════════════ */
+
+  /* Tumpukan avatar. Saling menindih sedikit — deretan orang, bukan daftar. */
+  .avatar-stack > * + * {
+    margin-inline-start: -0.375rem;
+  }
+  .avatar-stack > * {
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-accent) 25%, transparent),
+                0 0 0 1.5px var(--plate-fill-hi);
+  }
+
+  .avatar-sm {
+    width: 1.25rem;
+    height: 1.25rem;
+    font-size: 0.5625rem;
+  }
+  .avatar-lg {
+    width: 2.25rem;
+    height: 2.25rem;
+    font-size: 0.8125rem;
+  }
+  /* Foto profil menggantikan inisial; objek-cover supaya tidak gepeng. */
+  .avatar > img {
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    object-fit: cover;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     Dialog kartu
+     ══════════════════════════════════════════════════════════════ */
+
+  /* Sapuan di belakang dialog, sekaligus sasaran klik untuk menutupnya.
+     Elemen tersendiri, bukan latar pembungkusnya: dialog harus jadi saudara,
+     bukan anak — kalau tidak, lensanya mati. Tidak diberi backdrop-filter
+     sendiri: mengaburkan halaman di sini akan menghapus justru detail tajam
+     yang dibengkokkan tepi dialog. */
+  .scrim {
+    position: absolute;
+    inset: 0;
+    background-color: var(--scrim);
+    animation: scrim-in .18s ease both;
+  }
+
+  .scrim-dim {
+    background-color: var(--scrim-dim);
+  }
+
+  .card-dialog {
+    border-radius: 1.25rem;
+    background-color: var(--dialog-fill);
+    animation: dialog-in .24s var(--ease-spring) both;
+  }
+
+  /* Kartu kanban — satu-satunya permukaan besar di aplikasi ini yang bukan
+     kaca. Bukan karena materialnya gagal, tapi karena tugasnya beda: dialog
+     konfirmasi dibaca sekilas lalu ditutup, kartu kanban ditunggui. Yang
+     menggantikan lensa adalah bayangan yang lebih dalam — pemisahannya dari
+     papan sekarang datang dari ketinggian, bukan dari refraksi. */
+  .card-plain {
+    border-radius: 1.25rem;
+    background-color: var(--card-fill);
+    box-shadow: 0 2px 6px rgb(15 23 42 / 0.06),
+                0 28px 60px -28px rgb(15 23 42 / 0.45),
+                inset 0 0 0 1px var(--color-line-soft);
+    animation: dialog-in .24s var(--ease-spring) both;
+  }
+  [data-theme="dark"] .card-plain {
+    box-shadow: 0 2px 6px rgb(0 0 0 / 0.40),
+                0 28px 60px -28px rgb(0 0 0 / 0.85),
+                inset 0 0 0 1px var(--color-line-soft);
+  }
+
+  /* Di dalamnya, pelat kaca kehilangan pijakan: putih translusen di atas
+     putih pekat tidak meninggalkan bentuk apa pun. Jadi tombol dan isian di
+     sini memakai isian sendiri, dengan cincin sebagai tepinya. */
+  .card-plain .btn-glass,
+  .card-plain .field,
+  .card-plain .chip,
+  .card-plain .checkbox:not(:checked) {
+    background-color: var(--card-plate);
+  }
+  .card-plain .btn-glass {
+    box-shadow: inset 0 0 0 1px var(--color-line);
+  }
+  .card-plain .btn-glass:hover,
+  .card-plain .field:focus {
+    background-color: var(--card-plate-hi);
+  }
+
+  /* Kotak centang. Dilukis sendiri, bukan appearance bawaan: kotak bawaan
+     sistem adalah satu-satunya benda pekat di halaman yang serba kaca. */
+  .checkbox {
+    appearance: none;
+    flex-shrink: 0;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 0.3125rem;
+    background-color: var(--plate-fill);
+    box-shadow: inset 0 0 0 1px var(--color-line);
+    transition: background-color .18s ease, box-shadow .18s ease;
+  }
+  .checkbox:hover {
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-accent) 60%, transparent);
+  }
+  .checkbox:checked {
+    background-color: var(--color-accent);
+    box-shadow: inset 0 0 0 1px var(--color-accent);
+    /* Centang sebagai mask, bukan karakter teks — ukurannya tidak ikut
+       berubah oleh pengaturan font pengguna. */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-6'/%3E%3C/svg%3E");
+    background-size: 100%;
+  }
+  [data-theme="dark"] .checkbox:checked {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2304141F' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-6'/%3E%3C/svg%3E");
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     Lini masa followup
+     ══════════════════════════════════════════════════════════════ */
+
+  /* Satu garis tegak menyambung semua baris. Digambar per-baris, bukan sekali
+     di sepanjang daftar: hanya dengan begitu ujung atas dan ujung bawahnya
+     bisa berhenti tepat di titik tengah avatar pertama dan terakhir, alih-alih
+     menjulur ke ruang kosong.
+
+     Karena itu pula jarak antarbaris dibuat dari padding, bukan gap — gap
+     akan memutus garisnya di setiap sela. */
+  .timeline-item {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1.75rem 1fr;
+    column-gap: 0.625rem;
+    padding-bottom: 0.875rem;
+  }
+  .timeline-item::before {
+    content: '';
+    position: absolute;
+    left: 0.875rem;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background-color: var(--color-line);
+  }
+  .timeline-item:first-child::before { top: 0.875rem; }
+  .timeline-item:last-child::before  { bottom: auto; height: 0.875rem; }
+  /* Baris tunggal: tidak ada apa pun untuk disambung. */
+  .timeline-item:first-child:last-child::before { content: none; }
+  /* Avatar duduk di atas garis, menutupinya — bukan ditembus. */
+  .timeline-item > * { position: relative; }
+
+  /* Baris catatan perubahan: lebih rapat daripada followup yang ditulis
+     orang, supaya deretan panjang jejak tidak menenggelamkan percakapannya. */
+  .timeline-item-note {
+    padding-bottom: 0.5rem;
+  }
+
+  /* Pengganti avatar untuk pelaku yang sudah tidak ada di tim. */
+  .timeline-dot {
+    justify-self: center;
+    width: 0.4375rem;
+    height: 0.4375rem;
+    border-radius: 9999px;
+    background-color: var(--color-line);
+  }
+
+  /* Sasaran klik yang direntangkan menutupi pelat induknya. Dipakai judul
+     kartu: tombolnya tetap satu elemen yang bisa difokus dan punya nama
+     aksesibel, tapi seluruh muka kartu ikut bisa diklik — tanpa membungkus
+     tombol hapus ke dalam elemen yang berperan tombol juga. */
+  .stretch::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     Toast urung
+     ══════════════════════════════════════════════════════════════ */
+
+  /* Pelat mengambang berumur pendek. `overflow: hidden` supaya bilah
+     countdown-nya ikut terpotong lengkung sudut. */
+  .toast {
+    position: relative;
+    border-radius: 1rem;
+    overflow: hidden;
+    animation: toast-in .24s var(--ease-spring) both;
+  }
+
+  /* Alur setipis rambut di bibir bawah toast — ada supaya batang di atasnya
+     terbaca sebagai sisa waktu, bukan sebagai garis yang panjangnya acak. */
+  .toast-countdown {
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    height: 2px;
+    background-color: color-mix(in oklab, var(--color-ink) 8%, transparent);
+  }
+
+  /* Sisa waktu, bukan hiasan: menyusut dari penuh ke habis persis selama
+     jendela urung. scaleX, bukan width — animasinya di-composite, tidak
+     memicu layout tiap frame di atas pane ber-backdrop-filter. */
+  .toast-countdown > span {
+    display: block;
+    height: 100%;
+    transform-origin: left center;
+    background-color: color-mix(in oklab, var(--color-accent) 70%, transparent);
+    animation: undo-countdown var(--undo-ms, 6000ms) linear both;
+  }
+
+  /* Judul bagian di dalam dialog. */
+  .section-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-faint);
   }
 }
 
-html {
-  color-scheme: light dark;
+@keyframes scrim-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
-body {
-  @apply bg-surface text-slate-900 antialiased dark:text-slate-100;
+@keyframes dialog-in {
+  from { opacity: 0; transform: translateY(0.75rem) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(0.5rem) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes undo-countdown {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Batang countdown sengaja tidak ikut dimatikan: ia bukan hiasan, melainkan
+     satu-satunya penunjuk sisa waktu sebelum penghapusan dikirim. */
+  .scrim, .card-dialog, .toast { animation: none; }
+  .progress-bar { transition: none; }
+}
+
+/* Penanda sisi drop. Bukan garis rata: menyala di tengah lalu memudar ke
+   ujung, supaya terbaca sebagai berkas cahaya di antara dua pane kaca. */
+@layer components {
+  .drop-edge {
+    position: absolute;
+    border-radius: 9999px;
+    box-shadow: 0 0 8px 1px color-mix(in oklab, var(--color-accent) 55%, transparent);
+    pointer-events: none;
+  }
+  .drop-edge-x {
+    inset-inline: 0;
+    height: 2px;
+    background: linear-gradient(to right, transparent, var(--color-accent) 18%,
+                                var(--color-accent) 82%, transparent);
+  }
+  .drop-edge-y {
+    inset-block: 0;
+    width: 2px;
+    background: linear-gradient(to bottom, transparent, var(--color-accent) 18%,
+                                var(--color-accent) 82%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn:hover { transform: none; }
 }

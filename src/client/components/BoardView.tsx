@@ -1,9 +1,12 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { monitorForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { extractClosestEdge } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
+import { CardModal } from "./CardModal";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { ColumnView } from "./ColumnView";
 import { AddItemForm } from "./AddItemForm";
 import { useBoard } from "../hooks/useBoard";
+import { useSession } from "../lib/auth-client";
 import { navigate, paths } from "../lib/route";
 import { cn } from "../lib/cn";
 import type { ChannelStatus } from "../lib/realtime";
@@ -20,13 +23,13 @@ function LiveIndicator({ status, viewers }: { status: ChannelStatus; viewers: nu
         : "Terputus — mencoba lagi";
 
   return (
-    <span className="flex shrink-0 items-center gap-1.5 text-xs text-slate-500" title={label}>
+    <span className="chip shrink-0" title={label}>
       <span
         className={cn(
-          "size-2 rounded-full",
-          status === "live" && "bg-green-500",
-          status === "connecting" && "bg-amber-500",
-          status === "offline" && "bg-red-500",
+          "size-1.5 rounded-full",
+          status === "live" && "bg-ok",
+          status === "connecting" && "animate-pulse bg-warn",
+          status === "offline" && "bg-danger",
         )}
       />
       <span className="hidden sm:inline">{label}</span>
@@ -34,8 +37,67 @@ function LiveIndicator({ status, viewers }: { status: ChannelStatus; viewers: nu
   );
 }
 
-export function BoardView({ boardId }: { boardId: string }) {
-  const { board, loading, error, actions, live } = useBoard(boardId);
+/** Apa yang sedang ditanyakan dialog penegasan — sekaligus isi kalimatnya. */
+type Pending =
+  | { kind: "column"; id: string; title: string; cards: number }
+  | { kind: "card"; id: string; title: string };
+
+interface BoardProps {
+  boardId: string;
+  /** Kartu yang disebut alamat — begitulah notifikasi yang diketuk mendarat. */
+  openCardId?: string;
+}
+
+export function BoardView({ boardId, openCardId: linkedCardId }: BoardProps) {
+  const { board, loading, error, refresh, actions, live } = useBoard(boardId);
+  const { data: session } = useSession();
+  const [openCardId, setOpenCardId] = useState<string | null>(linkedCardId ?? null);
+
+  /* Notifikasi yang diketuk selagi aplikasinya sudah terbuka cuma mengubah
+     alamat — papannya tidak dimuat ulang, jadi dialognya dibuka dari sini. */
+  useEffect(() => {
+    if (linkedCardId) setOpenCardId(linkedCardId);
+  }, [linkedCardId]);
+
+  /* Menutup dialog juga meninggalkan alamat kartunya: kalau tidak, memuat
+     ulang halaman akan membukanya lagi. */
+  const closeCard = () => {
+    setOpenCardId(null);
+    if (linkedCardId) navigate(paths.board(boardId));
+  };
+
+  /* Satu dialog untuk seluruh papan, bukan satu per kartu: yang bisa ditanya
+     hanya satu pada satu waktu. */
+  const [pending, setPending] = useState<Pending | null>(null);
+
+  const askDeleteCard = (cardId: string) => {
+    const card = board?.columns.flatMap((col) => col.cards).find((c) => c.id === cardId);
+    if (card) setPending({ kind: "card", id: card.id, title: card.title });
+  };
+
+  const confirmDelete = () => {
+    if (!pending) return;
+    if (pending.kind === "card") actions.deleteCard(pending.id);
+    else actions.deleteColumn(pending.id);
+    setPending(null);
+  };
+
+  // Kartu yang sedang dibuka dicari ulang dari board setiap render: kalau
+  // kolaborator lain menghapusnya, dialognya ikut tertutup dengan sendirinya.
+  const open = useMemo(() => {
+    if (!openCardId || !board) return null;
+
+    for (const column of board.columns) {
+      if (column.cards.some((card) => card.id === openCardId)) {
+        return { cardId: openCardId, columnTitle: column.title };
+      }
+    }
+    return null;
+  }, [board, openCardId]);
+
+  useEffect(() => {
+    if (openCardId && board && !open) setOpenCardId(null);
+  }, [board, open, openCardId]);
 
   // Monitor DnD didaftarkan sekali; state terbaru dibaca lewat ref agar
   // listener tidak perlu dipasang ulang setiap render.
@@ -99,54 +161,75 @@ export function BoardView({ boardId }: { boardId: string }) {
   }, []);
 
   if (loading) {
-    return <p className="p-8 text-sm text-slate-500">Memuat board…</p>;
+    return (
+      <div className="flex flex-1 items-center justify-center p-8">
+        <p className="flex items-center gap-2 text-sm text-muted">
+          <span className="size-2 animate-pulse rounded-full bg-accent" />
+          Memuat board…
+        </p>
+      </div>
+    );
   }
 
   if (!board) {
     return (
-      <div className="p-8">
-        <p className="text-sm text-red-500">{error ?? "Board tidak ditemukan."}</p>
-        <button
-          onClick={() => navigate(paths.workspaces)}
-          className="mt-3 text-sm text-blue-600 hover:underline"
-        >
-          ← Kembali ke daftar workspace
-        </button>
+      <div className="flex flex-1 items-center justify-center p-8">
+        <div className="glass glass-frost rounded-2xl p-6 text-center">
+          <p className="text-sm text-danger">{error ?? "Board tidak ditemukan."}</p>
+          <button
+            onClick={() => navigate(paths.workspaces)}
+            className="btn btn-glass mt-4"
+          >
+            ← Kembali ke daftar workspace
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-dvh flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <AppHeader>
-        <span className="text-slate-400">/</span>
+        <span className="text-faint">/</span>
         <button
           onClick={() => navigate(paths.workspace(board.workspaceId))}
-          className="text-sm text-slate-500 hover:underline"
+          className="text-sm text-muted hover:text-ink"
         >
           Board
         </button>
-        <span className="text-slate-400">/</span>
+        <span className="text-faint">/</span>
         <h1 className="min-w-0 truncate text-sm font-medium">{board.title}</h1>
 
         <LiveIndicator status={live.status} viewers={live.viewers} />
-        {error && <span className="text-xs text-red-500">{error}</span>}
+        {error && <span className="text-xs text-danger">{error}</span>}
       </AppHeader>
 
-      <main className="flex flex-1 items-start gap-4 overflow-x-auto p-4">
+      {/* items-start: kolom setinggi isinya. Merentangkannya dulu punya alasan —
+          cairan di dasar gelas harus berdiri di dasar papan — dan alasan itu
+          sudah hilang bersama efeknya. `max-h-full` di kolom yang menahan
+          kolom panjang supaya menggulir di dalam dirinya sendiri. */}
+      <main className="flex flex-1 items-start gap-4 overflow-x-auto px-5 pt-1 pb-20">
         {board.columns.map((column) => (
           <ColumnView
             key={column.id}
             column={column}
             onAddCard={(title) => actions.addCard(column.id, title)}
             onRenameColumn={(title) => actions.renameColumn(column.id, title)}
-            onDeleteColumn={() => actions.deleteColumn(column.id)}
-            onRenameCard={actions.renameCard}
-            onDeleteCard={actions.deleteCard}
+            onDeleteColumn={() =>
+              setPending({
+                kind: "column",
+                id: column.id,
+                title: column.title,
+                cards: column.cards.length,
+              })
+            }
+            onOpenCard={setOpenCardId}
+            onDeleteCard={askDeleteCard}
           />
         ))}
 
-        <div className="w-72 shrink-0">
+        {/* Gelas kosong: hanya garis, menunggu diisi. */}
+        <div className="glass-column h-fit w-72 shrink-0 border border-dashed border-line p-2">
           <AddItemForm
             placeholder="Nama kolom…"
             submitLabel="+ Tambah kolom"
@@ -154,6 +237,40 @@ export function BoardView({ boardId }: { boardId: string }) {
           />
         </div>
       </main>
+
+      {pending && (
+        <ConfirmDialog
+          title={pending.kind === "card" ? "Hapus kartu?" : "Hapus kolom?"}
+          body={
+            pending.kind === "card" ? (
+              <>
+                “{pending.title}” akan dihapus bersama checklist, label, dan followup-nya.
+              </>
+            ) : (
+              <>
+                “{pending.title}” akan dihapus
+                {pending.cards > 0 && <> bersama {pending.cards} kartu di dalamnya</>}. Kolom yang
+                terhapus tidak bisa dipulihkan setelah jendela urung tutup.
+              </>
+            )
+          }
+          confirmLabel={pending.kind === "card" ? "Hapus kartu" : "Hapus kolom"}
+          onConfirm={confirmDelete}
+          onCancel={() => setPending(null)}
+        />
+      )}
+
+      {open && session && (
+        <CardModal
+          key={open.cardId}
+          cardId={open.cardId}
+          boardLabels={board.labels}
+          columnTitle={open.columnTitle}
+          currentUser={{ ...session.user, image: session.user.image ?? null }}
+          onClose={closeCard}
+          onBoardChange={() => void refresh()}
+        />
+      )}
     </div>
   );
 }
