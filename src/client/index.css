@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@theme {
+  --color-surface: oklch(0.99 0.002 260);
+  --color-surface-raised: oklch(1 0 0);
+  --color-border-subtle: oklch(0.91 0.006 260);
+}
+
+@media (prefers-color-scheme: dark) {
+  @theme {
+    --color-surface: oklch(0.19 0.012 260);
+    --color-surface-raised: oklch(0.24 0.014 260);
+    --color-border-subtle: oklch(0.32 0.014 260);
+  }
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  @apply bg-surface text-slate-900 antialiased dark:text-slate-100;
+}

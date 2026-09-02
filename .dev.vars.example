@@ -1,0 +1,11 @@
+# Salin file ini menjadi .dev.vars untuk pengembangan lokal.
+# Buat secret acak dengan: openssl rand -base64 32
+BETTER_AUTH_SECRET="ganti-dengan-secret-acak"
+BETTER_AUTH_URL="http://localhost:5173"
+
+# Opsional — kosongkan kalau belum mendaftarkan OAuth app.
+# Login email/password tetap berfungsi tanpa ini.
+GITHUB_CLIENT_ID=""
+GITHUB_CLIENT_SECRET=""
+GOOGLE_CLIENT_ID=""
+GOOGLE_CLIENT_SECRET=""

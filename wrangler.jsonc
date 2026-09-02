@@ -1,0 +1,35 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kanban-app",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-08-31",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    // Vite plugin yang mengatur direktori build; SPA fallback ke index.html
+    "not_found_handling": "single-page-application"
+  },
+  "observability": {
+    "enabled": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "kanban-db",
+      // ID di bawah dipakai database LOKAL. Untuk produksi, jalankan
+      // `npx wrangler d1 create kanban-db` lalu ganti dengan ID yang muncul.
+      "database_id": "8501918d-4f06-46cc-8f9c-b9a1f38f73a5",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "BOARD_ROOM", "class_name": "BoardRoom" }]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      // new_sqlite_classes (bukan new_classes) — versi SQLite-backed inilah
+      // yang tersedia di Workers free plan.
+      "new_sqlite_classes": ["BoardRoom"]
+    }
+  ]
+}
