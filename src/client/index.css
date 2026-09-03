@@ -123,6 +123,23 @@
      latar yang mundur, bukan latar yang ikut terang. */
   --scrim-dim: rgb(15 23 42 / 0.16);
 
+  /* Avatar tanpa foto. Rona-nya datang dari inisial (lihat lib/people), dan
+     hanya sudutnya yang berubah — terang dan kroma dikunci di sini supaya
+     dua belas warna itu terbaca sebagai satu keluarga, bukan dua belas
+     warna yang kebetulan bertetangga. Pasangan L dan C ditulis sebagai satu
+     token karena keduanya masuk ke oklch() bersama-sama.
+
+     Kroma-nya rendah dengan sengaja: yang dicari isyarat identitas, bukan
+     kepingan warna yang berteriak di sebelah nama orang. */
+  --avatar-fill: 0.885 0.068;
+  --avatar-ink: 0.40 0.105;
+
+  /* Kerangka muat. Isiannya menggelapkan latar, bukan memutihkannya: di atas
+     ladang cahaya, blok putih justru hilang dan kerangkanya berhenti terbaca
+     sebagai tempat yang sedang menunggu isi. Sapuannya yang terang. */
+  --skeleton-fill: rgb(15 23 42 / 0.07);
+  --skeleton-sheen: rgb(255 255 255 / 0.45);
+
   /* Arah cahaya — tracker menimpanya per pane; nilai default inilah yang
      dipakai kalau tidak ada pointer (sentuh, keyboard, reduced motion). */
   --glass-ang: 142deg;
@@ -198,6 +215,16 @@
 
   --scrim: rgb(8 9 12 / 0.30);
   --scrim-dim: rgb(4 5 7 / 0.44);
+
+  /* Isian avatar turun ke nada dalam dan inisialnya yang terang — kebalikan
+     tema terang, dengan arah kontras yang sama. */
+  --avatar-fill: 0.42 0.078;
+  --avatar-ink: 0.94 0.035;
+
+  /* Di tema gelap arahnya berbalik: isian yang menerangkan, dan sapuan yang
+     nyaris tak terlihat — sapuan seterang tema terang akan berkedip. */
+  --skeleton-fill: rgb(255 255 255 / 0.07);
+  --skeleton-sheen: rgb(255 255 255 / 0.06);
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -398,8 +425,17 @@ body {
                 inset 0 0 0 1px rgb(255 255 255 / 0.08);
   }
 
-  /* Avatar — inisial di atas keping beraksen. */
+  /* Avatar — inisial di atas keping beraksen. Ini bentuk netralnya: dipakai
+     foto profil (yang menutupinya), keping "+n" di tumpukan, dan pengganti
+     pelaku yang sudah keluar dari tim. Orang yang belum memasang foto
+     mendapat .avatar-tinted di atasnya.
+
+     Cincinnya lewat custom property, bukan langsung di box-shadow: tumpukan
+     avatar menimpa box-shadow untuk menambahkan garis pemisahnya, dan tanpa
+     variabel warna cincin di sana akan kembali ke aksen — di atas isian
+     berwarna, itu jadi lingkaran biru yang tidak berhubungan dengan apa pun. */
   .avatar {
+    --avatar-ring: color-mix(in oklab, var(--color-accent) 25%, transparent);
     display: grid;
     place-items: center;
     width: 1.75rem;
@@ -410,7 +446,21 @@ body {
     font-size: 0.6875rem;
     font-weight: 700;
     letter-spacing: 0.02em;
-    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-accent) 25%, transparent);
+    box-shadow: inset 0 0 0 1px var(--avatar-ring);
+  }
+
+  /* Isian pekat, bukan translusen: inisial harus terbaca di atas apa pun yang
+     kebetulan lewat di belakangnya — kartu putih, kolom kaca, atau lembar
+     menu — dan warna yang ikut berubah menurut latarnya berhenti berfungsi
+     sebagai penanda orang.
+
+     --avatar-hue dipasang React dari inisialnya; nilai cadangan di sini
+     dipakai kalau kelasnya terpasang tanpa rona, supaya tidak pernah ada
+     avatar tanpa warna. */
+  .avatar-tinted {
+    --avatar-ring: oklch(var(--avatar-ink) var(--avatar-hue, 250) / 0.16);
+    background-color: oklch(var(--avatar-fill) var(--avatar-hue, 250));
+    color: oklch(var(--avatar-ink) var(--avatar-hue, 250));
   }
   .glass-plate-hover:hover {
     background-color: var(--plate-fill-hi);
@@ -616,7 +666,10 @@ body {
     margin-inline-start: -0.375rem;
   }
   .avatar-stack > * {
-    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-accent) 25%, transparent),
+    /* Nilai cadangan bukan basa-basi: kerangka muat memakai tumpukan yang
+       sama tanpa .avatar, dan var() yang tidak terdefinisi akan membatalkan
+       seluruh box-shadow — termasuk garis pemisah putihnya. */
+    box-shadow: inset 0 0 0 1px var(--avatar-ring, transparent),
                 0 0 0 1.5px var(--plate-fill-hi);
   }
 
@@ -820,6 +873,69 @@ body {
     animation: undo-countdown var(--undo-ms, 6000ms) linear both;
   }
 
+  /* ══════════════════════════════════════════════════════════════
+     Kredit pembuat
+     ══════════════════════════════════════════════════════════════ */
+
+  /* Satu baris kecil di dasar layar. Tanpa isian saat diam — ia bagian dari
+     halaman, bukan benda lain yang mengambang di atasnya — dan baru
+     mengambil bentuk pil samar saat disentuh kursor. */
+  .credit {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.6875rem;
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    line-height: 1;
+    color: var(--color-muted);
+    background-color: transparent;
+    transition: color .25s ease, background-color .25s ease;
+  }
+  .credit:hover {
+    color: var(--color-ink-soft);
+    background-color: var(--color-line-soft);
+  }
+
+  /* Orbit atom baru berputar kalau diajak — pelan, satu putaran sembilan
+     detik. Gerak abadi di sudut layar cuma menarik mata yang sedang bekerja
+     di tempat lain. */
+  .credit-mark {
+    transition: transform .5s var(--ease-spring);
+  }
+  .credit:hover .credit-mark {
+    animation: credit-orbit 9s linear infinite;
+  }
+
+  /* Nama pembuatnya. Garis bawahnya bukan garis penuh: ia menyala dari
+     tengah ke kedua ujung lalu memudar, seperti berkas cahaya di penanda
+     drop — isyarat yang sama dipakai dua kali. */
+  .credit-name {
+    position: relative;
+    font-weight: 600;
+    color: var(--color-ink);
+    transition: color .25s ease;
+  }
+  .credit-name::after {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    bottom: -2px;
+    height: 1px;
+    border-radius: 9999px;
+    background: linear-gradient(to right, transparent, var(--color-accent), transparent);
+    transform: scaleX(0);
+    opacity: 0;
+    transition: transform .35s var(--ease-spring), opacity .25s ease;
+  }
+  .credit:hover .credit-name {
+    color: var(--color-accent-ink);
+  }
+  .credit:hover .credit-name::after {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+
   /* Judul bagian di dalam dialog. */
   .section-label {
     display: flex;
@@ -848,6 +964,10 @@ body {
   to   { opacity: 1; transform: none; }
 }
 
+@keyframes credit-orbit {
+  to { transform: rotate(360deg); }
+}
+
 @keyframes undo-countdown {
   from { transform: scaleX(1); }
   to   { transform: scaleX(0); }
@@ -857,6 +977,7 @@ body {
   /* Batang countdown sengaja tidak ikut dimatikan: ia bukan hiasan, melainkan
      satu-satunya penunjuk sisa waktu sebelum penghapusan dikirim. */
   .scrim, .card-dialog, .toast { animation: none; }
+  .credit:hover .credit-mark { animation: none; }
   .progress-bar { transition: none; }
 }
 
@@ -885,4 +1006,70 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .btn:hover { transform: none; }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Kerangka muat
+
+   Bentuk dulu, isi kemudian: selama data belum datang, halaman sudah
+   berdiri dengan tata letak yang sama persis dengan versi terisinya —
+   jadi saat isinya mendarat tidak ada yang melompat. Karena itu setiap
+   kerangka ditulis mengikuti ukuran aslinya (tinggi baris, radius, jarak),
+   bukan sebagai kotak abu-abu seadanya.
+
+   Satu sapuan cahaya berjalan melintasi blok. Durasinya sama di semua
+   blok dan semuanya dimulai bersamaan, jadi halaman terbaca sebagai satu
+   permukaan yang sedang disinari, bukan sekumpulan kotak yang berkedip
+   sendiri-sendiri.
+   ══════════════════════════════════════════════════════════════════ */
+@layer components {
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    border-radius: 0.5rem;
+    background-color: var(--skeleton-fill);
+  }
+
+  /* Sapuannya selebar bloknya sendiri dan berangkat dari luar tepi kiri,
+     jadi cahayanya benar-benar melintas alih-alih menyala di tempat. */
+  .skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--skeleton-sheen) 50%,
+      transparent
+    );
+    transform: translateX(-100%);
+    animation: skeleton-sweep 1.7s ease-in-out infinite;
+  }
+
+  /* Blok yang seharusnya bundar (avatar, titik, pil). */
+  .skeleton-round { border-radius: 9999px; }
+
+  /* Baris teks. Tingginya sengaja lebih pendek dari baris aslinya dan
+     dijaga di tengah lewat margin: huruf tidak mengisi seluruh tinggi
+     barisnya, dan blok setinggi penuh akan terbaca lebih berat dari teks
+     yang menggantikannya. Jumlah tinggi + margin justru dibuat pas 1.25rem,
+     setinggi satu baris text-sm — itu yang menjaga tata letaknya tidak
+     bergeser saat teks aslinya datang. Baris di ukuran lain menimpanya
+     dengan utility margin biasa. */
+  .skeleton-line {
+    height: 0.5rem;
+    border-radius: 9999px;
+    margin-block: 0.375rem;
+  }
+}
+
+@keyframes skeleton-sweep {
+  to { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Isian blok sudah cukup menyampaikan "belum ada isinya"; sapuannya
+     hiasan, dan hiasan yang bergerak terus-menerus justru yang paling
+     mengganggu di sini. */
+  .skeleton::after { display: none; }
 }

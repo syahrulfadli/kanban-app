@@ -3,6 +3,7 @@ import { api } from "../lib/api";
 import { AppHeader } from "./AppHeader";
 import { navigate, paths } from "../lib/route";
 import { useSession } from "../lib/auth-client";
+import { MembersSkeleton, SkeletonLine } from "./Skeleton";
 import type { Invitation, MemberSummary, Role, WorkspaceSummary } from "../../shared/types";
 
 const ROLE_LABEL: Record<Role, string> = {
@@ -14,7 +15,10 @@ const ROLE_LABEL: Record<Role, string> = {
 export function MembersPage({ workspaceId }: { workspaceId: string }) {
   const { data: session } = useSession();
   const [workspace, setWorkspace] = useState<WorkspaceSummary | null>(null);
-  const [members, setMembers] = useState<MemberSummary[]>([]);
+  /* `null` selama daftarnya belum datang. Dengan senarai kosong sebagai nilai
+     awal, halaman yang sedang memuat tidak bisa dibedakan dari workspace yang
+     benar-benar tidak beranggota. */
+  const [members, setMembers] = useState<MemberSummary[] | null>(null);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("member");
@@ -81,7 +85,7 @@ export function MembersPage({ workspaceId }: { workspaceId: string }) {
           onClick={() => navigate(paths.workspace(workspaceId))}
           className="truncate text-sm font-medium hover:underline"
         >
-          {workspace?.name ?? "…"}
+          {workspace ? workspace.name : <SkeletonLine className="w-24" />}
         </button>
       </AppHeader>
 
@@ -89,8 +93,14 @@ export function MembersPage({ workspaceId }: { workspaceId: string }) {
         <h1 className="text-2xl font-semibold tracking-tight">Anggota</h1>
         {error && <p className="mt-3 text-sm text-danger">{error}</p>}
 
-        <ul className="mt-6 flex flex-col gap-2">
-          {members.map((member) => {
+        {!members && !error && (
+          <div className="mt-6">
+            <MembersSkeleton />
+          </div>
+        )}
+
+        <ul className="mt-6 flex flex-col gap-2 empty:mt-0">
+          {members?.map((member) => {
             const isSelf = member.userId === session?.user.id;
 
             return (

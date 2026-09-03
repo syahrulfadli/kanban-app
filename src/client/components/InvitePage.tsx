@@ -3,6 +3,7 @@ import { api } from "../lib/api";
 import { AuthPage } from "./AuthPage";
 import { navigate, paths } from "../lib/route";
 import { useSession } from "../lib/auth-client";
+import { InviteSkeleton } from "./Skeleton";
 import type { InvitePreview } from "../../shared/types";
 
 const ROLE_LABEL = {
@@ -26,7 +27,7 @@ export function InvitePage({ token }: { token: string }) {
       );
   }, [token]);
 
-  if (isPending) return <p className="p-8 text-sm text-muted">Memuat…</p>;
+  if (isPending) return <InviteSkeleton />;
 
   if (error) {
     return (
@@ -42,7 +43,7 @@ export function InvitePage({ token }: { token: string }) {
     );
   }
 
-  if (!preview) return <p className="p-8 text-sm text-muted">Memuat undangan…</p>;
+  if (!preview) return <InviteSkeleton />;
 
   // Belum login: tampilkan konteks undangan dulu, baru form auth.
   if (!session) {

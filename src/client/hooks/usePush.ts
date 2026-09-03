@@ -5,7 +5,6 @@ import {
   detectSupport,
   disablePush,
   enablePush,
-  syncSubscription,
   type PushSupport,
 } from "../lib/push";
 import { DEFAULT_NOTIFICATION_SETTINGS, type NotificationSettings } from "../../shared/types";
@@ -48,13 +47,9 @@ export function usePush() {
         if (!alive.current) return;
         setPublicKey(settings.publicKey);
         setPrefs(settings.prefs);
+        // Pendaftaran ulang diam-diam bukan tugas hook ini: ProfileMenu
+        // melakukannya sekali tiap aplikasi dibuka, di semua halaman.
         setEnabled(subscription !== null);
-
-        /* Perangkat yang sudah berlangganan mendaftar ulang diam-diam: baris
-           di server bisa saja hilang — database dibangun ulang, atau langganan
-           lama sempat dianggap mati — sedangkan perangkatnya tidak tahu apa-apa
-           dan tidak akan pernah bertanya sendiri. */
-        if (subscription) await syncSubscription(subscription);
       } catch (e) {
         if (alive.current) setError(e instanceof Error ? e.message : "Gagal memuat pengaturan");
       } finally {

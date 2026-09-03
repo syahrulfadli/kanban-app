@@ -265,6 +265,59 @@ export const cardActivities = sqliteTable(
 );
 
 /**
+ * Kabar apa yang sedang diceritakan sebuah notifikasi. Nilainya sama dengan
+ * nama kanal di pengaturan, karena keduanya memang bicara soal yang sama.
+ */
+export const NOTIFICATION_KINDS = ["comments", "changes", "newCards"] as const;
+export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
+
+/**
+ * Kotak masuk notifikasi — satu baris per orang per kejadian.
+ *
+ * Isinya sengaja didenormalisasi (judul dan kalimatnya disalin, bukan dirujuk):
+ * riwayat harus tetap terbaca setelah kartunya diganti nama atau dihapus, dan
+ * baris ini justru sering dibaca ketika yang diceritakannya sudah tidak ada.
+ *
+ * Berbeda dengan push ke perangkat, tidak ada penyaringan preferensi di sini:
+ * kotak masuk adalah riwayat lengkap, dan yang mengatur keramaiannya adalah
+ * penyaring workspace/board di tampilannya.
+ */
+export const notifications = sqliteTable(
+  "notifications",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /* Konteks untuk penyaring. Ikut terhapus bersama workspace atau boardnya —
+       kabar tentang papan yang sudah tidak ada tidak berguna bagi siapa pun. */
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    boardId: text("board_id")
+      .notNull()
+      .references(() => boards.id, { onDelete: "cascade" }),
+    /* Tanpa foreign key, justru disengaja: kabar "kartu ini dihapus" harus
+       selamat dari kartunya sendiri. Tautannya boleh berujung ke papan saja. */
+    cardId: text("card_id"),
+    kind: text("kind", { enum: NOTIFICATION_KINDS }).notNull(),
+    actorId: text("actor_id").references(() => user.id, { onDelete: "set null" }),
+    /** Judul kartu (atau nama papan untuk kartu baru), disalin saat kejadian. */
+    title: text("title").notNull(),
+    /** Kalimatnya: "Rina menambahkan label “Mendesak”". */
+    body: text("body").notNull(),
+    readAt: integer("read_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [
+    index("notifications_user_idx").on(t.userId, t.createdAt),
+    /* Penghitung lencana menanyakan "berapa yang belum dibaca" di setiap
+       tarikan; tanpa indeks ini ia memindai seluruh riwayat orang itu. */
+    index("notifications_unread_idx").on(t.userId, t.readAt),
+  ],
+);
+
+/**
  * Satu baris per perangkat yang mengizinkan notifikasi — bukan per user:
  * orang yang sama boleh memasang aplikasinya di ponsel dan laptop, dan
  * masing-masing punya kunci enkripsinya sendiri.
@@ -313,6 +366,30 @@ export const notificationPrefs = sqliteTable("notification_prefs", {
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });
 
+/**
+ * Foto profil. Disimpan sebagai baris database, bukan berkas di object
+ * storage: batasan aplikasi ini nol biaya, dan D1 sudah ada di sini.
+ *
+ * Yang masuk ke `user.image` hanya URL ke `/api/avatars/:userId` — bukan data
+ * URL. Kalau isi berkasnya ikut ke sana, ia akan terbawa di setiap sesi dan di
+ * setiap peserta kartu yang dikirim board, dan payload papan membengkak
+ * berkali-kali lipat hanya untuk gambar yang sama.
+ *
+ * `version` berganti tiap unggahan dan ikut sebagai query di URL, jadi foto
+ * baru langsung tampak walau responsnya di-cache selamanya.
+ */
+export const userAvatars = sqliteTable("user_avatars", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  /** Tipe berkasnya — dipakai apa adanya sebagai Content-Type. */
+  mime: text("mime").notNull(),
+  /** Isi berkas dalam base64; klien sudah memangkasnya jadi persegi kecil. */
+  data: text("data").notNull(),
+  version: text("version").notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});
+
 export type Workspace = typeof workspaces.$inferSelect;
 export type WorkspaceMember = typeof workspaceMembers.$inferSelect;
 export type Invitation = typeof invitations.$inferSelect;
@@ -324,5 +401,7 @@ export type CardComment = typeof cardComments.$inferSelect;
 export type ChecklistItem = typeof checklistItems.$inferSelect;
 export type CardParticipant = typeof cardParticipants.$inferSelect;
 export type CardActivity = typeof cardActivities.$inferSelect;
+export type NotificationRow = typeof notifications.$inferSelect;
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
 export type NotificationPrefs = typeof notificationPrefs.$inferSelect;
+export type UserAvatar = typeof userAvatars.$inferSelect;

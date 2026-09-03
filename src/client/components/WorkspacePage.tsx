@@ -6,6 +6,7 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { useUndo } from "./UndoToasts";
 import { insertAt } from "../lib/reorder";
 import { navigate, paths } from "../lib/route";
+import { ListSkeleton, SkeletonLine } from "./Skeleton";
 import type { Board, WorkspaceSummary } from "../../shared/types";
 
 export function WorkspacePage({ workspaceId }: { workspaceId: string }) {
@@ -50,7 +51,11 @@ export function WorkspacePage({ workspaceId }: { workspaceId: string }) {
     <>
       <AppHeader>
         <span className="text-faint">/</span>
-        <span className="truncate text-sm font-medium">{workspace?.name ?? "…"}</span>
+        {workspace ? (
+          <span className="truncate text-sm font-medium">{workspace.name}</span>
+        ) : (
+          <SkeletonLine className="w-24" />
+        )}
       </AppHeader>
 
       <div className="mx-auto w-full max-w-2xl px-5 pb-6">
@@ -66,7 +71,13 @@ export function WorkspacePage({ workspaceId }: { workspaceId: string }) {
 
         {error && <p className="mt-4 text-sm text-danger">{error}</p>}
 
-        <ul className="mt-6 flex flex-col gap-2">
+        {!boards && !error && (
+          <div className="mt-6">
+            <ListSkeleton label="Memuat daftar board…" />
+          </div>
+        )}
+
+        <ul className="mt-6 flex flex-col gap-2 empty:mt-0">
           {boards?.map((board) => (
             <li
               key={board.id}

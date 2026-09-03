@@ -1,9 +1,11 @@
-import { and, eq, inArray, isNull, ne, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, lt, ne, or } from "drizzle-orm";
 import type { Context } from "hono";
+import { nanoid } from "nanoid";
 import {
   boards,
   cardParticipants,
   notificationPrefs,
+  notifications,
   pushSubscriptions,
   workspaceMembers,
   type Db,
@@ -40,6 +42,13 @@ export interface PushPayload {
 const TITLE_MAX = 80;
 const BODY_MAX = 200;
 
+/**
+ * Umur riwayat kotak masuk. Notifikasi adalah ketukan di bahu, bukan arsip:
+ * yang berumur lebih dari ini tidak pernah dibuka lagi, dan lini masa kartu
+ * tetap menyimpan kejadiannya untuk selamanya.
+ */
+const RETENTION_DAYS = 60;
+
 export function clip(text: string, max = BODY_MAX): string {
   const flat = text.replace(/\s+/g, " ").trim();
   return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
@@ -58,6 +67,89 @@ function allows(channel: NotifyChannel) {
   if (channel === "newCards") return eq(column, true);
 
   return or(isNull(notificationPrefs.userId), eq(column, true));
+}
+
+/** Satu kabar, lengkap dengan konteks yang dibutuhkan penyaring kotak masuk. */
+interface Announcement {
+  userIds: string[];
+  channel: NotifyChannel;
+  workspaceId: string;
+  boardId: string;
+  cardId: string;
+  /** Judul kartu — atau nama papan, untuk kabar kartu baru. */
+  title: string;
+  body: string;
+}
+
+/**
+ * Tulis kabar ini ke kotak masuk penerimanya.
+ *
+ * Tidak ada penyaringan preferensi di sini, berbeda dengan `deliver`: kotak
+ * masuk adalah riwayat lengkap, sedangkan preferensi mengatur perangkat mana
+ * yang ikut bergetar. Mematikan sebuah kanal menenangkan ponsel, bukan
+ * menghapus kabarnya dari halaman.
+ */
+async function record(
+  db: Db,
+  announcement: Announcement,
+  actorId: string,
+  title: string,
+  body: string,
+): Promise<void> {
+  const now = new Date();
+
+  await db.insert(notifications).values(
+    announcement.userIds.map((userId) => ({
+      id: nanoid(),
+      userId,
+      workspaceId: announcement.workspaceId,
+      boardId: announcement.boardId,
+      cardId: announcement.cardId,
+      kind: announcement.channel,
+      actorId,
+      title,
+      body,
+      createdAt: now,
+    })),
+  );
+
+  /* Riwayat lama dibuang sekalian di sini. Satu DELETE per kejadian — bukan
+     per penerima — dan indeks (user_id, created_at) yang mengerjakannya; itu
+     lebih murah daripada menyiapkan tugas berkala yang harus dijadwalkan
+     sendiri di plan gratis. */
+  await db
+    .delete(notifications)
+    .where(
+      and(
+        inArray(notifications.userId, announcement.userIds),
+        lt(notifications.createdAt, new Date(now.getTime() - RETENTION_DAYS * 86_400_000)),
+      ),
+    );
+}
+
+/**
+ * Catat kabar ini di kotak masuk, lalu ketuk perangkat yang mau diketuk.
+ *
+ * Urutannya penting: notifikasi harus sudah ada di halaman sebelum ponselnya
+ * berbunyi, supaya orang yang membuka aplikasi dari notifikasi tidak menemukan
+ * kotak masuk yang masih kosong.
+ */
+async function announce(c: Context<AppEnv>, announcement: Announcement): Promise<void> {
+  if (announcement.userIds.length === 0) return;
+
+  const title = clip(announcement.title, TITLE_MAX);
+  const body = clip(announcement.body);
+
+  await record(c.get("db"), announcement, c.get("user").id, title, body);
+
+  await deliver(c, announcement.userIds, announcement.channel, {
+    title,
+    body,
+    // Satu tag per kartu: sepuluh perubahan beruntun meninggalkan satu
+    // notifikasi di layar kunci, bukan sepuluh.
+    tag: `card:${announcement.cardId}`,
+    url: `/#/board/${announcement.boardId}/card/${announcement.cardId}`,
+  });
 }
 
 /**
@@ -108,11 +200,30 @@ async function deliver(
   }
 }
 
-/** Peserta kartu selain pelakunya — mereka inilah "anggota" sebuah kartu. */
-async function cardWatchers(db: Db, cardId: string, actorId: string): Promise<string[]> {
+/**
+ * Peserta kartu selain pelakunya — mereka inilah "anggota" sebuah kartu.
+ *
+ * Keanggotaan workspace ikut diperiksa: jejak seseorang di `card_participants`
+ * tidak ikut terhapus saat ia dikeluarkan dari tim, dan tanpa penjagaan ini ia
+ * akan terus menerima kabar tentang papan yang sudah tidak boleh ia buka.
+ */
+async function cardWatchers(
+  db: Db,
+  cardId: string,
+  boardId: string,
+  actorId: string,
+): Promise<string[]> {
   const rows = await db
     .select({ userId: cardParticipants.userId })
     .from(cardParticipants)
+    .innerJoin(boards, eq(boards.id, boardId))
+    .innerJoin(
+      workspaceMembers,
+      and(
+        eq(workspaceMembers.workspaceId, boards.workspaceId),
+        eq(workspaceMembers.userId, cardParticipants.userId),
+      ),
+    )
     .where(and(eq(cardParticipants.cardId, cardId), ne(cardParticipants.userId, actorId)))
     .all();
 
@@ -125,13 +236,32 @@ async function cardWatchers(db: Db, cardId: string, actorId: string): Promise<st
  */
 async function boardAudience(db: Db, boardId: string, actorId: string) {
   const rows = await db
-    .select({ userId: workspaceMembers.userId, boardTitle: boards.title })
+    .select({
+      userId: workspaceMembers.userId,
+      workspaceId: boards.workspaceId,
+      boardTitle: boards.title,
+    })
     .from(workspaceMembers)
     .innerJoin(boards, eq(boards.workspaceId, workspaceMembers.workspaceId))
     .where(and(eq(boards.id, boardId), ne(workspaceMembers.userId, actorId)))
     .all();
 
-  return { boardTitle: rows[0]?.boardTitle ?? "Papan", userIds: rows.map((row) => row.userId) };
+  return {
+    workspaceId: rows[0]?.workspaceId ?? null,
+    boardTitle: rows[0]?.boardTitle ?? "Papan",
+    userIds: rows.map((row) => row.userId),
+  };
+}
+
+/** Workspace pemilik sebuah board — konteks yang dipakai penyaring kotak masuk. */
+async function boardWorkspace(db: Db, boardId: string): Promise<string | null> {
+  const row = await db
+    .select({ workspaceId: boards.workspaceId })
+    .from(boards)
+    .where(eq(boards.id, boardId))
+    .get();
+
+  return row?.workspaceId ?? null;
 }
 
 interface CardNews {
@@ -158,24 +288,28 @@ export function notifyCard(
   channel: "comments" | "changes",
   news: CardNews,
 ): void {
-  // Tanpa kunci VAPID tidak ada notifikasi sama sekali; tidak perlu ada satu
-  // query pun yang jalan untuk menemukan itu.
-  if (!c.env.VAPID_PUBLIC_KEY) return;
-
   const db = c.get("db");
   const actorId = c.get("user").id;
 
   c.executionCtx.waitUntil(
     (async () => {
-      const watchers = news.watchers ?? (await cardWatchers(db, news.cardId, actorId));
+      const [watchers, workspaceId] = await Promise.all([
+        news.watchers ?? cardWatchers(db, news.cardId, news.boardId, actorId),
+        boardWorkspace(db, news.boardId),
+      ]);
 
-      await deliver(c, watchers, channel, {
-        title: clip(news.cardTitle, TITLE_MAX),
-        body: clip(news.body),
-        // Satu tag per kartu: sepuluh perubahan beruntun meninggalkan satu
-        // notifikasi di layar kunci, bukan sepuluh.
-        tag: `card:${news.cardId}`,
-        url: `/#/board/${news.boardId}/card/${news.cardId}`,
+      // Boardnya keburu hilang di antara aksi dan kabarnya — tidak ada lagi
+      // konteks yang bisa ditulis, dan tidak ada lagi yang perlu dikabari.
+      if (!workspaceId) return;
+
+      await announce(c, {
+        userIds: watchers,
+        channel,
+        workspaceId,
+        boardId: news.boardId,
+        cardId: news.cardId,
+        title: news.cardTitle,
+        body: news.body,
       });
     })(),
   );
@@ -207,8 +341,6 @@ export function notifyCardActivity(
   c: Context<AppEnv>,
   news: Omit<CardNews, "body"> & { notes?: ActivityNote | ActivityNote[] },
 ): void {
-  if (!c.env.VAPID_PUBLIC_KEY) return;
-
   const body = sentence(c.get("user").name, news.notes ? [news.notes].flat() : []);
   if (!body) return;
 
@@ -220,20 +352,22 @@ export function notifyNewCard(
   c: Context<AppEnv>,
   news: { boardId: string; cardId: string; cardTitle: string },
 ): void {
-  if (!c.env.VAPID_PUBLIC_KEY) return;
-
   const db = c.get("db");
   const actor = c.get("user");
 
   c.executionCtx.waitUntil(
     (async () => {
-      const { boardTitle, userIds } = await boardAudience(db, news.boardId, actor.id);
+      const { workspaceId, boardTitle, userIds } = await boardAudience(db, news.boardId, actor.id);
+      if (!workspaceId) return;
 
-      await deliver(c, userIds, "newCards", {
-        title: clip(boardTitle, TITLE_MAX),
-        body: clip(`${actor.name} menambahkan kartu “${news.cardTitle}”`),
-        tag: `card:${news.cardId}`,
-        url: `/#/board/${news.boardId}/card/${news.cardId}`,
+      await announce(c, {
+        userIds,
+        channel: "newCards",
+        workspaceId,
+        boardId: news.boardId,
+        cardId: news.cardId,
+        title: boardTitle,
+        body: `${actor.name} menambahkan kartu “${news.cardTitle}”`,
       });
     })(),
   );
@@ -243,7 +377,7 @@ export function notifyNewCard(
 export function watchersBeforeDelete(
   c: Context<AppEnv>,
   cardId: string,
-): Promise<string[]> | undefined {
-  if (!c.env.VAPID_PUBLIC_KEY) return undefined;
-  return cardWatchers(c.get("db"), cardId, c.get("user").id);
+  boardId: string,
+): Promise<string[]> {
+  return cardWatchers(c.get("db"), cardId, boardId, c.get("user").id);
 }

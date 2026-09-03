@@ -1,5 +1,5 @@
 import { cn } from "../lib/cn";
-import { initials } from "../lib/people";
+import { avatarTint, initials } from "../lib/people";
 import type { UserBrief } from "../../shared/types";
 
 type Size = "sm" | "md" | "lg";
@@ -18,13 +18,20 @@ interface AvatarProps {
 }
 
 export function Avatar({ person, size = "md", className, title }: AvatarProps) {
+  /* Rona hanya dipasang kalau inisialnya yang terlihat. Foto menutupi seluruh
+     keping, jadi mewarnai bawahnya cuma menaruh warna di tempat yang tidak
+     pernah terlihat — kecuali sepersekian detik sebelum gambarnya mendarat,
+     dan kedipan warna di situ justru mengganggu. */
+  const photo = person.image;
+
   return (
     <span
-      className={cn("avatar shrink-0 overflow-hidden", SIZE[size], className)}
+      className={cn("avatar shrink-0 overflow-hidden", !photo && "avatar-tinted", SIZE[size], className)}
+      style={photo ? undefined : avatarTint(person.name, person.email)}
       title={title ?? `${person.name} · ${person.email}`}
     >
-      {person.image ? (
-        <img src={person.image} alt="" loading="lazy" />
+      {photo ? (
+        <img src={photo} alt="" loading="lazy" />
       ) : (
         initials(person.name, person.email)
       )}

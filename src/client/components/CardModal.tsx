@@ -3,6 +3,7 @@ import { CardChecklist } from "./CardChecklist";
 import { CardFollowup } from "./CardFollowup";
 import { CardLabels } from "./CardLabels";
 import { AvatarStack } from "./Avatar";
+import { CardDetailSkeleton, SkeletonLine } from "./Skeleton";
 import { api } from "../lib/api";
 import { optimisticActivity, type ActivityNote } from "../lib/activity";
 import { formatDateTime, formatRelative } from "../lib/format";
@@ -21,6 +22,8 @@ interface Props {
   boardLabels: Label[];
   columnTitle: string;
   currentUser: UserBrief;
+  /** Alamat kartu ini — yang sama dengan yang sedang dipakai bilah alamat. */
+  shareUrl: string;
   onClose: () => void;
   /** Muat ulang board, supaya muka kartu di papan ikut berubah. */
   onBoardChange: () => void;
@@ -43,6 +46,7 @@ export function CardModal({
   boardLabels,
   columnTitle,
   currentUser,
+  shareUrl,
   onClose,
   onBoardChange,
 }: Props) {
@@ -50,7 +54,26 @@ export function CardModal({
   const [error, setError] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingDescription, setEditingDescription] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
+
+  /* Menyalin alamat kartu. Kartunya sudah punya alamat sendiri sejak dibuka,
+     jadi tombol ini cuma memindahkannya ke clipboard — tidak ada tautan
+     khusus yang dibuat, yang dibagikan persis yang terbaca di bilah alamat. */
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setLinkCopied(true);
+    } catch {
+      setError("Tautan gagal disalin — salin saja dari bilah alamat");
+    }
+  };
+
+  useEffect(() => {
+    if (!linkCopied) return;
+    const t = setTimeout(() => setLinkCopied(false), 1800);
+    return () => clearTimeout(t);
+  }, [linkCopied]);
 
   const load = useCallback(async () => {
     try {
@@ -335,10 +358,29 @@ export function CardModal({
                 title="Klik untuk mengubah judul"
                 className="cursor-text text-base leading-snug font-semibold wrap-break-word whitespace-pre-wrap"
               >
-                {detail?.title ?? "Memuat…"}
+                {detail?.title ?? <SkeletonLine className="my-2 w-56" />}
               </h2>
             )}
           </div>
+
+          <button
+            type="button"
+            onClick={() => void copyLink()}
+            aria-label="Salin tautan kartu"
+            title={linkCopied ? "Tautan disalin" : "Salin tautan kartu"}
+            className="grid size-8 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-line-soft hover:text-ink"
+          >
+            {linkCopied ? (
+              <svg viewBox="0 0 24 24" className="size-4 text-ok" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="m5 12.5 4.5 4.5L19 7.5" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M10 13.5a4 4 0 0 0 5.7.4l3-3a4 4 0 0 0-5.7-5.7l-1.6 1.6" />
+                <path d="M14 10.5a4 4 0 0 0-5.7-.4l-3 3a4 4 0 0 0 5.7 5.7l1.6-1.6" />
+              </svg>
+            )}
+          </button>
 
           <button
             type="button"
@@ -359,10 +401,7 @@ export function CardModal({
         )}
 
         {!detail ? (
-          <p className="flex items-center gap-2 px-5 pb-6 text-sm text-muted">
-            <span className="size-2 animate-pulse rounded-full bg-accent" />
-            Memuat kartu…
-          </p>
+          <CardDetailSkeleton />
         ) : (
           <>
             {/* Dua pilar. Isi kartu di kiri, lini masanya di kanan — masing-masing

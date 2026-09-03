@@ -11,6 +11,7 @@ import { navigate, paths } from "../lib/route";
 import { cn } from "../lib/cn";
 import type { ChannelStatus } from "../lib/realtime";
 import { AppHeader } from "./AppHeader";
+import { BoardSkeleton } from "./Skeleton";
 
 function LiveIndicator({ status, viewers }: { status: ChannelStatus; viewers: number }) {
   const label =
@@ -44,27 +45,43 @@ type Pending =
 
 interface BoardProps {
   boardId: string;
-  /** Kartu yang disebut alamat — begitulah notifikasi yang diketuk mendarat. */
+  /** Kartu yang disebut alamat — dialog yang terbuka selalu berasal dari sini. */
   openCardId?: string;
 }
 
-export function BoardView({ boardId, openCardId: linkedCardId }: BoardProps) {
+export function BoardView({ boardId, openCardId }: BoardProps) {
   const { board, loading, error, refresh, actions, live } = useBoard(boardId);
   const { data: session } = useSession();
-  const [openCardId, setOpenCardId] = useState<string | null>(linkedCardId ?? null);
 
-  /* Notifikasi yang diketuk selagi aplikasinya sudah terbuka cuma mengubah
-     alamat — papannya tidak dimuat ulang, jadi dialognya dibuka dari sini. */
-  useEffect(() => {
-    if (linkedCardId) setOpenCardId(linkedCardId);
-  }, [linkedCardId]);
+  /* Kartu yang terbuka tinggal di alamat, bukan di state: satu-satunya cara
+     membuka dialog adalah pindah ke alamat kartunya. Harganya satu langkah
+     riwayat per kartu — dan itu justru yang diinginkan, karena alamatnya jadi
+     bisa disalin, dibagikan, dan ditutup dengan tombol kembali.
 
-  /* Menutup dialog juga meninggalkan alamat kartunya: kalau tidak, memuat
-     ulang halaman akan membukanya lagi. */
-  const closeCard = () => {
-    setOpenCardId(null);
-    if (linkedCardId) navigate(paths.board(boardId));
+     Langkah yang dibuat sendiri itu dimakan kembali saat dialognya ditutup;
+     kalau alamat kartunya datang dari luar — tautan yang dibagikan, notifikasi
+     yang diketuk — tidak ada langkah yang boleh dimakan, jadi alamat papan
+     menggantikannya di tempat. */
+  const pushedCardId = useRef<string | null>(null);
+
+  const openCard = (cardId: string) => {
+    pushedCardId.current = cardId;
+    navigate(paths.card(boardId, cardId));
   };
+
+  const leaveCard = () => {
+    const pushed = pushedCardId.current;
+    pushedCardId.current = null;
+
+    if (pushed && pushed === openCardId) history.back();
+    else navigate(paths.board(boardId), { replace: true });
+  };
+
+  /* Tombol kembali juga menutup dialog — dan langkah yang tadi dibuat sudah
+     habis terpakai, jadi catatannya ikut dibuang. */
+  useEffect(() => {
+    if (!openCardId) pushedCardId.current = null;
+  }, [openCardId]);
 
   /* Satu dialog untuk seluruh papan, bukan satu per kartu: yang bisa ditanya
      hanya satu pada satu waktu. */
@@ -96,8 +113,11 @@ export function BoardView({ boardId, openCardId: linkedCardId }: BoardProps) {
   }, [board, openCardId]);
 
   useEffect(() => {
-    if (openCardId && board && !open) setOpenCardId(null);
-  }, [board, open, openCardId]);
+    if (openCardId && board && !open) {
+      pushedCardId.current = null;
+      navigate(paths.board(boardId), { replace: true });
+    }
+  }, [board, boardId, open, openCardId]);
 
   // Monitor DnD didaftarkan sekali; state terbaru dibaca lewat ref agar
   // listener tidak perlu dipasang ulang setiap render.
@@ -160,16 +180,9 @@ export function BoardView({ boardId, openCardId: linkedCardId }: BoardProps) {
     });
   }, []);
 
-  if (loading) {
-    return (
-      <div className="flex flex-1 items-center justify-center p-8">
-        <p className="flex items-center gap-2 text-sm text-muted">
-          <span className="size-2 animate-pulse rounded-full bg-accent" />
-          Memuat board…
-        </p>
-      </div>
-    );
-  }
+  // Kerangkanya membawa breadcrumb-nya sendiri, jadi kepala halaman tidak
+  // muncul belakangan dan mendorong papan ke bawah.
+  if (loading) return <BoardSkeleton />;
 
   if (!board) {
     return (
@@ -208,7 +221,7 @@ export function BoardView({ boardId, openCardId: linkedCardId }: BoardProps) {
           cairan di dasar gelas harus berdiri di dasar papan — dan alasan itu
           sudah hilang bersama efeknya. `max-h-full` di kolom yang menahan
           kolom panjang supaya menggulir di dalam dirinya sendiri. */}
-      <main className="flex flex-1 items-start gap-4 overflow-x-auto px-5 pt-1 pb-20">
+      <main className="flex flex-1 items-start gap-4 overflow-x-auto px-5 pt-1 pb-24">
         {board.columns.map((column) => (
           <ColumnView
             key={column.id}
@@ -223,7 +236,7 @@ export function BoardView({ boardId, openCardId: linkedCardId }: BoardProps) {
                 cards: column.cards.length,
               })
             }
-            onOpenCard={setOpenCardId}
+            onOpenCard={openCard}
             onDeleteCard={askDeleteCard}
           />
         ))}
@@ -266,8 +279,9 @@ export function BoardView({ boardId, openCardId: linkedCardId }: BoardProps) {
           cardId={open.cardId}
           boardLabels={board.labels}
           columnTitle={open.columnTitle}
+          shareUrl={`${location.origin}${location.pathname}${paths.card(boardId, open.cardId)}`}
           currentUser={{ ...session.user, image: session.user.image ?? null }}
-          onClose={closeCard}
+          onClose={leaveCard}
           onBoardChange={() => void refresh()}
         />
       )}

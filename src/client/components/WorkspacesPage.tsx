@@ -3,6 +3,7 @@ import { api } from "../lib/api";
 import { AddItemForm } from "./AddItemForm";
 import { AppHeader } from "./AppHeader";
 import { navigate, paths } from "../lib/route";
+import { ListSkeleton } from "./Skeleton";
 import type { WorkspaceSummary } from "../../shared/types";
 
 const ROLE_LABEL = { owner: "Pemilik", admin: "Admin", member: "Anggota" } as const;
@@ -37,7 +38,15 @@ export function WorkspacesPage() {
 
         {error && <p className="mt-4 text-sm text-danger">{error}</p>}
 
-        <ul className="mt-6 flex flex-col gap-2">
+        {/* `null` berarti masih dimuat; senarai kosong berarti memang belum
+            ada workspace. Keduanya tidak boleh terlihat sama. */}
+        {!workspaces && !error && (
+          <div className="mt-6">
+            <ListSkeleton label="Memuat daftar workspace…" />
+          </div>
+        )}
+
+        <ul className="mt-6 flex flex-col gap-2 empty:mt-0">
           {workspaces?.map((workspace) => (
             <li key={workspace.id}>
               <button

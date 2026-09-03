@@ -69,17 +69,24 @@ self.addEventListener("push", (event) => {
   const title = payload.title || "Kanban";
 
   event.waitUntil(
-    self.registration.showNotification(title, {
-      body: payload.body || "Ada perubahan di papan Anda.",
-      // Tag per kartu: kabar baru menimpa kabar lama tentang kartu yang sama,
-      // jadi layar kunci tidak dipenuhi satu kartu yang sedang ramai disunting.
-      tag: payload.tag || "kanban",
-      icon: "/icons/icon-192.png",
-      badge: "/icons/badge-96.png",
-      lang: "id",
-      timestamp: Date.now(),
-      data: { url: payload.url || "/" },
-    }),
+    (async () => {
+      await self.registration.showNotification(title, {
+        body: payload.body || "Ada perubahan di papan Anda.",
+        // Tag per kartu: kabar baru menimpa kabar lama tentang kartu yang sama,
+        // jadi layar kunci tidak dipenuhi satu kartu yang sedang ramai disunting.
+        tag: payload.tag || "kanban",
+        icon: "/icons/icon-192.png",
+        badge: "/icons/badge-96.png",
+        lang: "id",
+        timestamp: Date.now(),
+        data: { url: payload.url || "/" },
+      });
+
+      /* Tab yang sedang terbuka ikut diberi tahu, supaya lencana di loncengnya
+         bergerak saat itu juga alih-alih menunggu tarikan berkala berikutnya. */
+      const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const client of clients) client.postMessage({ type: "notification" });
+    })(),
   );
 });
 

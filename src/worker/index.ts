@@ -6,6 +6,8 @@ import boards from "./routes/boards";
 import columns from "./routes/columns";
 import cards from "./routes/cards";
 import labels from "./routes/labels";
+import notifications from "./routes/notifications";
+import profile, { avatars } from "./routes/profile";
 import push from "./routes/push";
 import workspaces from "./routes/workspaces";
 import invitations, { invitePreview } from "./routes/invitations";
@@ -46,7 +48,10 @@ const api = new Hono<AppEnv>()
   .route("/columns", columns)
   .route("/cards", cards)
   .route("/labels", labels)
-  .route("/push", push);
+  .route("/push", push)
+  .route("/profile", profile)
+  .route("/avatars", avatars)
+  .route("/notifications", notifications);
 
 app.route("/api", api);
 

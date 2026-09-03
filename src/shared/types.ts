@@ -10,6 +10,7 @@ import type {
   Invitation,
   Label,
   LabelColor,
+  NotificationKind,
   Role,
   Workspace,
 } from "../db/schema";
@@ -27,6 +28,7 @@ export type {
   Invitation,
   Label,
   LabelColor,
+  NotificationKind,
   Role,
   Workspace,
 };
@@ -145,6 +147,66 @@ export interface PushSettings {
   /** Kunci publik VAPID; null berarti server belum memasangnya dan fiturnya mati. */
   publicKey: string | null;
   prefs: NotificationSettings;
+}
+
+/* ── Foto profil ──────────────────────────────────────────────────
+   Aturan yang harus sama di kedua sisi: klien memangkas dan mengencode,
+   server yang memeriksa hasilnya. */
+
+/** Format yang boleh disimpan. Klien selalu mengirim salah satu dari ini. */
+export const AVATAR_MIMES = ["image/webp", "image/jpeg", "image/png"] as const;
+export type AvatarMime = (typeof AVATAR_MIMES)[number];
+
+/** Sisi persegi foto setelah dipangkas, dalam piksel. */
+export const AVATAR_SIZE = 256;
+
+/* Batas panjang base64-nya. 256 piksel persegi jatuh di kisaran 20 KB, jadi
+   150 KB sudah sangat longgar — angka ini penjaga terhadap kiriman yang
+   tidak wajar, bukan target. */
+export const MAX_AVATAR_BASE64 = 200_000;
+
+/* ── Kotak masuk notifikasi ───────────────────────────────────────── */
+
+/**
+ * Satu kabar di kotak masuk. Judul dan kalimatnya sudah jadi teks — disalin
+ * saat kejadian, bukan dirujuk — jadi baris ini tetap terbaca setelah kartunya
+ * berganti nama atau hilang.
+ */
+export interface NotificationItem {
+  id: string;
+  kind: NotificationKind;
+  title: string;
+  body: string;
+  workspaceId: string;
+  workspaceName: string;
+  boardId: string;
+  boardTitle: string;
+  /** Null kalau kartunya sudah dihapus — tautannya berujung ke papan saja. */
+  cardId: string | null;
+  actor: UserBrief | null;
+  readAt: string | null;
+  createdAt: string;
+}
+
+/**
+ * Pilihan penyaring, diturunkan dari isi kotak masuk itu sendiri — bukan dari
+ * daftar keanggotaan. Papan yang tidak pernah mengabari apa pun tidak perlu
+ * muncul sebagai pilihan yang selalu kosong.
+ */
+export interface NotificationScope {
+  workspaceId: string;
+  workspaceName: string;
+  unread: number;
+  boards: { id: string; title: string; unread: number }[];
+}
+
+export interface NotificationFeed {
+  items: NotificationItem[];
+  /** Yang belum dibaca di seluruh kotak masuk — bukan hanya di penyaring ini. */
+  unread: number;
+  scopes: NotificationScope[];
+  /** Penanda halaman berikutnya; null berarti sudah sampai dasar. */
+  nextCursor: string | null;
 }
 
 export interface ApiError {

@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { signIn, signUp } from "../lib/auth-client";
+import { PROVIDER_LABEL, signIn, signUp } from "../lib/auth-client";
 import { api } from "../lib/api";
 
-const PROVIDER_LABEL: Record<string, string> = { github: "GitHub", google: "Google" };
-
-export function AuthPage() {
-  const [mode, setMode] = useState<"login" | "register">("login");
+/* `initialMode` hanya menentukan tampilan pertama — sesudahnya sakelar di
+   bawah form yang memegang kendali, tanpa menyentuh alamat. Halaman
+   pengantar memakainya supaya "Mulai sekarang" mendarat di form daftar,
+   bukan di form masuk yang harus ditukar sendiri. */
+export function AuthPage({ initialMode = "login" }: { initialMode?: "login" | "register" }) {
+  const [mode, setMode] = useState<"login" | "register">(initialMode);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

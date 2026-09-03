@@ -1,7 +1,8 @@
-import { useEffect, useId, useRef } from "react";
+import { useId } from "react";
 import { cn } from "../lib/cn";
 import type { usePush } from "../hooks/usePush";
 import type { NotificationSettings as Prefs } from "../../shared/types";
+import { ToggleListSkeleton } from "./Skeleton";
 
 /** Sakelar dua keadaan. Tombolnya sendiri yang jadi jalur peluncurnya. */
 function Toggle({
@@ -92,115 +93,92 @@ const PREFS: { key: keyof Prefs; title: string; hint: string }[] = [
 ];
 
 /**
- * Pengaturan notifikasi perangkat. Satu dialog, bukan halaman tersendiri:
- * yang diatur cuma empat sakelar, dan semuanya berlaku untuk perangkat yang
- * sedang dipegang.
+ * Pengaturan notifikasi. Sakelar teratas berlaku untuk perangkat yang sedang
+ * dipegang — langganan push memang milik perangkat, bukan milik akun — sedangkan
+ * pilihan kanal di bawahnya berlaku untuk orangnya di semua perangkat.
+ *
+ * Judul dan penjelasan bagiannya datang dari SettingsPage.
  */
-export function NotificationSettings({
-  push,
-  onClose,
-}: {
-  push: ReturnType<typeof usePush>;
-  onClose: () => void;
-}) {
-  const labelId = useId();
-  const closeRef = useRef<HTMLButtonElement>(null);
+export function NotificationSettings({ push }: { push: ReturnType<typeof usePush> }) {
+  if (push.loading) {
+    return <ToggleListSkeleton rows={4} />;
+  }
 
-  useEffect(() => {
-    closeRef.current?.focus();
-  }, []);
+  // Tidak ada kunci VAPID di server berarti tidak ada yang bisa mengirim apa
+  // pun; menawarkan sakelarnya cuma menjanjikan sesuatu yang tidak akan datang.
+  if (!push.available) {
+    return (
+      <p className="glass-plate rounded-xl px-3 py-2.5 text-xs leading-relaxed text-muted">
+        Server ini belum dipasangi kunci notifikasi, jadi notifikasi belum bisa dinyalakan.
+      </p>
+    );
+  }
 
   return (
-    <div
-      className="fixed inset-0 z-[55] flex items-center justify-center overflow-hidden p-4"
-      onKeyDown={(e) => {
-        if (e.key === "Escape") onClose();
-      }}
-    >
-      {/* Saudara, bukan induk — lihat catatan .glass-frost. */}
-      <div className="scrim" onClick={onClose} aria-hidden />
-
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={labelId}
-        className="glass glass-lens card-dialog relative w-full max-w-sm p-5 outline-none"
-      >
-        <h2 id={labelId} className="text-base font-semibold tracking-tight">
-          Notifikasi
-        </h2>
-        <p className="mt-1 text-sm leading-relaxed text-muted">
-          Kabar dari kartu yang Anda ikuti, sampai ke perangkat ini meski aplikasinya sedang
-          tertutup.
+    <>
+      {push.support === "install-first" ? (
+        <p className="rounded-xl bg-accent-soft px-3 py-2.5 text-xs leading-relaxed text-accent-ink">
+          Di iPhone dan iPad, notifikasi baru bisa dinyalakan setelah aplikasi ini ditambahkan ke
+          Layar Utama — lewat tombol Bagikan, lalu “Tambahkan ke Layar Utama”.
         </p>
+      ) : push.support === "unsupported" ? (
+        <p className="glass-plate rounded-xl px-3 py-2.5 text-xs leading-relaxed text-muted">
+          Browser ini belum mendukung notifikasi push.
+        </p>
+      ) : push.blocked ? (
+        <p className="glass-plate rounded-xl px-3 py-2.5 text-xs leading-relaxed text-muted">
+          Notifikasi diblokir untuk situs ini. Izinkan lagi lewat pengaturan situs di browser
+          Anda, lalu muat ulang halaman ini.
+        </p>
+      ) : (
+        <>
+          <Row
+            title="Perangkat ini"
+            hint={
+              push.enabled
+                ? "Perangkat ini menerima notifikasi."
+                : "Nyalakan untuk menerima notifikasi di sini."
+            }
+            checked={push.enabled}
+            onChange={(next) => void (next ? push.enable() : push.disable())}
+            disabled={push.busy}
+          />
 
-        <div className="mt-4">
-          {push.support === "install-first" ? (
-            <p className="rounded-xl bg-accent-soft px-3 py-2.5 text-xs leading-relaxed text-accent-ink">
-              Di iPhone dan iPad, notifikasi baru bisa dinyalakan setelah aplikasi ini
-              ditambahkan ke Layar Utama — lewat tombol Bagikan, lalu “Tambahkan ke Layar
-              Utama”.
-            </p>
-          ) : push.support === "unsupported" ? (
-            <p className="glass-plate rounded-xl px-3 py-2.5 text-xs leading-relaxed text-muted">
-              Browser ini belum mendukung notifikasi push.
-            </p>
-          ) : push.blocked ? (
-            <p className="glass-plate rounded-xl px-3 py-2.5 text-xs leading-relaxed text-muted">
-              Notifikasi diblokir untuk situs ini. Izinkan lagi lewat pengaturan situs di
-              browser Anda, lalu buka pengaturan ini kembali.
-            </p>
-          ) : (
-            <>
-              <Row
-                title="Perangkat ini"
-                hint={
-                  push.enabled
-                    ? "Perangkat ini menerima notifikasi."
-                    : "Nyalakan untuk menerima notifikasi di sini."
-                }
-                checked={push.enabled}
-                onChange={(next) => void (next ? push.enable() : push.disable())}
-                disabled={push.loading || push.busy}
-              />
-
-              {/* Pilihan kanal hanya berarti kalau ada yang mengirim ke sini. */}
-              {push.enabled && (
-                <div className="mt-1 divide-y divide-line-soft border-t border-line-soft">
-                  {PREFS.map((pref) => (
-                    <Row
-                      key={pref.key}
-                      title={pref.title}
-                      hint={pref.hint}
-                      checked={push.prefs[pref.key]}
-                      onChange={(next) => void push.setPref(pref.key, next)}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        {push.error && <p className="mt-3 text-xs text-danger">{push.error}</p>}
-        {push.notice && <p className="mt-3 text-xs text-ok">{push.notice}</p>}
-
-        <div className="mt-5 flex justify-end gap-2">
+          {/* Pilihan kanal hanya berarti kalau ada yang mengirim ke sini. */}
           {push.enabled && (
-            <button
-              type="button"
-              onClick={() => void push.test()}
-              disabled={push.busy}
-              className="btn btn-glass"
-            >
-              Kirim percobaan
-            </button>
+            <div className="mt-1 divide-y divide-line-soft border-t border-line-soft">
+              {PREFS.map((pref) => (
+                <Row
+                  key={pref.key}
+                  title={pref.title}
+                  hint={pref.hint}
+                  checked={push.prefs[pref.key]}
+                  onChange={(next) => void push.setPref(pref.key, next)}
+                />
+              ))}
+            </div>
           )}
-          <button ref={closeRef} type="button" onClick={onClose} className="btn btn-primary">
-            Selesai
+        </>
+      )}
+
+      {push.error && <p className="mt-3 text-xs text-danger">{push.error}</p>}
+      {push.notice && <p className="mt-3 text-xs text-ok">{push.notice}</p>}
+
+      {push.enabled && (
+        <div className="mt-4 flex justify-end">
+          {/* Rantainya panjang — izin, service worker, kunci VAPID, push
+              service — dan hanya notifikasi yang benar-benar sampai yang
+              membuktikan semuanya tersambung. */}
+          <button
+            type="button"
+            onClick={() => void push.test()}
+            disabled={push.busy}
+            className="btn btn-glass"
+          >
+            Kirim percobaan
           </button>
         </div>
-      </div>
-    </div>
+      )}
+    </>
   );
 }

@@ -7,7 +7,8 @@ thread followup, serta jejak siapa membuat dan mengubahnya.
 
 Bisa dipasang sebagai aplikasi (PWA) dan mengirim notifikasi push ke perangkat —
 peserta sebuah kartu dikabari saat ada followup baru atau kartunya berubah,
-meski aplikasinya sedang tertutup.
+meski aplikasinya sedang tertutup. Kabar yang sama juga menumpuk di kotak masuk
+di dalam aplikasi, lengkap dengan penyaring per workspace dan per papan.
 
 ## Stack
 
@@ -157,13 +158,21 @@ board tidak bocor ke orang luar.
 | `POST` | `/api/push/subscribe`, `/api/push/unsubscribe` | login |
 | `PATCH` | `/api/push/prefs` | login |
 | `POST` | `/api/push/test` | login (notifikasi percobaan ke perangkat ini) |
+| `GET` | `/api/notifications` | login (kotak masuk; saring `workspaceId`/`boardId`) |
+| `GET` | `/api/notifications/count` | login (angka lencana saja) |
+| `POST` | `/api/notifications/read`, `/api/notifications/read-all` | login |
+| `PUT DELETE` | `/api/profile/avatar` | login (foto profil sendiri) |
+| `POST` | `/api/profile/password` | login (kata sandi pertama untuk akun sosial) |
+| `GET` | `/api/avatars/:userId` | login (berkas foto profil) |
 
 ### Frontend
 
 ```
-#/                      daftar workspace
+#/                      daftar workspace — atau halaman pengantar, kalau belum masuk
+#/masuk, #/daftar       masuk & buat akun
 #/w/:workspaceId        daftar board dalam workspace
 #/w/:workspaceId/members anggota & undangan
+#/settings              pengaturan akun & notifikasi
 #/board/:boardId        papan kanban
 #/board/:boardId/card/:cardId  papan dengan satu kartu terbuka (tujuan notifikasi)
 #/invite/:token         terima undangan
@@ -274,6 +283,33 @@ manual: siapa pun yang pernah menyentuh kartu itu ikut mendengar kabarnya. Pelak
 sendiri selalu dikecualikan. Kanal `newCards` adalah satu-satunya yang menyapa
 seluruh anggota workspace, dan karena itu defaultnya mati.
 
+**Kotak masuk mencatat semuanya; preferensi hanya mengatur perangkat.** Sakelar
+Followup / Perubahan kartu / Kartu baru di halaman pengaturan menentukan apa yang
+membuat ponsel bergetar — bukan apa yang tercatat. Kotak masuk tetap menjadi
+riwayat lengkap, karena kabar yang tidak sempat dilihat di ponsel justru itulah
+yang dicari orang saat membuka aplikasinya. Keramaiannya diatur penyaring
+workspace/papan, bukan dengan membuang kabarnya.
+
+**Isi notifikasi didenormalisasi.** Judul dan kalimatnya disalin ke baris
+`notifications` saat kejadian, bukan dirujuk ke kartunya. Baris ini justru
+sering dibaca ketika yang diceritakannya sudah berubah nama atau dihapus — dan
+`card_id`-nya sengaja tanpa foreign key supaya kabar "kartu ini dihapus" selamat
+dari kartunya sendiri. Riwayatnya disimpan 60 hari, dibuang di kiriman berikutnya.
+
+**Lencana ditanyakan berkala, bukan disiarkan.** Papan punya Durable Object-nya
+sendiri, tapi kotak masuk mengikuti orangnya ke halaman mana pun; membuka DO
+kedua per orang hanya demi satu angka tidak sepadan di plan gratis. Jadi
+`/api/notifications/count` ditanyakan tiap menit — hanya selagi tabnya terlihat —
+dan service worker mendorong pembaruan seketika lewat `postMessage` setiap kali
+ada push yang mendarat, jadi perangkat yang mengizinkan notifikasi tidak pernah
+menunggu detik ke-60.
+
+**Peserta yang sudah keluar dari tim berhenti dikabari.** Jejak seseorang di
+`card_participants` tidak ikut terhapus saat ia dikeluarkan dari workspace —
+lini masa kartu memang harus tetap utuh — jadi pencarian penerima ikut memeriksa
+keanggotaan. Tanpa itu, mantan anggota terus menerima kabar tentang papan yang
+sudah tidak boleh ia buka.
+
 **Bunyi notifikasi dipinjam dari lini masa kartu.** `describeActivity` di
 [src/shared/activity.ts](src/shared/activity.ts) dipakai dua sisi: klien
 menggambarnya sebagai baris riwayat, server merangkainya jadi kalimat notifikasi.
@@ -309,6 +345,22 @@ dicache hanya [public/offline.html](public/offline.html).
 melukis PNG-nya langsung (rounded rect + zlib + CRC32), tanpa satu pun dependensi
 gambar, dan warnanya diambil dari token `--color-accent` yang sama dengan CSS.
 
+**Foto profil tinggal di D1, dan yang tersimpan di `user.image` hanya URL-nya.**
+Klien memangkas gambarnya jadi persegi 256 piksel lalu mengencode WebP di browser
+(puluhan kilobita), barisnya masuk ke tabel `user_avatars`, dan Worker melayaninya di
+`/api/avatars/:userId`. Object storage sengaja tidak dipakai — batasannya nol biaya —
+dan data URL juga tidak, karena `user.image` terbawa di setiap sesi dan di setiap
+peserta kartu yang dikirim board: satu foto akan membengkakkan payload papan
+berkali-kali lipat. Query `?v=` berganti tiap unggahan, jadi responsnya boleh
+di-cache selamanya tanpa pernah menyajikan foto yang sudah diganti.
+
+**Ganti email hanya untuk akun yang belum terverifikasi.** Memindahkan email dengan
+benar butuh surat verifikasi, dan tidak ada layanan email yang gratis — jadi
+`updateEmailWithoutVerification` dinyalakan dan yang bisa berganti hanya akun yang
+mendaftar sendiri dengan email dan kata sandi. Akun Google/GitHub datang dengan
+`emailVerified: true`; halaman pengaturan menampilkan emailnya terkunci beserta
+alasannya, bukan tombol yang akan ditolak server.
+
 **Schema Better Auth di-generate, jangan diedit manual.** `src/db/auth-schema.ts` dibuat
 oleh `npm run auth:generate`. Versi CLI harus cocok dengan versi `better-auth` di
 `package.json` — CLI yang lebih tua menghasilkan schema tanpa kolom yang dibutuhkan
@@ -328,7 +380,4 @@ per-entitas atau CRDT untuk benar-benar mulus.
 **Presence per-orang.** Sekarang hanya jumlah penonton, belum menampilkan siapa saja
 yang sedang membuka board.
 
-**Kotak notifikasi di dalam aplikasi.** Notifikasi hanya dikirim ke perangkat; tidak
-ada daftar "yang belum dibaca" yang bisa ditengok belakangan dari dalam aplikasi.
-
-**Lain-lain:** due date & penugasan kartu, lampiran, undo, verifikasi email.
+**Lain-lain:** due date & penugasan kartu, lampiran, undo, verifikasi email, hapus akun.

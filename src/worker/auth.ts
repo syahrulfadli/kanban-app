@@ -47,6 +47,17 @@ export function createAuth(env: Env, db: Db) {
     basePath: "/api/auth",
     emailAndPassword: { enabled: true },
     socialProviders,
+    user: {
+      /* Ganti email tanpa surat verifikasi. Mengirim surat butuh layanan email
+         berbayar, dan aplikasi ini dijalankan tanpa biaya — jadi yang boleh
+         berganti hanya email yang memang belum pernah diverifikasi, yaitu
+         akun yang mendaftar sendiri dengan email dan kata sandi.
+
+         Akun dari Google/GitHub datang dengan emailVerified true, dan Better
+         Auth menolak permintaannya di sini. Itu memang yang diinginkan:
+         email mereka milik penyedianya, bukan milik aplikasi ini. */
+      changeEmail: { enabled: true, updateEmailWithoutVerification: true },
+    },
     session: {
       cookieCache: { enabled: true, maxAge: 5 * 60 },
     },

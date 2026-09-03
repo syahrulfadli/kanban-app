@@ -445,7 +445,7 @@ const app = new Hono<AppEnv>()
 
     // Daftar pesertanya ikut lenyap bersama kartunya, jadi harus dibaca selagi
     // barisnya masih ada.
-    const watchers = await watchersBeforeDelete(c, card.id);
+    const watchers = await watchersBeforeDelete(c, card.id, boardId);
 
     await db.delete(cards).where(eq(cards.id, card.id));
     await touchBoard(c, boardId);

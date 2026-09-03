@@ -1,4 +1,5 @@
 import type {
+  AvatarMime,
   Board,
   BoardDetail,
   Card,
@@ -13,6 +14,7 @@ import type {
   Label,
   LabelColor,
   MemberSummary,
+  NotificationFeed,
   NotificationSettings,
   PushSettings,
   Role,
@@ -52,6 +54,20 @@ const send = <T,>(path: string, method: string, body?: unknown, init?: RequestIn
  * tab ditutup di tengah jendela urung — lihat UndoProvider.
  */
 type SendOptions = { keepalive?: boolean };
+
+/** Penyaring kotak masuk; field yang kosong tidak ikut dikirim. */
+export interface NotificationFilter {
+  workspaceId?: string;
+  boardId?: string;
+  cursor?: string;
+}
+
+const queryString = (params: NotificationFilter) => {
+  const search = new URLSearchParams(
+    Object.entries(params).filter((entry): entry is [string, string] => Boolean(entry[1])),
+  );
+  return search.size > 0 ? `?${search}` : "";
+};
 
 export const api = {
   getConfig: () => request<{ providers: string[] }>("/config"),
@@ -126,6 +142,15 @@ export const api = {
     send<CardCommentDetail>(`/cards/comments/${id}`, "PATCH", { body }),
   deleteComment: (id: string) => send<void>(`/cards/comments/${id}`, "DELETE"),
 
+  /* kotak masuk notifikasi */
+  getNotifications: (filter: NotificationFilter = {}) =>
+    request<NotificationFeed>(`/notifications${queryString(filter)}`),
+  countUnreadNotifications: () => request<{ unread: number }>("/notifications/count"),
+  markNotificationsRead: (ids: string[]) =>
+    send<{ unread: number }>("/notifications/read", "POST", { ids }),
+  markAllNotificationsRead: (filter: NotificationFilter = {}) =>
+    send<{ unread: number }>("/notifications/read-all", "POST", filter),
+
   /* notifikasi perangkat */
   getPushSettings: () => request<PushSettings>("/push"),
   subscribePush: (subscription: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
@@ -134,6 +159,13 @@ export const api = {
   updateNotificationPrefs: (patch: Partial<NotificationSettings>) =>
     send<NotificationSettings>("/push/prefs", "PATCH", patch),
   sendTestPush: (endpoint: string) => send<void>("/push/test", "POST", { endpoint }),
+
+  /* akun — sisi yang tidak ditangani Better Auth sendiri */
+  uploadAvatar: (upload: { mime: AvatarMime; data: string }) =>
+    send<{ image: string }>("/profile/avatar", "PUT", upload),
+  deleteAvatar: () => send<void>("/profile/avatar", "DELETE"),
+  createPassword: (newPassword: string) =>
+    send<void>("/profile/password", "POST", { newPassword }),
 
   /* checklist */
   addChecklistItem: (cardId: string, text: string) =>

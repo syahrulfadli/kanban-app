@@ -6,4 +6,24 @@ export type { SessionQueryParams } from "better-auth/client";
 
 export const authClient = createAuthClient({ basePath: "/api/auth" });
 
-export const { useSession, signIn, signUp, signOut } = authClient;
+/** Pengguna yang sedang masuk, sebagaimana Better Auth membentuknya. */
+export type SessionUser = typeof authClient.$Infer.Session.user;
+
+/** Nama provider sosial untuk dibaca orang. Kuncinya `providerId` Better Auth. */
+export const PROVIDER_LABEL: Record<string, string> = {
+  github: "GitHub",
+  google: "Google",
+};
+
+export const {
+  useSession,
+  signIn,
+  signUp,
+  signOut,
+  /** Nama dan foto profil — email sengaja tidak lewat sini, lihat changeEmail. */
+  updateUser,
+  changeEmail,
+  changePassword,
+  /** Cara akun ini bisa masuk: "credential" untuk email dan kata sandi. */
+  listAccounts,
+} = authClient;
