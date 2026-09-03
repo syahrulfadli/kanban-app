@@ -83,7 +83,7 @@ export function CardItem({ card, onOpen, onDelete }: Props) {
          dengan cincin cahayanya sendiri, tanpa backdrop-filter. Kaca di dalam
          kaca tidak akan menghasilkan apa-apa — lihat catatan .glass-frost. */
       className={cn(
-        "glass glass-plate glass-plate-hover group rounded-xl p-3 transition-[background-color,transform]",
+        "glass board-card board-card-hover group rounded-xl p-3 transition-[background-color,transform]",
         "cursor-grab text-left active:cursor-grabbing",
         "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent",
         dragging && "opacity-40",

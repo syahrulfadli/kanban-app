@@ -79,6 +79,15 @@
      punya backdrop-filter sendiri, alasannya ada di .glass-frost. */
   --plate-fill: rgb(255 255 255 / 0.58);
   --plate-fill-hi: rgb(255 255 255 / 0.78);
+  --plate-depth: 0 1px 2px rgb(15 23 42 / 0.04),
+                 0 6px 14px -12px rgb(15 23 42 / 0.22);
+
+  /* Kartu di PAPAN punya isiannya sendiri, terpisah dari pelat dan dari
+     dialog kartu (--card-fill, di bawah). Di tema terang isinya sama dengan
+     pelat; yang membedakan hanya tema gelap, dan menumpang pada --plate-fill
+     akan ikut menyeret input, tombol, dan baris daftar di seluruh aplikasi. */
+  --board-card-fill: rgb(255 255 255 / 0.58);
+  --board-card-fill-hi: rgb(255 255 255 / 0.78);
 
   /* Isian menu pop-up. Menu profil bersarang di dalam kapsul ber-frost,
      dan di dalam backdrop root filter tidak menghitung apa pun — jadi
@@ -190,6 +199,15 @@
 
   --plate-fill: rgb(255 255 255 / 0.07);
   --plate-fill-hi: rgb(255 255 255 / 0.12);
+  --plate-depth: 0 1px 2px rgb(0 0 0 / 0.18),
+                 0 8px 18px -14px rgb(0 0 0 / 0.45);
+
+  /* Kartu di tema gelap MENGGELAPKAN kolomnya, bukan menerangi. Isian hitam
+     translusen, bukan abu-abu pekat: kartu tetap meneruskan rona dari kaca
+     kolom di belakangnya, jadi masih terbaca sebagai benda di dalam kolom.
+     Hover menipiskan kegelapannya — kartu naik ke arah cahaya. */
+  --board-card-fill: rgb(4 6 10 / 0.55);
+  --board-card-fill-hi: rgb(4 6 10 / 0.36);
 
   --sheet-fill: rgb(22 25 32 / 0.95);
 
@@ -379,14 +397,18 @@ body {
      milimeter di atas dasar gelas, bukan di atas meja. */
   .glass-plate {
     background-color: var(--plate-fill);
-    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04),
-                0 6px 14px -12px rgb(15 23 42 / 0.22),
-                var(--glass-inner);
+    box-shadow: var(--plate-depth), var(--glass-inner);
   }
-  [data-theme="dark"] .glass-plate {
-    box-shadow: 0 1px 2px rgb(0 0 0 / 0.18),
-                0 8px 18px -14px rgb(0 0 0 / 0.45),
-                var(--glass-inner);
+
+  /* Kartu di papan. Kembaran .glass-plate yang isiannya sendiri — bayangannya
+     dibagi lewat --plate-depth supaya keduanya tidak bisa saling menyimpang
+     diam-diam. */
+  .board-card {
+    background-color: var(--board-card-fill);
+    box-shadow: var(--plate-depth), var(--glass-inner);
+  }
+  .board-card-hover:hover {
+    background-color: var(--board-card-fill-hi);
   }
 
   /* Pane kecil (pil, sakelar) — cincin dan bevel tetap, kedalaman dikurangi. */

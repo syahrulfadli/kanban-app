@@ -66,7 +66,7 @@ function CardSkeleton({ index }: { index: number }) {
   const withLabels = index % 3 === 0;
 
   return (
-    <li className="glass glass-plate rounded-xl p-3">
+    <li className="glass board-card rounded-xl p-3">
       {withLabels && (
         <div className="mb-2 flex items-center gap-1">
           <Skeleton className="h-4 w-12 rounded-full" />
