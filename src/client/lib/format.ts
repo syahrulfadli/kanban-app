@@ -19,7 +19,15 @@ const shortDate = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "sho
 /** "2 Sep 2026, 17.40" — dipakai di tooltip dan baris jejak waktu. */
 export const formatDateTime = (value: Stamp) => absolute.format(toDate(value));
 
+/* Dua pemformat, dan pemilihannya ada di formatRelative.
+
+   `auto` yang memberi "kemarin" — dan itu memang yang diinginkan untuk satu
+   hari. Tapi ia juga punya kata sendiri untuk dua hari ("kemarin dulu") dan
+   tiga hari, dan kata-kata itu justru lebih lambat dibaca daripada angkanya:
+   orang harus menghitung dulu sebelum tahu itu berapa hari. Jadi mulai dua,
+   yang dipakai bentuk berangka. */
 const relative = new Intl.RelativeTimeFormat("id", { numeric: "auto" });
+const counted = new Intl.RelativeTimeFormat("id", { numeric: "always" });
 
 const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
   ["year", 365 * 24 * 3600_000],
@@ -44,8 +52,14 @@ export function formatRelative(value: Stamp): string {
   if (abs < 60_000) return "baru saja";
   if (abs > 7 * 24 * 3600_000) return shortDate.format(date);
 
+  /* Dipotong, bukan dibulatkan: yang dihitung satuan yang sudah LEWAT.
+     Dibulatkan, sesuatu dari kemarin sore melompat jadi dua hari begitu
+     umurnya melewati satu setengah hari — padahal tanggalnya masih kemarin. */
   for (const [unit, ms] of UNITS) {
-    if (abs >= ms) return relative.format(Math.round(diff / ms), unit);
+    if (abs < ms) continue;
+
+    const count = Math.trunc(diff / ms);
+    return (Math.abs(count) === 1 ? relative : counted).format(count, unit);
   }
 
   return "baru saja";

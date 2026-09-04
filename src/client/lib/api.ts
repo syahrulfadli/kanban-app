@@ -8,6 +8,7 @@ import type {
   CardSummary,
   ChecklistItem,
   Column,
+  ColumnColor,
   Invitation,
   InvitationCreated,
   InvitePreview,
@@ -76,7 +77,8 @@ export const api = {
   listWorkspaces: () => request<WorkspaceSummary[]>("/workspaces"),
   createWorkspace: (name: string) => send<WorkspaceSummary>("/workspaces", "POST", { name }),
   renameWorkspace: (id: string, name: string) => send<void>(`/workspaces/${id}`, "PATCH", { name }),
-  deleteWorkspace: (id: string) => send<void>(`/workspaces/${id}`, "DELETE"),
+  deleteWorkspace: (id: string, options?: SendOptions) =>
+    send<void>(`/workspaces/${id}`, "DELETE", undefined, options),
 
   /* anggota */
   listMembers: (workspaceId: string) =>
@@ -108,11 +110,22 @@ export const api = {
 
   /* kolom & kartu */
   createColumn: (boardId: string, title: string) =>
-    send<Column>("/columns", "POST", { boardId, title }),
+    send<Column & { watching: boolean }>("/columns", "POST", { boardId, title }),
   renameColumn: (id: string, title: string) => send<Column>(`/columns/${id}`, "PATCH", { title }),
+  /* Null mengembalikan kolom ke tanpa warna, jadi ia harus benar-benar
+     terkirim — bukan dihilangkan dari payload seperti nilai kosong lainnya. */
+  recolorColumn: (id: string, color: ColumnColor | null) =>
+    send<Column>(`/columns/${id}`, "PATCH", { color }),
   moveColumn: (id: string, index: number) => send<Column>(`/columns/${id}/move`, "POST", { index }),
   deleteColumn: (id: string, options?: SendOptions) =>
     send<void>(`/columns/${id}`, "DELETE", undefined, options),
+
+  /* Awasi. Dua alamat, satu bentuk — jawabannya mengulang keadaan yang
+     tersimpan, jadi klien yang sudah menebak duluan tinggal mencocokkan. */
+  watchColumn: (id: string, watching: boolean) =>
+    send<{ watching: boolean }>(`/columns/${id}/watch`, "POST", { watching }),
+  watchCard: (id: string, watching: boolean) =>
+    send<{ watching: boolean }>(`/cards/${id}/watch`, "POST", { watching }),
 
   createCard: (columnId: string, title: string) =>
     send<CardSummary>("/cards", "POST", { columnId, title }),

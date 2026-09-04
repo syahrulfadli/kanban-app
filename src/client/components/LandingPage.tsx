@@ -1,4 +1,8 @@
+import { AvatarStack } from "./Avatar";
+import { cn } from "../lib/cn";
+import { labelTint } from "../lib/people";
 import { navigate, paths } from "../lib/route";
+import type { LabelColor, UserBrief } from "../../shared/types";
 
 /* Halaman pengantar untuk orang yang belum masuk.
 
@@ -109,51 +113,169 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
   );
 }
 
-/* Papan mini. Bukan tangkapan layar: kolom dan kartunya dibangun dari
-   permukaan yang sama dengan papan sungguhan, jadi ia ikut berubah bersama
-   tema dan tidak pernah basi. Sepenuhnya hiasan — pembaca layar melewatinya,
-   karena kalimat di sebelahnya sudah mengatakan hal yang sama. */
-const PREVIEW: { title: string; cards: { text: string; tint: string; done?: boolean }[] }[] = [
+/* Papan mini di kepala halaman.
+
+   Bukan tangkapan layar dan bukan tiruan yang digambar ulang: kolom, kartu,
+   chip label, batang progres, dan avatarnya memakai kelas dan komponen yang
+   sama persis dengan papan sungguhan — termasuk label yang di muka kartu
+   memang terlipat jadi sepotong warna. Jadi ilustrasinya ikut berubah bersama
+   tema, dan tidak bisa diam-diam basi terhadap aplikasi yang ia gambarkan.
+
+   Satu hal yang sengaja berbeda: kolomnya memakai .glass-plate, bukan pane
+   ber-frost seperti kolom sungguhan. Pane hero di belakangnya sudah ber-frost,
+   dan kaca di dalam kaca tidak menghasilkan apa-apa — lihat catatan
+   .glass-frost.
+
+   Sepenuhnya hiasan: pembaca layar melewatinya, karena kalimat di sebelahnya
+   sudah mengatakan hal yang sama. */
+
+/** Orang contoh. Namanya saja yang terpakai — inisial dan ronanya lahir dari situ. */
+const person = (name: string): UserBrief => ({
+  id: name,
+  name,
+  email: `${name.toLowerCase()}@contoh.id`,
+  image: null,
+});
+
+interface PreviewCard {
+  text: string;
+  labels: { name: string; color: LabelColor }[];
+  people?: UserBrief[];
+  checklist?: { done: number; total: number };
+  comments?: number;
+}
+
+const PREVIEW: { title: string; cards: PreviewCard[] }[] = [
   {
     title: "Rencana",
     cards: [
-      { text: "Susun materi rapat", tint: "var(--label-sky)" },
-      { text: "Kumpulkan umpan balik", tint: "var(--label-violet)" },
+      {
+        text: "Susun materi rapat",
+        labels: [{ name: "Riset", color: "sky" }],
+        people: [person("Rina")],
+      },
+      {
+        text: "Kumpulkan umpan balik",
+        labels: [
+          { name: "Riset", color: "violet" },
+          { name: "Nanti", color: "slate" },
+        ],
+        comments: 3,
+      },
     ],
   },
   {
     title: "Dikerjakan",
-    cards: [{ text: "Rapikan halaman depan", tint: "var(--label-amber)" }],
+    cards: [
+      {
+        text: "Rapikan halaman depan",
+        labels: [{ name: "Desain", color: "amber" }],
+        people: [person("Adi"), person("Sari")],
+        checklist: { done: 2, total: 5 },
+      },
+    ],
   },
   {
     title: "Selesai",
-    cards: [{ text: "Rilis versi 1.0", tint: "var(--label-green)", done: true }],
+    cards: [
+      {
+        text: "Rilis versi 1.0",
+        labels: [{ name: "Rilis", color: "green" }],
+        checklist: { done: 4, total: 4 },
+      },
+    ],
   },
 ];
 
+function PreviewCard({ card }: { card: PreviewCard }) {
+  const { checklist } = card;
+  const percent = checklist ? Math.round((checklist.done / checklist.total) * 100) : 0;
+  const complete = checklist ? checklist.done === checklist.total : false;
+  const footer = card.people || checklist || card.comments;
+
+  return (
+    <div className="glass board-card rounded-xl p-2">
+      {/* `data-open="false"`: keadaan istirahat kartu di papan sungguhan —
+          nama labelnya terlipat dan yang tersisa potongan warnanya. */}
+      <div className="label-row flex flex-wrap items-center gap-1" data-open="false">
+        {card.labels.map((label) => (
+          <span key={label.name} className="label-chip" style={labelTint(label.color)}>
+            <span className="label-text truncate">{label.name}</span>
+          </span>
+        ))}
+      </div>
+
+      <p className="mt-1.5 text-[0.6875rem] leading-snug text-ink-soft">{card.text}</p>
+
+      {footer && (
+        <div className="mt-2 flex items-center gap-2">
+          {card.people && <AvatarStack people={card.people} />}
+
+          {/* Di kolom selebar sepertiga layar ponsel, angka-angka ini tidak
+              lagi punya ruang — dan yang harus terbaca lebih dulu di sana
+              bentuk kartunya, bukan isi baris kakinya. */}
+          <span className="ml-auto hidden items-center gap-2 text-faint sm:flex">
+            {checklist && (
+              <span className="flex items-center gap-1.5">
+                <span className="progress card-progress">
+                  <span
+                    className="progress-bar"
+                    data-complete={complete}
+                    style={{ width: `${percent}%` }}
+                  />
+                </span>
+                <span
+                  className={cn(
+                    "shrink-0 text-[0.6875rem] font-semibold tabular-nums",
+                    complete ? "text-ok" : "text-faint",
+                  )}
+                >
+                  {checklist.done}/{checklist.total}
+                </span>
+              </span>
+            )}
+
+            {!!card.comments && (
+              <span className="flex items-center gap-1 text-[0.6875rem] font-semibold tabular-nums">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="size-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z" />
+                </svg>
+                {card.comments}
+              </span>
+            )}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BoardPreview() {
   return (
-    <div className="mt-7 grid grid-cols-3 gap-2.5" aria-hidden>
+    <div className="mt-7 grid grid-cols-3 items-start gap-2.5" aria-hidden>
       {PREVIEW.map((column) => (
-        <div key={column.title} className="glass-plate flex flex-col gap-2 rounded-2xl p-2.5">
-          <p className="px-0.5 text-[0.6875rem] font-semibold tracking-wide text-faint uppercase">
-            {column.title}
-          </p>
+        <div key={column.title} className="glass-plate flex flex-col gap-2 rounded-2xl p-2">
+          {/* Kepala kolom yang sama dengan di papan: nama di kiri, jumlah
+              kartunya sebagai chip di kanan. */}
+          <div className="flex items-center gap-1.5 px-1 pt-0.5">
+            <p className="min-w-0 flex-1 truncate text-xs font-semibold tracking-tight">
+              {column.title}
+            </p>
+            <span className="chip hidden shrink-0 tabular-nums sm:inline-flex">
+              {column.cards.length}
+            </span>
+          </div>
 
           {column.cards.map((card) => (
-            <div
-              key={card.text}
-              className="rounded-xl bg-[var(--card-fill)] p-2 shadow-[0_1px_2px_rgb(15_23_42_/_0.06)]"
-            >
-              <span
-                className="block h-1 w-7 rounded-full"
-                style={{ backgroundColor: card.tint }}
-              />
-              <p className="mt-1.5 text-[0.6875rem] leading-snug text-ink-soft">{card.text}</p>
-              {card.done && (
-                <span className="mt-1.5 block h-1 w-full rounded-full bg-[var(--label-green)]" />
-              )}
-            </div>
+            <PreviewCard key={card.text} card={card} />
           ))}
         </div>
       ))}
@@ -161,9 +283,15 @@ function BoardPreview() {
   );
 }
 
-export function LandingPage() {
+/**
+ * `signedIn` hanya mengubah ajakannya, bukan isinya: penjelasan kanban tetap
+ * penjelasan kanban bagi siapa pun yang membukanya. Yang sudah punya akun
+ * tidak ditawari mendaftar — ia ditawari jalan kembali ke papannya.
+ */
+export function LandingPage({ signedIn = false }: { signedIn?: boolean }) {
   const daftar = () => navigate(paths.daftar);
   const masuk = () => navigate(paths.masuk);
+  const buka = () => navigate(paths.workspaces);
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4 sm:p-6">
@@ -181,12 +309,20 @@ export function LandingPage() {
         </p>
 
         <div className="mt-6 flex flex-wrap items-center gap-2.5">
-          <button type="button" onClick={daftar} className="btn btn-primary px-5 py-2.5">
-            Mulai sekarang
-          </button>
-          <button type="button" onClick={masuk} className="btn btn-glass px-5 py-2.5">
-            Sudah punya akun
-          </button>
+          {signedIn ? (
+            <button type="button" onClick={buka} className="btn btn-primary px-5 py-2.5">
+              Buka workspace saya
+            </button>
+          ) : (
+            <>
+              <button type="button" onClick={daftar} className="btn btn-primary px-5 py-2.5">
+                Mulai sekarang
+              </button>
+              <button type="button" onClick={masuk} className="btn btn-glass px-5 py-2.5">
+                Sudah punya akun
+              </button>
+            </>
+          )}
         </div>
 
         <BoardPreview />
@@ -259,14 +395,22 @@ export function LandingPage() {
       {/* ── Penutup ── */}
       <section className="glass glass-frost flex flex-col items-start gap-4 rounded-3xl p-7 sm:flex-row sm:items-center sm:justify-between sm:p-9">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">Buat papan pertama Anda</h2>
+          <h2 className="text-lg font-semibold tracking-tight">
+            {signedIn ? "Kembali ke papan Anda" : "Buat papan pertama Anda"}
+          </h2>
           <p className="mt-1 text-sm text-muted">
-            Cukup email dan kata sandi — papan kosong siap dalam satu menit.
+            {signedIn
+              ? "Halaman ini tetap di tempatnya — buka lagi kapan pun ada yang perlu dibaca ulang."
+              : "Cukup email dan kata sandi — papan kosong siap dalam satu menit."}
           </p>
         </div>
 
-        <button type="button" onClick={daftar} className="btn btn-primary shrink-0 px-5 py-2.5">
-          Mulai sekarang
+        <button
+          type="button"
+          onClick={signedIn ? buka : daftar}
+          className="btn btn-primary shrink-0 px-5 py-2.5"
+        >
+          {signedIn ? "Buka workspace" : "Mulai sekarang"}
         </button>
       </section>
     </div>

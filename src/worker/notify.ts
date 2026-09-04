@@ -4,6 +4,9 @@ import { nanoid } from "nanoid";
 import {
   boards,
   cardParticipants,
+  cardWatches,
+  cards,
+  columnWatches,
   notificationPrefs,
   notifications,
   pushSubscriptions,
@@ -13,7 +16,12 @@ import {
 import type { AppEnv } from "./auth";
 import type { ActivityNote } from "./card-data";
 import { createPusher } from "./push";
-import { describeActivity } from "../shared/activity";
+import {
+  describeCardDeleted,
+  describeComment,
+  describeNewCard,
+  describeNotification,
+} from "../shared/activity";
 
 /**
  * Siapa yang dikabari, dan atas kabar jenis apa.
@@ -76,7 +84,13 @@ interface Announcement {
   workspaceId: string;
   boardId: string;
   cardId: string;
-  /** Judul kartu — atau nama papan, untuk kabar kartu baru. */
+  /**
+   * Baris pertama notifikasi: nama papannya.
+   *
+   * Bukan judul kartunya — kartu yang bersangkutan sudah disebut di dalam
+   * kalimat, dan mengulangnya di baris atas hanya menghabiskan satu dari dua
+   * baris yang tersedia di layar kunci.
+   */
   title: string;
   body: string;
 }
@@ -201,33 +215,92 @@ async function deliver(
 }
 
 /**
- * Peserta kartu selain pelakunya — mereka inilah "anggota" sebuah kartu.
+ * Anggota sebuah workspace — penjaga terakhir setiap daftar penerima.
  *
- * Keanggotaan workspace ikut diperiksa: jejak seseorang di `card_participants`
- * tidak ikut terhapus saat ia dikeluarkan dari tim, dan tanpa penjagaan ini ia
- * akan terus menerima kabar tentang papan yang sudah tidak boleh ia buka.
+ * Jejak seseorang di `card_participants` dan pilihan Awasinya tidak ikut
+ * terhapus saat ia dikeluarkan dari tim, dan tanpa penyaringan ini ia akan
+ * terus menerima kabar tentang papan yang sudah tidak boleh ia buka.
  */
-async function cardWatchers(
-  db: Db,
-  cardId: string,
-  boardId: string,
-  actorId: string,
-): Promise<string[]> {
+async function memberIds(db: Db, workspaceId: string): Promise<Set<string>> {
   const rows = await db
-    .select({ userId: cardParticipants.userId })
-    .from(cardParticipants)
-    .innerJoin(boards, eq(boards.id, boardId))
-    .innerJoin(
-      workspaceMembers,
-      and(
-        eq(workspaceMembers.workspaceId, boards.workspaceId),
-        eq(workspaceMembers.userId, cardParticipants.userId),
-      ),
-    )
-    .where(and(eq(cardParticipants.cardId, cardId), ne(cardParticipants.userId, actorId)))
+    .select({ userId: workspaceMembers.userId })
+    .from(workspaceMembers)
+    .where(eq(workspaceMembers.workspaceId, workspaceId))
     .all();
 
-  return rows.map((row) => row.userId);
+  return new Set(rows.map((row) => row.userId));
+}
+
+/**
+ * Siapa yang mengawasi kartu ini, selain pelakunya.
+ *
+ * Tiga lapis, dan urutan penerapannya yang menentukan artinya:
+ *
+ * 1. Peserta kartu mengawasi secara bawaan — inilah yang membuat pembuat dan
+ *    kontributor kartu dikabari tanpa pernah menekan apa pun.
+ * 2. Pengawas kolom tempat kartu itu sekarang berada ikut terbawa — dan, saat
+ *    kartunya baru saja pindah, pengawas kolom yang ditinggalkannya juga —
+ *    walau mereka belum pernah menyentuh kartunya.
+ * 3. Pilihan manual di `card_watches` menimpa keduanya. Karena itulah
+ *    mematikan Awasi di satu kartu tetap menyunyikannya sekalipun kolomnya
+ *    sedang diawasi — yang dinyatakan orangnya selalu menang atas yang
+ *    disimpulkan aplikasi.
+ */
+async function cardAudience(
+  db: Db,
+  cardId: string,
+  workspaceId: string,
+  actorId: string,
+  /**
+   * Kolom lain yang pengawasnya ikut dikabari. Dipakai perpindahan kartu:
+   * kolom asalnya sudah tidak memuat kartu ini lagi saat kabarnya disusun,
+   * padahal "kartu itu keluar dari sini" justru kabar untuk yang menjaganya.
+   */
+  alsoColumnId?: string,
+): Promise<string[]> {
+  const [participants, choices, columnWatchers, alsoWatchers, members] = await Promise.all([
+    db
+      .select({ userId: cardParticipants.userId })
+      .from(cardParticipants)
+      .where(eq(cardParticipants.cardId, cardId))
+      .all(),
+
+    db
+      .select({ userId: cardWatches.userId, watching: cardWatches.watching })
+      .from(cardWatches)
+      .where(eq(cardWatches.cardId, cardId))
+      .all(),
+
+    db
+      .select({ userId: columnWatches.userId })
+      .from(columnWatches)
+      .innerJoin(cards, eq(cards.columnId, columnWatches.columnId))
+      .where(eq(cards.id, cardId))
+      .all(),
+
+    alsoColumnId
+      ? db
+          .select({ userId: columnWatches.userId })
+          .from(columnWatches)
+          .where(eq(columnWatches.columnId, alsoColumnId))
+          .all()
+      : [],
+
+    memberIds(db, workspaceId),
+  ]);
+
+  const watching = new Set<string>();
+  for (const row of participants) watching.add(row.userId);
+  for (const row of columnWatchers) watching.add(row.userId);
+  for (const row of alsoWatchers) watching.add(row.userId);
+  for (const row of choices) {
+    if (row.watching) watching.add(row.userId);
+    else watching.delete(row.userId);
+  }
+
+  watching.delete(actorId);
+
+  return [...watching].filter((id) => members.has(id));
 }
 
 /**
@@ -253,23 +326,26 @@ async function boardAudience(db: Db, boardId: string, actorId: string) {
   };
 }
 
-/** Workspace pemilik sebuah board — konteks yang dipakai penyaring kotak masuk. */
-async function boardWorkspace(db: Db, boardId: string): Promise<string | null> {
+/**
+ * Papan beserta workspace pemiliknya: namanya jadi baris pertama notifikasi,
+ * workspace-nya jadi konteks penyaring kotak masuk.
+ */
+async function boardScope(db: Db, boardId: string) {
   const row = await db
-    .select({ workspaceId: boards.workspaceId })
+    .select({ workspaceId: boards.workspaceId, title: boards.title })
     .from(boards)
     .where(eq(boards.id, boardId))
     .get();
 
-  return row?.workspaceId ?? null;
+  return row ?? null;
 }
 
 interface CardNews {
   cardId: string;
   boardId: string;
-  /** Judul kartu — jadi baris pertama notifikasi. */
+  /** Judul kartu — disebut di dalam kalimatnya, bukan di baris judul. */
   cardTitle: string;
-  /** Kalimatnya, sudah utuh: "Rina menulis followup: …". */
+  /** Kalimatnya, sudah utuh: "Rina menulis di “Perbaiki login”: …". */
   body: string;
   /**
    * Penerima yang sudah dikumpulkan lebih dulu. Hanya dipakai penghapusan
@@ -277,38 +353,40 @@ interface CardNews {
    * dibaca selagi masih ada.
    */
   watchers?: string[];
+  /** Kolom yang baru saja ditinggalkan kartu ini — pengawasnya ikut dikabari. */
+  fromColumnId?: string;
 }
 
 /**
- * Kabari peserta sebuah kartu. Aman dipanggil tanpa `await` — seluruh
+ * Kabari pengawas sebuah kartu. Aman dipanggil tanpa `await` — seluruh
  * pekerjaannya, termasuk mencari penerimanya, berjalan setelah respons pergi.
+ *
+ * Tidak diekspor: rute cukup menyebutkan apa yang terjadi lewat salah satu
+ * pembungkus di bawah, supaya seluruh kalimat notifikasi lahir di berkas ini.
  */
-export function notifyCard(
-  c: Context<AppEnv>,
-  channel: "comments" | "changes",
-  news: CardNews,
-): void {
+function notifyCard(c: Context<AppEnv>, channel: "comments" | "changes", news: CardNews): void {
   const db = c.get("db");
   const actorId = c.get("user").id;
 
   c.executionCtx.waitUntil(
     (async () => {
-      const [watchers, workspaceId] = await Promise.all([
-        news.watchers ?? cardWatchers(db, news.cardId, news.boardId, actorId),
-        boardWorkspace(db, news.boardId),
-      ]);
+      const board = await boardScope(db, news.boardId);
 
       // Boardnya keburu hilang di antara aksi dan kabarnya — tidak ada lagi
       // konteks yang bisa ditulis, dan tidak ada lagi yang perlu dikabari.
-      if (!workspaceId) return;
+      if (!board) return;
+
+      const watchers =
+        news.watchers ??
+        (await cardAudience(db, news.cardId, board.workspaceId, actorId, news.fromColumnId));
 
       await announce(c, {
         userIds: watchers,
         channel,
-        workspaceId,
+        workspaceId: board.workspaceId,
         boardId: news.boardId,
         cardId: news.cardId,
-        title: news.cardTitle,
+        title: board.title,
         body: news.body,
       });
     })(),
@@ -316,19 +394,20 @@ export function notifyCard(
 }
 
 /**
- * Ubah catatan lini masa jadi satu kalimat: "Rina menambahkan label “Mendesak”".
+ * Ubah catatan lini masa jadi satu kalimat utuh:
+ * "Rina menambahkan label “Mendesak” pada “Perbaiki login”".
  *
- * Kalimatnya dipinjam dari lini masa kartu, bukan ditulis ulang di sini —
- * dengan begitu notifikasi dan riwayat kartu selalu menceritakan kejadian yang
- * sama dengan kata-kata yang sama.
+ * Kartunya ikut disebut — beda dengan baris lini masa, yang sudah berdiri di
+ * dalam kartunya. Notifikasi dibaca jauh dari sana, dan kalimat tanpa objek
+ * ("memindahkan dari Backlog ke Selesai") memaksa orang menebak apa yang
+ * sebenarnya berpindah.
  */
-function sentence(actorName: string, notes: ActivityNote[]): string | null {
+function sentence(actorName: string, cardTitle: string, notes: ActivityNote[]): string | null {
   if (notes.length === 0) return null;
 
-  const phrases = notes.map((note) => {
-    const { verb, subject } = describeActivity(note.kind, note.detail ?? null);
-    return subject ? `${verb} “${subject}”` : verb;
-  });
+  const phrases = notes.map((note) =>
+    describeNotification(note.kind, note.detail ?? null, cardTitle),
+  );
 
   return `${actorName} ${phrases.join(" dan ")}`;
 }
@@ -341,16 +420,48 @@ export function notifyCardActivity(
   c: Context<AppEnv>,
   news: Omit<CardNews, "body"> & { notes?: ActivityNote | ActivityNote[] },
 ): void {
-  const body = sentence(c.get("user").name, news.notes ? [news.notes].flat() : []);
+  const notes = news.notes ? [news.notes].flat() : [];
+  const body = sentence(c.get("user").name, news.cardTitle, notes);
   if (!body) return;
 
   notifyCard(c, "changes", { ...news, body });
 }
 
-/** Kabari seluruh anggota workspace bahwa ada kartu baru di salah satu papannya. */
+/** Followup baru: isinya sendiri yang jadi kabarnya, di kartu yang disebut namanya. */
+export function notifyComment(
+  c: Context<AppEnv>,
+  news: Omit<CardNews, "body"> & { comment: string },
+): void {
+  notifyCard(c, "comments", {
+    ...news,
+    body: `${c.get("user").name} ${describeComment(news.cardTitle, news.comment)}`,
+  });
+}
+
+/**
+ * Kartu yang dihapus. Penerimanya harus sudah dikumpulkan lebih dulu lewat
+ * `watchersBeforeDelete` — daftar pesertanya ikut lenyap bersama kartunya.
+ */
+export function notifyCardDeleted(c: Context<AppEnv>, news: Omit<CardNews, "body">): void {
+  notifyCard(c, "changes", {
+    ...news,
+    body: `${c.get("user").name} ${describeCardDeleted(news.cardTitle)}`,
+  });
+}
+
+/**
+ * Kabari yang perlu tahu bahwa ada kartu baru — lewat dua kabar yang berbeda,
+ * karena bagi dua kelompok ini kejadiannya memang bukan hal yang sama.
+ *
+ * Bagi pengawas kolomnya ini kabar tentang sesuatu yang mereka ikuti, jadi ia
+ * datang sebagai `changes`: bercerita tentang kartunya, dan ikut aturan kanal
+ * yang defaultnya nyala. Bagi seluruh anggota workspace ini siaran — kartu di
+ * papan yang belum tentu mereka pedulikan — dan tetap `newCards`, kanal yang
+ * defaultnya mati. Tidak ada yang menerima dua-duanya.
+ */
 export function notifyNewCard(
   c: Context<AppEnv>,
-  news: { boardId: string; cardId: string; cardTitle: string },
+  news: { boardId: string; cardId: string; cardTitle: string; columnTitle: string },
 ): void {
   const db = c.get("db");
   const actor = c.get("user");
@@ -360,24 +471,43 @@ export function notifyNewCard(
       const { workspaceId, boardTitle, userIds } = await boardAudience(db, news.boardId, actor.id);
       if (!workspaceId) return;
 
+      /* Kartunya baru lahir, jadi satu-satunya pesertanya adalah pembuatnya —
+         yang sudah tersaring sebagai pelaku. Yang tersisa dari daftar ini
+         persis para pengawas kolomnya. */
+      const watchers = await cardAudience(db, news.cardId, workspaceId, actor.id);
+      const watching = new Set(watchers);
+
+      const context = { workspaceId, boardId: news.boardId, cardId: news.cardId };
+
       await announce(c, {
-        userIds,
-        channel: "newCards",
-        workspaceId,
-        boardId: news.boardId,
-        cardId: news.cardId,
+        ...context,
+        userIds: watchers,
+        channel: "changes",
         title: boardTitle,
-        body: `${actor.name} menambahkan kartu “${news.cardTitle}”`,
+        // Pengawas kolomnya perlu tahu kolom mana yang bertambah isi.
+        body: `${actor.name} ${describeNewCard(news.cardTitle)} di kolom “${news.columnTitle}”`,
+      });
+
+      await announce(c, {
+        ...context,
+        userIds: userIds.filter((id) => !watching.has(id)),
+        channel: "newCards",
+        title: boardTitle,
+        body: `${actor.name} ${describeNewCard(news.cardTitle)}`,
       });
     })(),
   );
 }
 
-/** Peserta kartu, dibaca lebih dulu karena kartunya sebentar lagi dihapus. */
-export function watchersBeforeDelete(
+/** Pengawas kartu, dibaca lebih dulu karena kartunya sebentar lagi dihapus. */
+export async function watchersBeforeDelete(
   c: Context<AppEnv>,
   cardId: string,
   boardId: string,
 ): Promise<string[]> {
-  return cardWatchers(c.get("db"), cardId, boardId, c.get("user").id);
+  const db = c.get("db");
+  const board = await boardScope(db, boardId);
+  if (!board) return [];
+
+  return cardAudience(db, cardId, board.workspaceId, c.get("user").id);
 }

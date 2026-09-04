@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { ColorSwatches } from "./ColorSwatches";
 import { labelTint } from "../lib/people";
-import { LABEL_COLORS, type Label, type LabelColor } from "../../shared/types";
+import type { Label, LabelColor } from "../../shared/types";
 
 interface Props {
   /** Palet board — label apa saja yang tersedia untuk dipasang di sini. */
@@ -10,33 +11,6 @@ interface Props {
   onCreate: (name: string, color: LabelColor) => void;
   onRename: (id: string, patch: { name?: string; color?: LabelColor }) => void;
   onDelete: (id: string) => void;
-}
-
-/** Deretan pilihan warna. Titik, bukan kotak: warnanya yang dipilih, bukan bentuknya. */
-function ColorSwatches({
-  value,
-  onChange,
-}: {
-  value: LabelColor;
-  onChange: (color: LabelColor) => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {LABEL_COLORS.map((color) => (
-        <button
-          key={color}
-          type="button"
-          aria-label={`Warna ${color}`}
-          aria-pressed={color === value}
-          onClick={() => onChange(color)}
-          style={labelTint(color)}
-          className="grid size-6 place-items-center rounded-full transition-transform hover:scale-110"
-        >
-          <span className="label-dot size-4" data-selected={color === value} />
-        </button>
-      ))}
-    </div>
-  );
 }
 
 export function CardLabels({
@@ -151,7 +125,7 @@ export function CardLabels({
                       }}
                       className="field"
                     />
-                    <ColorSwatches value={draftColor} onChange={setDraftColor} />
+                    <ColorSwatches value={draftColor} onChange={(c) => c && setDraftColor(c)} />
                     <div className="flex items-center gap-1.5">
                       <button type="button" onClick={commitEdit} className="btn btn-primary">
                         Simpan
@@ -239,7 +213,7 @@ export function CardLabels({
                 }}
                 className="field"
               />
-              <ColorSwatches value={newColor} onChange={setNewColor} />
+              <ColorSwatches value={newColor} onChange={(c) => c && setNewColor(c)} />
               <button
                 type="button"
                 onClick={commitCreate}

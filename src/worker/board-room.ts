@@ -1,10 +1,31 @@
 import { DurableObject } from "cloudflare:workers";
+import type { UserBrief } from "../shared/types";
 
 export type BoardEvent =
   /** Isi board berubah — klien lain perlu menarik ulang datanya. */
   | { type: "board:changed"; origin: string | null; at: number }
-  /** Jumlah orang yang sedang membuka board ini. */
-  | { type: "presence"; count: number };
+  /** Siapa saja yang sedang membuka board ini. */
+  | { type: "presence"; count: number; viewers: UserBrief[] };
+
+/**
+ * Nama parameter yang membawa identitas penonton di URL upgrade.
+ *
+ * Isinya dipasang Worker dari sesi yang sudah diperiksa, bukan dikirim klien
+ * (lihat routes/boards.ts) — daftar "siapa yang sedang di papan ini" tidak
+ * boleh bisa diisi nama karangan oleh tab mana pun yang berhasil menyambung.
+ */
+export const VIEWER_PARAM = "viewer";
+
+function readViewer(url: string): UserBrief | null {
+  const raw = new URL(url).searchParams.get(VIEWER_PARAM);
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw) as UserBrief;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Satu Durable Object per board: menampung koneksi WebSocket para kolaborator
@@ -22,6 +43,10 @@ export class BoardRoom extends DurableObject<Env> {
 
     const { 0: client, 1: server } = new WebSocketPair();
     this.ctx.acceptWebSocket(server);
+
+    /* Identitas ikut disimpan pada soketnya, bukan di state objek: lampiran
+       ini selamat melewati hibernasi, sedangkan variabel di memori tidak. */
+    server.serializeAttachment(readViewer(request.url));
 
     this.broadcastPresence();
 
@@ -65,10 +90,29 @@ export class BoardRoom extends DurableObject<Env> {
   /**
    * Socket yang sedang ditutup masih ikut terhitung di getWebSockets(),
    * jadi ia harus dikecualikan agar hitungannya tidak kelebihan satu.
+   *
+   * Yang disiarkan orangnya, bukan koneksinya: satu orang yang membuka papan
+   * di dua tab tetap satu orang di daftar, dan sebuah papan yang menyebut
+   * "2 orang" padahal cuma satu justru mengabarkan kehadiran yang tidak ada.
    */
   private broadcastPresence(excluding?: WebSocket): void {
     const sockets = this.ctx.getWebSockets().filter((socket) => socket !== excluding);
-    const payload = JSON.stringify({ type: "presence", count: sockets.length });
+
+    const viewers = new Map<string, UserBrief>();
+    for (const socket of sockets) {
+      const viewer = socket.deserializeAttachment() as UserBrief | null;
+      if (viewer) viewers.set(viewer.id, viewer);
+    }
+
+    const event: BoardEvent = {
+      type: "presence",
+      // Soket dari sebelum identitas ikut dikirim tidak punya lampiran; di
+      // papan yang isinya hanya soket seperti itu, hitungan koneksi masih
+      // lebih benar daripada nol.
+      count: viewers.size || sockets.length,
+      viewers: [...viewers.values()],
+    };
+    const payload = JSON.stringify(event);
 
     for (const socket of sockets) {
       try {

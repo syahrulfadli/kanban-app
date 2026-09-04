@@ -3,6 +3,10 @@ import { useSyncExternalStore } from "react";
 /** Router hash minimal — cukup untuk jumlah halaman saat ini. */
 export type Route =
   | { name: "workspaces" }
+  /** Halaman pengantar. Berdiri sendiri di alamatnya supaya tetap bisa
+      dibuka oleh yang sudah masuk — akar sudah jadi milik daftar workspace
+      begitu ada sesi. */
+  | { name: "landing" }
   | { name: "workspace"; workspaceId: string }
   | { name: "members"; workspaceId: string }
   | { name: "settings" }
@@ -21,6 +25,7 @@ function parse(hash: string): Route {
   if (board) return { name: "board", boardId: board[1], cardId: board[2] };
 
   if (path === "/settings") return { name: "settings" };
+  if (path === "/pengantar") return { name: "landing" };
 
   if (path === "/masuk") return { name: "auth", mode: "login" };
   if (path === "/daftar") return { name: "auth", mode: "register" };
@@ -54,6 +59,7 @@ export function useRoute(): Route {
 
 export const paths = {
   workspaces: "#/",
+  pengantar: "#/pengantar",
   workspace: (id: string) => `#/w/${id}`,
   members: (id: string) => `#/w/${id}/members`,
   settings: "#/settings",

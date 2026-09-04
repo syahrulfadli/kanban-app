@@ -16,8 +16,22 @@ export function AddItemForm({ placeholder, submitLabel, onSubmit }: Props) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="w-full rounded-lg px-2.5 py-2 text-left text-sm text-muted transition-colors hover:bg-line-soft hover:text-ink"
+        /* .add-item mengambil rona dari kolomnya (--col). Tanpa rona ia jatuh
+           ke nada netral yang sama seperti sebelumnya — lihat index.css. */
+        className="add-item flex w-full items-center gap-1.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors"
       >
+        <svg
+          viewBox="0 0 24 24"
+          className="size-4 shrink-0"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+        >
+          <path d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
         {submitLabel}
       </button>
     );

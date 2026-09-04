@@ -25,6 +25,23 @@
   --color-line: rgb(15 23 42 / 0.12);
   --color-line-soft: rgb(15 23 42 / 0.07);
 
+  /* Salinan beku dari --color-muted, dan bekunya itulah gunanya.
+
+     Substitusi var() diselesaikan di elemen tempat ia ditulis, jadi nilai di
+     sini sudah jadi warna sungguhan sebelum sempat diwarisi — dan tetap warna
+     itu di dalam kolom berwarna, yang menimpa --color-muted untuk seluruh
+     perabotnya. Dipakai barang yang duduk di lembar putih meski lahir di
+     dalam kolom berwarna: lembarnya tidak ikut berona, jadi tintanya juga
+     tidak boleh. Blok tema gelap menimpa --color-muted lebih dulu di elemen
+     yang sama, jadi salinan ini ikut benar di kedua tema.
+
+     Ketiga sekawannya menyusul dengan alasan yang sama: .sheet memakainya
+     untuk memulihkan seluruh tangga tinta di dalam lembarnya sendiri. */
+  --color-ink-base: var(--color-ink);
+  --color-ink-soft-base: var(--color-ink-soft);
+  --color-muted-base: var(--color-muted);
+  --color-faint-base: var(--color-faint);
+
   /* Aksen — biru air, satu-satunya warna interaktif */
   --color-accent: #0284C7;
   --color-accent-ink: #0369A1;
@@ -426,6 +443,21 @@ body {
     box-shadow: 0 2px 6px rgb(15 23 42 / 0.06),
                 0 18px 40px -18px rgb(15 23 42 / 0.35),
                 inset 0 0 0 1px var(--color-line-soft);
+
+    /* Lembar pop-up memulihkan tangga tintanya sendiri.
+
+       Ia mengambang di atas halaman, bukan menempel pada apa yang
+       memunculkannya — tapi di DOM ia tetap anak dari sana, dan menu kolom
+       lahir persis di dalam .column-chrome. Tanpa baris-baris ini, seluruh
+       tulisan menu di kolom berwarna ikut dibelokkan jadi nada muda rona itu
+       (lihat blok [data-tinted="true"] .column-chrome) — nada yang memang
+       dibuat untuk dibaca di atas isian pekat kolomnya, dan yang di atas
+       lembar putih ini nyaris lenyap. */
+    --color-ink: var(--color-ink-base);
+    --color-ink-soft: var(--color-ink-soft-base);
+    --color-muted: var(--color-muted-base);
+    --color-faint: var(--color-faint-base);
+    color: var(--color-ink);
   }
   [data-theme="dark"] .sheet {
     box-shadow: 0 2px 6px rgb(0 0 0 / 0.35),
@@ -493,6 +525,96 @@ body {
      pane lain di halaman ini, cuma lebih tinggi. */
   .glass-column {
     border-radius: 1rem;
+  }
+
+  /* Kolom berwarna.
+
+     Ronanya dipasang pekat, bukan sebagai wash tipis — arah yang sama dengan
+     chip label: yang pekat sudah jadi sepotong warna sebelum apa pun di
+     dalamnya dibaca, dan itulah gunanya kolom diberi warna. Isiannya tetap
+     tembus sedikit supaya ladang cahaya di belakang papan masih lewat dan
+     kolom tidak berubah jadi kotak cat.
+
+     `data-tinted`, bukan `[style*=--col]`: custom property tidak bisa jadi
+     selector, dan kolom tanpa warna memang tidak memasang --col sama sekali. */
+  .glass-column[data-tinted="true"] {
+    --col-deep: color-mix(in oklab, var(--col) 76%, #101828);
+    background-color: color-mix(in oklab, var(--col-deep) 88%, transparent);
+
+    /* Kartu dinaikkan jadi nyaris pekat. Isian bawaannya setengah tembus —
+       di atas kolom pekat itu berubah jadi nada tengah, dan tinta kartu yang
+       gelap kehilangan kontrasnya. Yang dinaikkan isiannya, bukan tintanya:
+       kartu harus tetap terbaca sebagai kartu yang sama di kolom mana pun. */
+    --board-card-fill: rgb(255 255 255 / 0.90);
+    --board-card-fill-hi: rgb(255 255 255 / 0.97);
+  }
+  [data-theme="dark"] .glass-column[data-tinted="true"] {
+    /* Rona label di tema gelap sudah terang, jadi porsinya dibalik — yang
+       dicampur lebih banyak justru arangnya. */
+    --col-deep: color-mix(in oklab, var(--col) 38%, #0A0C11);
+
+    --board-card-fill: rgb(4 6 10 / 0.58);
+    --board-card-fill-hi: rgb(4 6 10 / 0.40);
+  }
+
+  /* Judul kolom yang sedang disusutkan.
+
+     `vertical-rl` memutar teksnya searah jarum jam, arah yang sama dengan
+     judul di punggung buku — kepala orang tinggal miring ke kanan untuk
+     membacanya, dan kolomnya cukup selebar satu tombol.
+
+     `truncate` bawaan Tailwind bekerja pada sumbu tulisannya sendiri, jadi
+     pasangan ini sudah cukup: nama yang lebih panjang daripada tinggi papan
+     berakhir dengan elipsis, bukan menjulur keluar layar. */
+  .column-title-vertical {
+    writing-mode: vertical-rl;
+  }
+
+  /* Perabot kolom yang duduk LANGSUNG di atas isian pekat itu: kepala kolom,
+     kaki penambah kartu, dan pelat "belum ada kartu".
+
+     Yang ditimpa tokennya, bukan tiap kelasnya. Utility Tailwind menunjuk ke
+     custom property yang sama (`text-faint` itu `var(--color-faint)`), jadi
+     satu blok ini membelokkan judul, chip hitung, tombol, kolom isian, dan
+     garis putus-putus sekaligus — tanpa perlu menang lawan urutan layer, yang
+     tidak bisa dimenangkan aturan komponen.
+
+     Sengaja tidak dipasang di kolomnya: kartu ikut mewarisi apa pun yang
+     dipasang di sana, dan kartu punya isiannya sendiri yang terang. */
+  [data-tinted="true"] .column-chrome {
+    --color-ink: color-mix(in oklab, var(--col) 14%, #FFFFFF);
+    --color-ink-soft: color-mix(in oklab, var(--col) 30%, #FFFFFF);
+    --color-muted: color-mix(in oklab, var(--col) 46%, #FFFFFF);
+    --color-faint: color-mix(in oklab, var(--col) 60%, #FFFFFF);
+    --color-line: rgb(255 255 255 / 0.18);
+    --color-line-soft: rgb(255 255 255 / 0.11);
+    --plate-fill: rgb(255 255 255 / 0.16);
+    --plate-fill-hi: rgb(255 255 255 / 0.24);
+    color: var(--color-ink);
+  }
+
+  /* ── Penambah kartu / kolom ──────────────────────────────────────
+     Tombol yang tidur sampai ditekan. Warnanya seluruhnya dari token, jadi
+     di kolom berwarna ia ikut jadi nada muda rona itu tanpa aturan sendiri —
+     dan di kolom tanpa warna ia tetap seperti sebelumnya: abu yang menggelap
+     saat disentuh di tema terang, dan menerang di tema gelap. */
+  .add-item {
+    color: var(--color-muted);
+  }
+  .add-item:hover {
+    background-color: var(--color-line-soft);
+    color: var(--color-ink);
+  }
+  /* Kecuali latar hover-nya: garis putih tipis akan terbaca sebagai kabut di
+     atas rona, bukan sebagai rona yang menerang. Yang dipakai ronanya sendiri,
+     ditipiskan. */
+  [data-tinted="true"] .add-item:hover {
+    background-color: color-mix(in oklab, var(--col) 30%, transparent);
+  }
+  /* Porsinya turun di tema gelap: ronanya sudah terang di sana, dan kadar yang
+     sama akan melompat keluar dari kolomnya alih-alih menerangkan satu baris. */
+  [data-theme="dark"] [data-tinted="true"] .add-item:hover {
+    background-color: color-mix(in oklab, var(--col) 16%, transparent);
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -596,8 +718,15 @@ body {
      ══════════════════════════════════════════════════════════════ */
 
   /* Semua rona diturunkan dari satu --label yang dipasang inline, jadi chip,
-     titik pemilih, dan pratinjau tidak pernah berbeda warna. Isiannya sengaja
-     tipis: label adalah kaca yang diberi warna, bukan stiker yang ditempel. */
+     titik pemilih, dan pratinjau tidak pernah berbeda rona.
+
+     Isiannya pekat dan tulisannya terang — kebalikan dari rona itu sendiri.
+     Chip yang cuma diberi rona tipis harus dibaca dulu sebelum warnanya
+     terbaca; yang pekat sudah jadi sepotong warna sejak sebelum tulisannya
+     dilihat, dan itulah yang membuatnya masih berguna saat teksnya
+     disembunyikan di mode ringkas. Yang digelapkan warna dasarnya, bukan
+     kroma: dicampur ke arang biru yang sama dengan tinta halaman, jadi
+     sembilan rona tetap terbaca sebagai satu keluarga. */
   .label-chip {
     display: inline-flex;
     align-items: center;
@@ -612,13 +741,83 @@ body {
     font-size: 0.6875rem;
     font-weight: 600;
     line-height: 1.4;
-    color: color-mix(in oklab, var(--label) 78%, var(--color-ink));
-    background-color: color-mix(in oklab, var(--label) 16%, transparent);
-    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--label) 34%, transparent);
+    color: color-mix(in oklab, var(--label) 14%, #FFFFFF);
+    background-color: color-mix(in oklab, var(--label) 82%, #101828);
   }
+  /* Di tema gelap rona label memang sudah terang, jadi porsinya dibalik:
+     yang dicampur lebih banyak justru arangnya, supaya chip tetap lebih
+     gelap daripada pelat kartu di belakangnya. */
   [data-theme="dark"] .label-chip {
-    color: color-mix(in oklab, var(--label) 82%, var(--color-ink));
-    background-color: color-mix(in oklab, var(--label) 20%, transparent);
+    color: color-mix(in oklab, var(--label) 34%, #FFFFFF);
+    background-color: color-mix(in oklab, var(--label) 44%, #0A0C11);
+  }
+
+  /* ── Baris label di muka kartu ─────────────────────────────────
+     Yang terbaca dari seberang papan itu warnanya, bukan namanya. Jadi di
+     muka kartu chip menyusut jadi sepotong warna: tulisannya disembunyikan,
+     tingginya disisakan cukup untuk tetap terlihat sebagai warna. Kartu masih
+     bisa dikenali dari deretan ronanya, dan judulnya jadi yang paling dulu
+     terbaca.
+
+     Namanya tidak hilang, cuma dilipat — sebaris klik membukanya kembali.
+     Yang dibuka satu baris penuh, bukan chip yang diklik: nama label baru
+     berguna kalau bisa dibandingkan dengan tetangganya, dan satu nama yang
+     mekar sendirian di antara potongan warna justru lebih sulit dibaca
+     daripada semuanya sekaligus.
+
+     Hanya di .board-card — pemilih label di dalam dialog kartu tetap utuh,
+     karena di sana orang memang sedang membaca namanya. */
+  /* Melipatnya dianimasikan, dan itu menentukan bentuk aturannya.
+
+     `display: none` tidak bisa dianimasikan, dan lebar `auto` juga tidak —
+     jadi tidak satu pun dipakai. Yang menyusut nama labelnya lewat max-width
+     dengan overflow terpotong, dan chip tidak pernah diberi lebar sama
+     sekali: lebarnya selalu `auto`, jadi ia mengikuti anaknya yang sedang
+     menyusut alih-alih melompat di antara dua angka. `min-width` yang
+     menahannya berhenti di ukuran sepotong warna, bukan menghilang.
+
+     Nama tetap ada di pohon dokumen selama terlipat — cuma selebar nol.
+     Pembaca layar tetap mendapatkannya; yang dilipat tampilannya saja. */
+  .label-row .label-chip {
+    min-width: 1.375rem;
+    height: 1.25rem;
+    flex: none;
+    transition: height .3s var(--ease-spring),
+                padding .3s var(--ease-spring),
+                gap .3s var(--ease-spring);
+  }
+  /* Kurva dua arahnya sengaja berbeda, dan alasannya geometri.
+
+     max-width harus dipatok di atas nama terpanjang supaya tidak ada yang
+     jadi terpotong — jadi sebagian besar rentangnya berada DI ATAS lebar
+     tulisan yang sebenarnya, dan di rentang itu tidak ada yang bergerak di
+     layar. Yang terlihat cuma potongan bawahnya.
+
+     Membuka: kurva yang berangkat pelan, jadi potongan bawah itu tidak
+     dilewati dalam beberapa frame pertama dan lebarnya sempat terbaca sebagai
+     gerak. Melipat: kurva yang berangkat cepat, supaya rentang mati di atas
+     habis lebih dulu dan sisa waktunya jatuh ke bagian yang benar-benar
+     menyusut. Dipasang terbalik, keduanya jadi tersentak di satu ujung dan
+     diam di ujung lain. */
+  .label-row .label-text {
+    max-width: 14rem;
+    transition: max-width .3s cubic-bezier(0.45, 0, 0.35, 1),
+                opacity .2s ease .08s;
+  }
+
+  .label-row[data-open="false"] .label-chip {
+    gap: 0;
+    height: 0.5rem;
+    padding: 0;
+  }
+  .label-row[data-open="false"] .label-text {
+    max-width: 0;
+    opacity: 0;
+    /* Tulisan pergi lebih dulu dan tanpa tunda: yang menyusut sampai nol
+       harus sudah tidak terbaca sebelum ruangnya habis, kalau tidak yang
+       terlihat huruf terpotong, bukan nama yang dilipat. */
+    transition: max-width .3s var(--ease-spring),
+                opacity .14s ease;
   }
 
   /* Titik warna di pemilih label. */
@@ -636,6 +835,23 @@ body {
     box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.12),
                 0 0 0 2px var(--sheet-fill),
                 0 0 0 3.5px var(--label);
+  }
+
+  /* Titik "tanpa warna" di pemilih kolom: lingkaran kosong bergaris, bukan
+     titik abu — yang ditawarkan ketiadaan pilihan, bukan warna kesepuluh.
+
+     Ditulis setelah .label-dot, dan itu bukan kebetulan: keduanya sama
+     spesifik, jadi yang menang adalah yang belakangan. Ditaruh lebih dulu,
+     isian dan cincinnya ditimpa .label-dot dan titiknya hilang di atas
+     lembar putih. */
+  .label-dot-none {
+    background-color: transparent;
+    box-shadow: inset 0 0 0 1.5px var(--color-muted-base);
+  }
+  .label-dot-none[data-selected="true"] {
+    box-shadow: inset 0 0 0 1.5px var(--color-muted-base),
+                0 0 0 2px var(--sheet-fill),
+                0 0 0 3.5px var(--color-muted-base);
   }
 
   /* Versi ringkas untuk muka kartu: hanya sepotong warna, tanpa teks —
@@ -657,6 +873,7 @@ body {
      Sudah terbaca di muka kartu, jauh sebelum kartunya dibuka. */
   .progress {
     position: relative;
+    display: block;
     height: 0.3125rem;
     border-radius: 9999px;
     overflow: hidden;
@@ -668,6 +885,7 @@ body {
     box-shadow: inset 0 1px 1px rgb(0 0 0 / 0.35);
   }
   .progress-bar {
+    display: block;
     height: 100%;
     border-radius: 9999px;
     background-color: var(--color-accent);
@@ -677,6 +895,16 @@ body {
      dikenali dari seberang papan tanpa membaca angkanya. */
   .progress-bar[data-complete="true"] {
     background-color: var(--color-ok);
+  }
+
+  /* Di muka kartu batangnya duduk di baris kaki, sebaris dengan avatar dan
+     jumlah followup. Lebarnya dipatok pendek, tidak melar: baris itu berisi
+     beberapa hal kecil, dan satu batang yang mengambil semua sisa ruang akan
+     membaca sebagai isi kartu, bukan sebagai catatan kaki. Angka di sebelahnya
+     yang memberi ketepatan; batangnya cukup memberi kira-kira. */
+  .card-progress {
+    width: 2rem;
+    flex: none;
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -1001,6 +1229,7 @@ body {
   .scrim, .card-dialog, .toast { animation: none; }
   .credit:hover .credit-mark { animation: none; }
   .progress-bar { transition: none; }
+  .label-row .label-chip, .label-row .label-text { transition: none; }
 }
 
 /* Penanda sisi drop. Bukan garis rata: menyala di tengah lalu memudar ke

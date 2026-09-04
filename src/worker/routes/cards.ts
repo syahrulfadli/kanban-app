@@ -7,6 +7,7 @@ import {
   cardActivities,
   cardComments,
   cardLabels,
+  cardWatches,
   cards,
   checklistItems,
   columns,
@@ -43,11 +44,16 @@ import { evenPositions, needsRebalance, positionBetween } from "../../shared/pos
 import type { CardDetail, CardSummary, UserBrief } from "../../shared/types";
 
 /** Kartu + segala yang menggantung padanya — payload untuk dialog kartu. */
-async function buildCardDetail(db: Db, cardId: string, boardId: string): Promise<CardDetail> {
+async function buildCardDetail(
+  db: Db,
+  cardId: string,
+  boardId: string,
+  viewerId: string,
+): Promise<CardDetail> {
   const [card, extrasMap, items, comments, activities] = await Promise.all([
     db.select().from(cards).where(eq(cards.id, cardId)).get(),
 
-    loadCardExtras(db, { cardId }),
+    loadCardExtras(db, { cardId }, viewerId),
 
     db
       .select()
@@ -158,7 +164,12 @@ const app = new Hono<AppEnv>()
         note: { kind: "card_created" },
       });
       await touchBoard(c, boardId);
-      notifyNewCard(c, { boardId, cardId: card.id, cardTitle: card.title });
+      notifyNewCard(c, {
+        boardId,
+        cardId: card.id,
+        cardTitle: card.title,
+        columnTitle: column.title,
+      });
 
       // Kartu baru masih kosong; klien tidak perlu menariknya ulang.
       const summary: CardSummary = {
@@ -167,6 +178,8 @@ const app = new Hono<AppEnv>()
         checklist: { total: 0, done: 0 },
         commentCount: 0,
         participants: [toBrief(c.get("user"))],
+        // Membuat kartu berarti mengawasinya — lewat jejaknya sebagai peserta.
+        watching: true,
       };
 
       return c.json(summary, 201);
@@ -297,10 +310,41 @@ const app = new Hono<AppEnv>()
 
   .get("/:id", async (c) => {
     const db = c.get("db");
-    const { card, boardId } = await requireCard(db, c.req.param("id"), c.get("user").id);
+    const userId = c.get("user").id;
+    const { card, boardId } = await requireCard(db, c.req.param("id"), userId);
 
-    return c.json(await buildCardDetail(db, card.id, boardId));
+    return c.json(await buildCardDetail(db, card.id, boardId, userId));
   })
+
+  /**
+   * Awasi kartu ini, atau berhenti mengawasinya.
+   *
+   * Selalu menulis baris — juga saat jawabannya "jangan". Baris itulah yang
+   * membuat pilihannya bertahan: tanpa ia, aturan bawaan akan menyalakan
+   * kembali Awasi di followup berikutnya orang yang sama (lihat `card_watches`
+   * di skema). Tidak memanggil `touchBoard`, karena yang berubah cuma keadaan
+   * satu orang.
+   */
+  .post(
+    "/:id/watch",
+    zValidator("json", z.object({ watching: z.boolean() })),
+    async (c) => {
+      const db = c.get("db");
+      const userId = c.get("user").id;
+      const { card } = await requireCard(db, c.req.param("id"), userId);
+      const { watching } = c.req.valid("json");
+
+      await db
+        .insert(cardWatches)
+        .values({ cardId: card.id, userId, watching, updatedAt: new Date() })
+        .onConflictDoUpdate({
+          target: [cardWatches.cardId, cardWatches.userId],
+          set: { watching, updatedAt: new Date() },
+        });
+
+      return c.json({ watching });
+    },
+  )
 
   .patch(
     "/:id",
@@ -432,6 +476,9 @@ const app = new Hono<AppEnv>()
         boardId,
         cardTitle: card.title,
         notes: note,
+        // Kartunya sudah pindah, jadi kolom asalnya harus disebut sendiri —
+        // pengawasnya tidak akan ditemukan lagi lewat kartu ini.
+        fromColumnId: from ? card.columnId : undefined,
       });
 
       return c.json(updated);

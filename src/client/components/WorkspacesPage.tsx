@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { AddItemForm } from "./AddItemForm";
 import { AppHeader } from "./AppHeader";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { useUndo } from "./UndoToasts";
+import { insertAt } from "../lib/reorder";
 import { navigate, paths } from "../lib/route";
 import { ListSkeleton } from "./Skeleton";
 import type { WorkspaceSummary } from "../../shared/types";
@@ -11,6 +14,8 @@ const ROLE_LABEL = { owner: "Pemilik", admin: "Admin", member: "Anggota" } as co
 export function WorkspacesPage() {
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<WorkspaceSummary | null>(null);
+  const undo = useUndo();
 
   useEffect(() => {
     api
@@ -24,6 +29,25 @@ export function WorkspacesPage() {
   const create = async (name: string) => {
     const workspace = await api.createWorkspace(name);
     navigate(paths.workspace(workspace.id));
+  };
+
+  /* Sama seperti menghapus board: barisnya hilang sekarang, perintah DELETE-nya
+     berangkat setelah jendela urung habis — lihat UndoProvider. Yang ikut
+     terbawa cascade di sini jauh lebih banyak (board, kolom, kartu, dan
+     keanggotaan), jadi jendela itu justru paling berguna di halaman ini. */
+  const remove = (workspace: WorkspaceSummary) => {
+    const index = workspaces?.findIndex((w) => w.id === workspace.id) ?? -1;
+    if (index < 0) return;
+
+    setPending(null);
+    setWorkspaces((prev) => prev?.filter((w) => w.id !== workspace.id) ?? null);
+
+    undo({
+      message: `Workspace “${workspace.name}” dihapus`,
+      commit: (options) => api.deleteWorkspace(workspace.id, options),
+      revert: () => setWorkspaces((prev) => (prev ? insertAt(prev, workspace, index) : prev)),
+      onError: setError,
+    });
   };
 
   return (
@@ -48,16 +72,35 @@ export function WorkspacesPage() {
 
         <ul className="mt-6 flex flex-col gap-2 empty:mt-0">
           {workspaces?.map((workspace) => (
-            <li key={workspace.id}>
+            <li
+              key={workspace.id}
+              className="glass glass-plate glass-plate-hover flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-colors"
+            >
               <button
                 onClick={() => navigate(paths.workspace(workspace.id))}
-                className="glass glass-plate glass-plate-hover flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left transition-colors"
+                className="min-w-0 flex-1 truncate text-left text-sm font-medium hover:text-accent-ink"
               >
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                  {workspace.name}
-                </span>
-                <span className="chip">{ROLE_LABEL[workspace.role]}</span>
+                {workspace.name}
               </button>
+
+              <span className="chip shrink-0">{ROLE_LABEL[workspace.role]}</span>
+
+              {/* Hanya pemilik yang boleh menghapus workspace — server tetap
+                  yang memutuskan; ini cuma menyembunyikan tombol yang pasti
+                  ditolak. Anggota lain yang ingin pergi memakai "keluar dari
+                  workspace" di halaman Anggota, bukan tombol ini. */}
+              {workspace.role === "owner" && (
+                <button
+                  onClick={() => setPending(workspace)}
+                  aria-label={`Hapus workspace ${workspace.name}`}
+                  title="Hapus workspace"
+                  className="grid size-6 shrink-0 place-items-center rounded-full text-faint transition-colors hover:bg-danger/10 hover:text-danger"
+                >
+                  <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
+                    <path d="M6 6 18 18M18 6 6 18" />
+                  </svg>
+                </button>
+              )}
             </li>
           ))}
 
@@ -71,11 +114,27 @@ export function WorkspacesPage() {
         <div className="mt-3">
           <AddItemForm
             placeholder="Nama workspace…"
-            submitLabel="+ Workspace baru"
+            submitLabel="Workspace baru"
             onSubmit={create}
           />
         </div>
       </div>
+
+      {pending && (
+        <ConfirmDialog
+          title="Hapus workspace?"
+          body={
+            <>
+              “{pending.name}” akan dihapus bersama seluruh board, kolom, dan kartu di dalamnya,
+              dan anggotanya kehilangan aksesnya. Setelah jendela urung tutup, isinya tidak bisa
+              dipulihkan.
+            </>
+          }
+          confirmLabel="Hapus workspace"
+          onConfirm={() => remove(pending)}
+          onCancel={() => setPending(null)}
+        />
+      )}
     </>
   );
 }

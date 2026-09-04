@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { LabelColor } from "../../shared/types";
+import type { ColumnColor, LabelColor } from "../../shared/types";
 
 /* Inisial dari nama: dua kata pertama, atau dua huruf pertama kalau namanya
    satu kata. Jatuh ke email bila nama kosong, dan ke "?" bila keduanya kosong. */
@@ -51,3 +51,18 @@ export function avatarTint(name?: string | null, email?: string | null) {
  */
 export const labelTint = (color: LabelColor) =>
   ({ "--label": `var(--label-${color})` }) as CSSProperties;
+
+/**
+ * Rona kolom. Palet dan mekanismenya sama dengan label — kolom berwarna dan
+ * label berwarna harus terbaca sebagai satu keluarga, bukan dua sistem yang
+ * kebetulan bertumpuk di papan yang sama.
+ *
+ * Custom property-nya sendiri (`--col`, bukan `--label`) karena kartu di dalam
+ * kolom membawa chip labelnya masing-masing: satu nama untuk keduanya berarti
+ * rona kolom menetes ke setiap chip di dalamnya lewat pewarisan.
+ *
+ * Null mengembalikan objek kosong, bukan rona netral — aturan CSS-nya
+ * bergantung pada `--col` yang benar-benar tidak ada.
+ */
+export const columnTint = (color: ColumnColor | null) =>
+  (color ? { "--col": `var(--label-${color})` } : {}) as CSSProperties;

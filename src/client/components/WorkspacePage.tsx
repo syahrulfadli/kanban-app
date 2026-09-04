@@ -113,7 +113,7 @@ export function WorkspacePage({ workspaceId }: { workspaceId: string }) {
         </ul>
 
         <div className="mt-3">
-          <AddItemForm placeholder="Nama board…" submitLabel="+ Board baru" onSubmit={create} />
+          <AddItemForm placeholder="Nama board…" submitLabel="Board baru" onSubmit={create} />
         </div>
       </div>
 

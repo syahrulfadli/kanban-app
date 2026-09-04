@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CardChecklist } from "./CardChecklist";
 import { CardFollowup } from "./CardFollowup";
 import { CardLabels } from "./CardLabels";
+import { WatchToggle } from "./WatchToggle";
 import { AvatarStack } from "./Avatar";
 import { CardDetailSkeleton, SkeletonLine } from "./Skeleton";
 import { api } from "../lib/api";
@@ -93,6 +94,29 @@ export function CardModal({
   useEffect(() => {
     dialogRef.current?.focus();
   }, []);
+
+  /**
+   * Awasi kartu ini, atau berhenti mengawasinya.
+   *
+   * Sengaja tidak lewat `run`: Awasi bukan suntingan kartu. Ia tidak mengubah
+   * "diubah oleh", tidak menambahkan siapa pun ke deretan avatar, dan tidak
+   * meninggalkan apa-apa di lini masa — yang berubah hanya kabar apa yang
+   * sampai ke satu orang.
+   */
+  const setWatching = async (watching: boolean) => {
+    setDetail((prev) => (prev ? { ...prev, watching } : prev));
+
+    try {
+      await api.watchCard(cardId, watching);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Perubahan gagal disimpan");
+      await load();
+    } finally {
+      // Muka kartu di papan punya matanya sendiri untuk digambar ulang.
+      onBoardChange();
+    }
+  };
 
   /**
    * Terapkan perubahan di layar dulu, lalu kirim ke server. Kalau server
@@ -328,7 +352,13 @@ export function CardModal({
         onKeyDown={(e) => {
           if (e.key === "Escape") onClose();
         }}
-        className="card-plain relative flex max-h-full w-full max-w-4xl flex-col overflow-hidden outline-none"
+        /* Tingginya dipatok penuh, bukan mengikuti isi. Dialog yang tumbuh
+           setinggi isinya berpindah-pindah ukuran tiap kali kartu lain dibuka —
+           dan yang paling sering dibuka justru kartu yang isinya sedikit, jadi
+           deskripsi dan lini masa berdesakan di jendela sempit padahal layarnya
+           kosong. Dengan tinggi tetap, tiap kartu terbuka di bingkai yang sama
+           dan ruang bacanya selalu selebar-lebarnya yang ada. */
+        className="card-plain relative flex h-full w-full max-w-4xl flex-col overflow-hidden outline-none"
       >
         <header className="flex items-start gap-3 px-5 pt-4 pb-3">
           <div className="min-w-0 flex-1">
@@ -362,6 +392,15 @@ export function CardModal({
               </h2>
             )}
           </div>
+
+          {detail && (
+            <WatchToggle
+              watching={detail.watching}
+              onChange={(watching) => void setWatching(watching)}
+              subject="kartu ini"
+              className="size-8 text-muted"
+            />
+          )}
 
           <button
             type="button"

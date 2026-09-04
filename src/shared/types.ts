@@ -7,6 +7,7 @@ import type {
   CardComment,
   ChecklistItem,
   Column,
+  ColumnColor,
   Invitation,
   Label,
   LabelColor,
@@ -14,7 +15,7 @@ import type {
   Role,
   Workspace,
 } from "../db/schema";
-import { LABEL_COLORS } from "../db/schema";
+import { COLUMN_COLORS, LABEL_COLORS } from "../db/schema";
 
 export type {
   ActivityDetail,
@@ -25,6 +26,7 @@ export type {
   CardComment,
   ChecklistItem,
   Column,
+  ColumnColor,
   Invitation,
   Label,
   LabelColor,
@@ -32,7 +34,7 @@ export type {
   Role,
   Workspace,
 };
-export { LABEL_COLORS };
+export { COLUMN_COLORS, LABEL_COLORS };
 
 /** Workspace beserta peran user yang sedang login di dalamnya. */
 export interface WorkspaceSummary extends Workspace {
@@ -63,6 +65,13 @@ export interface CardSummary extends Card {
   commentCount: number;
   /** Terurut dari yang paling awal menyentuh kartu — pembuat selalu di depan. */
   participants: UserBrief[];
+  /**
+   * Apakah orang yang sedang melihat mengawasi kartu ini — hanya kartunya
+   * sendiri. Mengawasi kolomnya juga mengirim kabar tentang kartu ini, tapi
+   * tidak dinyatakan di sini: mata yang muncul di setiap kartu sebuah kolom
+   * yang diawasi hanya mengulang apa yang sudah tertulis di kepala kolomnya.
+   */
+  watching: boolean;
 }
 
 export interface CardCommentDetail extends CardComment {
@@ -86,11 +95,18 @@ export interface CardDetail extends CardSummary {
 }
 
 /** Satu board lengkap dengan kolom dan kartunya — payload untuk render board. */
+/** Kolom sebagaimana digambar di papan. */
+export interface ColumnSummary extends Column {
+  cards: CardSummary[];
+  /** Apakah orang yang sedang melihat mengawasi kolom ini. */
+  watching: boolean;
+}
+
 export interface BoardDetail extends Board {
   role: Role;
   /** Label milik board — palet yang bisa dipasang ke kartu mana pun di sini. */
   labels: Label[];
-  columns: (Column & { cards: CardSummary[] })[];
+  columns: ColumnSummary[];
 }
 
 export interface MemberSummary {
@@ -126,9 +142,9 @@ export interface SessionUser {
  * Bentuk yang sama dipakai server (tabel `notification_prefs`) dan klien.
  */
 export interface NotificationSettings {
-  /** Followup baru di kartu yang pernah saya sentuh. */
+  /** Followup baru di kartu yang saya awasi. */
   comments: boolean;
-  /** Perubahan pada kartu itu: judul, deskripsi, label, checklist, pindah kolom. */
+  /** Perubahan di kartu dan kolom yang saya awasi: judul, deskripsi, label, checklist, pindah kolom. */
   changes: boolean;
   /** Kartu baru di papan mana pun di workspace saya. */
   newCards: boolean;

@@ -18,6 +18,15 @@ const GEAR = (
 
 const EXIT = <path d="M15 17l5-5-5-5M20 12H9M12 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h6" />;
 
+/* Tanda tanya dalam lingkaran — halaman yang menjelaskan, bukan yang mengatur. */
+const ABOUT = (
+  <>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.6 9.2a2.5 2.5 0 1 1 3.3 2.4c-.6.2-.9.7-.9 1.3v.6" />
+    <path d="M12 16.8h.01" />
+  </>
+);
+
 /** Baris menu: ikon, label, dan rona yang membedakan aksi biasa dari keluar. */
 function Item({
   icon,
@@ -132,6 +141,19 @@ export function ProfileMenu() {
           </div>
 
           <span className="my-1 block h-px bg-line-soft" />
+
+          {/* Halaman pengantar tidak berhenti berguna setelah orang punya akun
+              — ia yang menjelaskan kanban dan isi aplikasi ini — tapi akar
+              sudah jadi milik daftar workspace begitu ada sesi. Jadi jalannya
+              ke sana ada di sini, satu ketukan dari halaman mana pun. */}
+          <Item
+            icon={ABOUT}
+            label="Pengantar"
+            onClick={() => {
+              setOpen(false);
+              navigate(paths.pengantar);
+            }}
+          />
 
           <Item
             icon={GEAR}

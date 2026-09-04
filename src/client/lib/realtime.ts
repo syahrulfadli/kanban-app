@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { UserBrief } from "../../shared/types";
 
 /**
  * Id koneksi tab ini. Dikirim di header pada setiap request yang mengubah data,
@@ -11,7 +12,7 @@ export const CLIENT_ID_HEADER = "X-Client-Id";
 
 type BoardEvent =
   | { type: "board:changed"; origin: string | null; at: number }
-  | { type: "presence"; count: number };
+  | { type: "presence"; count: number; viewers: UserBrief[] };
 
 export type ChannelStatus = "connecting" | "live" | "offline";
 
@@ -27,7 +28,12 @@ const MAX_ATTEMPTS = 10;
 /** Langganan perubahan board dari kolaborator lain. */
 export function useBoardChannel(boardId: string, onRemoteChange: () => void) {
   const [status, setStatus] = useState<ChannelStatus>("connecting");
-  const [viewers, setViewers] = useState(1);
+
+  /* Siapa saja yang sedang membuka papan ini — termasuk diri sendiri. Kosong
+     selama belum ada kabar dari server; yang membaca daftar ini tahu bahwa
+     dirinya sendiri selalu ada di papan, jadi tidak ada gunanya menebak satu
+     orang palsu sebagai isi awal. */
+  const [viewers, setViewers] = useState<UserBrief[]>([]);
 
   // Callback dibaca lewat ref supaya koneksi tidak dibuka ulang tiap render.
   const handler = useRef(onRemoteChange);
@@ -57,7 +63,7 @@ export function useBoardChannel(boardId: string, onRemoteChange: () => void) {
         const event = JSON.parse(e.data as string) as BoardEvent;
 
         if (event.type === "presence") {
-          setViewers(event.count);
+          setViewers(event.viewers);
         } else if (event.origin !== CLIENT_ID) {
           handler.current();
         }

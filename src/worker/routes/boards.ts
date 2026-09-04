@@ -1,14 +1,15 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { boards, cards, columns, labels } from "../../db";
+import { boards, cards, columnWatches, columns, labels } from "../../db";
 import type { AppEnv } from "../auth";
 import { assertRole, requireBoard, requireMembership } from "../guards";
 import { notifyBoard } from "../realtime";
+import { VIEWER_PARAM } from "../board-room";
 import { extrasFor, loadCardExtras } from "../card-data";
-import type { BoardDetail } from "../../shared/types";
+import type { BoardDetail, UserBrief } from "../../shared/types";
 
 const DEFAULT_COLUMNS = ["To Do", "In Progress", "Done"];
 
@@ -44,21 +45,28 @@ const app = new Hono<AppEnv>()
     async (c) => {
       const db = c.get("db");
       const { workspaceId, title } = c.req.valid("json");
-      await requireMembership(db, workspaceId, c.get("user").id);
+      const userId = c.get("user").id;
+      await requireMembership(db, workspaceId, userId);
 
       const now = new Date();
       const board = { id: nanoid(), workspaceId, title, createdAt: now, updatedAt: now };
+      const starters = DEFAULT_COLUMNS.map((columnTitle, i) => ({
+        id: nanoid(),
+        boardId: board.id,
+        title: columnTitle,
+        position: (i + 1) * 1024,
+        createdAt: now,
+      }));
 
+      /* Kolom bawaan ini tetap kolom yang dibuat orangnya — ia menekan "buat
+         papan" dan ketiganya muncul — jadi ia mengawasinya, sama seperti kolom
+         yang ia ketik sendiri nanti. Papan baru biasanya papan yang sedang
+         digarap; kalau ternyata tidak, matanya tinggal dimatikan. */
       await db.batch([
         db.insert(boards).values(board),
-        ...DEFAULT_COLUMNS.map((columnTitle, i) =>
-          db.insert(columns).values({
-            id: nanoid(),
-            boardId: board.id,
-            title: columnTitle,
-            position: (i + 1) * 1024,
-            createdAt: now,
-          }),
+        ...starters.map((column) => db.insert(columns).values(column)),
+        ...starters.map((column) =>
+          db.insert(columnWatches).values({ columnId: column.id, userId, createdAt: now }),
         ),
       ] as never);
 
@@ -72,14 +80,26 @@ const app = new Hono<AppEnv>()
    */
   .get("/:id/ws", async (c) => {
     const { board } = await requireBoard(c.get("db"), c.req.param("id"), c.get("user").id);
+    const { id, name, email, image } = c.get("user");
+
+    /* Identitas penonton ditempelkan di sini, dari sesi yang barusan
+       diperiksa — bukan dikirim klien. Papan memakainya untuk menjawab "siapa
+       saja yang sedang membuka papan ini", dan jawaban itu tidak boleh bisa
+       ditulis sendiri oleh tab yang bertanya. */
+    const url = new URL(c.req.url);
+    url.searchParams.set(
+      VIEWER_PARAM,
+      JSON.stringify({ id, name, email, image: image ?? null } satisfies UserBrief),
+    );
 
     const stub = c.env.BOARD_ROOM.get(c.env.BOARD_ROOM.idFromName(board.id));
-    return stub.fetch(c.req.raw);
+    return stub.fetch(new Request(url, c.req.raw));
   })
 
   .get("/:id", async (c) => {
     const db = c.get("db");
-    const { board, role } = await requireBoard(db, c.req.param("id"), c.get("user").id);
+    const userId = c.get("user").id;
+    const { board, role } = await requireBoard(db, c.req.param("id"), userId);
 
     const cols = await db
       .select()
@@ -96,16 +116,25 @@ const app = new Hono<AppEnv>()
           .orderBy(asc(cards.position))
       : [];
 
-    // Label, progress checklist, jumlah followup, dan peserta ikut terangkut di
-    // payload board: kartu harus bisa menggambar semuanya tanpa dibuka dulu.
-    const [extras, boardLabels] = await Promise.all([
-      loadCardExtras(db, { boardId: board.id }),
+    // Label, progress checklist, jumlah followup, peserta, dan keadaan Awasi
+    // ikut terangkut di payload board: kartu dan kolom harus bisa menggambar
+    // semuanya tanpa dibuka dulu.
+    const [extras, boardLabels, watched] = await Promise.all([
+      loadCardExtras(db, { boardId: board.id }, userId),
       db
         .select()
         .from(labels)
         .where(eq(labels.boardId, board.id))
         .orderBy(asc(labels.createdAt)),
+      db
+        .select({ columnId: columnWatches.columnId })
+        .from(columnWatches)
+        .innerJoin(columns, eq(columns.id, columnWatches.columnId))
+        .where(and(eq(columns.boardId, board.id), eq(columnWatches.userId, userId)))
+        .all(),
     ]);
+
+    const watchedColumns = new Set(watched.map((row) => row.columnId));
 
     const detail: BoardDetail = {
       ...board,
@@ -113,6 +142,7 @@ const app = new Hono<AppEnv>()
       labels: boardLabels,
       columns: cols.map((col) => ({
         ...col,
+        watching: watchedColumns.has(col.id),
         cards: allCards
           .filter((card) => card.columnId === col.id)
           .map((card) => ({ ...card, ...extrasFor(extras, card.id) })),

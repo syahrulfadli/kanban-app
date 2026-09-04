@@ -3,7 +3,7 @@ import { api } from "../lib/api";
 import { insertAt, moveCardLocal, moveColumnLocal } from "../lib/reorder";
 import { useBoardChannel } from "../lib/realtime";
 import { useUndo } from "../components/UndoToasts";
-import type { BoardDetail, CardSummary } from "../../shared/types";
+import type { BoardDetail, CardSummary, ColumnColor } from "../../shared/types";
 
 /** Perubahan beruntun dari orang lain digabung jadi satu kali tarik data. */
 const REMOTE_REFRESH_DEBOUNCE_MS = 200;
@@ -141,6 +141,29 @@ export function useBoard(boardId: string) {
           columns: b.columns.map((col) => (col.id === columnId ? { ...col, title } : col)),
         }),
         () => api.renameColumn(columnId, title),
+      ),
+
+    recolorColumn: (columnId: string, color: ColumnColor | null) =>
+      optimistic(
+        (b) => ({
+          ...b,
+          columns: b.columns.map((col) => (col.id === columnId ? { ...col, color } : col)),
+        }),
+        () => api.recolorColumn(columnId, color),
+      ),
+
+    /* Awasi kolom. Optimistic seperti aksi kolom lainnya, walau yang berubah
+       hanya keadaan orang ini sendiri — dan justru karena itu server tidak
+       menyiarkan apa pun, jadi tidak ada tarikan ulang yang akan membenarkan
+       tebakannya kalau ia meleset. `optimistic` sudah menariknya sendiri saat
+       server menolak. */
+    watchColumn: (columnId: string, watching: boolean) =>
+      optimistic(
+        (b) => ({
+          ...b,
+          columns: b.columns.map((col) => (col.id === columnId ? { ...col, watching } : col)),
+        }),
+        () => api.watchColumn(columnId, watching),
       ),
 
     deleteColumn: (columnId: string) => {

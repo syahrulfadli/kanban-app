@@ -56,6 +56,27 @@ export const invitations = sqliteTable(
   (t) => [index("invitations_workspace_idx").on(t.workspaceId)],
 );
 
+/** Warna label — kunci simbolik, bukan hex: peta warnanya milik tema. */
+export const LABEL_COLORS = [
+  "slate",
+  "red",
+  "orange",
+  "amber",
+  "green",
+  "teal",
+  "sky",
+  "violet",
+  "pink",
+] as const;
+export type LabelColor = (typeof LABEL_COLORS)[number];
+
+/* Kolom memakai palet yang sama persis, dan itu disengaja: satu papan yang
+   memakai dua keluarga rona akan terbaca sebagai dua sistem yang kebetulan
+   bertumpuk. Aliasnya ada supaya sisi yang bicara soal kolom tidak perlu
+   menyebut "label" untuk sesuatu yang bukan label. */
+export const COLUMN_COLORS = LABEL_COLORS;
+export type ColumnColor = LabelColor;
+
 /**
  * Posisi memakai fractional indexing (real, bukan integer berurutan):
  * memindahkan satu kartu cukup meng-update satu baris, bukan seluruh kolom.
@@ -83,6 +104,11 @@ export const columns = sqliteTable(
       .notNull()
       .references(() => boards.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
+    /* Null berarti kolom tanpa warna — dan itu bukan sekadar "belum dipilih":
+       papan yang setiap kolomnya berwarna kehilangan gunanya warna. Null
+       adalah keadaan istirahat, dan warna dipakai untuk menandai kolom yang
+       memang perlu dibedakan. */
+    color: text("color", { enum: LABEL_COLORS }),
     position: real("position").notNull(),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   },
@@ -108,20 +134,6 @@ export const cards = sqliteTable(
   },
   (t) => [index("cards_column_idx").on(t.columnId, t.position)],
 );
-
-/** Warna label — kunci simbolik, bukan hex: peta warnanya milik tema. */
-export const LABEL_COLORS = [
-  "slate",
-  "red",
-  "orange",
-  "amber",
-  "green",
-  "teal",
-  "sky",
-  "violet",
-  "pink",
-] as const;
-export type LabelColor = (typeof LABEL_COLORS)[number];
 
 /**
  * Jenis perubahan yang tercatat di lini masa kartu. Followup yang ditulis
@@ -243,6 +255,65 @@ export const cardParticipants = sqliteTable(
 );
 
 /**
+ * Kartu yang diawasi seseorang — tapi hanya sebagai *pengecualian*.
+ *
+ * Aturan bawaannya tidak disimpan di sini: siapa pun yang punya jejak di
+ * `card_participants` sudah dianggap mengawasi kartunya, dan itulah yang
+ * membuat pembuat serta kontributor kartu dikabari tanpa perlu menekan apa
+ * pun. Baris di tabel ini hanya muncul ketika seseorang menyatakan pilihan
+ * yang berbeda dari aturan itu.
+ *
+ * Sengaja tidak digabung ke `card_participants`, walau isinya mirip: baris
+ * peserta itulah yang menggambar deretan avatar di muka kartu, dan berhenti
+ * mengawasi tidak boleh menghapus seseorang dari kartu yang jelas-jelas ia
+ * kerjakan.
+ *
+ * `watching = false` karena itu sama pentingnya dengan `true` — ia yang
+ * membuat "sudah saya matikan" bertahan melewati followup berikutnya, alih-alih
+ * hidup lagi sendiri setiap kali orangnya menyentuh kartu itu.
+ */
+export const cardWatches = sqliteTable(
+  "card_watches",
+  {
+    cardId: text("card_id")
+      .notNull()
+      .references(() => cards.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    watching: integer("watching", { mode: "boolean" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.cardId, t.userId] }),
+    index("card_watches_user_idx").on(t.userId),
+  ],
+);
+
+/**
+ * Kolom yang diawasi seseorang. Di sini kehadiran barisnya sudah berarti
+ * "diawasi", tanpa kolom `watching`: berbeda dengan kartu, kolom tidak punya
+ * aturan bawaan yang perlu dibantah — tidak ada peserta kolom, dan pembuatnya
+ * mendapat barisnya sendiri saat kolom itu dibuat.
+ */
+export const columnWatches = sqliteTable(
+  "column_watches",
+  {
+    columnId: text("column_id")
+      .notNull()
+      .references(() => columns.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.columnId, t.userId] }),
+    index("column_watches_user_idx").on(t.userId),
+  ],
+);
+
+/**
  * Jejak setiap perubahan pada kartu — satu baris per kejadian, tidak pernah
  * disunting. Digabung dengan `card_comments` di klien jadi satu lini masa.
  *
@@ -356,12 +427,15 @@ export const notificationPrefs = sqliteTable("notification_prefs", {
   userId: text("user_id")
     .primaryKey()
     .references(() => user.id, { onDelete: "cascade" }),
-  /** Followup baru di kartu yang pernah saya sentuh. */
+  /** Followup baru di kartu yang saya awasi. */
   comments: integer("comments", { mode: "boolean" }).notNull().default(true),
-  /** Perubahan kartu itu sendiri: judul, deskripsi, label, checklist, pindah kolom. */
+  /* Perubahan di kartu dan kolom yang saya awasi: judul, deskripsi, label,
+     checklist, pindah kolom — termasuk kartu baru yang mendarat di kolom yang
+     saya awasi, yang bagi pengawasnya memang kabar tentang hal yang ia ikuti
+     dan bukan siaran. */
   changes: integer("changes", { mode: "boolean" }).notNull().default(true),
-  /* Kartu baru menyapa seluruh anggota workspace, bukan cuma peserta kartu —
-     di board yang ramai itu bisa jadi berisik, jadi defaultnya mati. */
+  /* Kartu baru menyapa seluruh anggota workspace, diawasi atau tidak — di
+     board yang ramai itu bisa jadi berisik, jadi defaultnya mati. */
   newCards: integer("new_cards", { mode: "boolean" }).notNull().default(false),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });
@@ -400,6 +474,8 @@ export type Label = typeof labels.$inferSelect;
 export type CardComment = typeof cardComments.$inferSelect;
 export type ChecklistItem = typeof checklistItems.$inferSelect;
 export type CardParticipant = typeof cardParticipants.$inferSelect;
+export type CardWatch = typeof cardWatches.$inferSelect;
+export type ColumnWatch = typeof columnWatches.$inferSelect;
 export type CardActivity = typeof cardActivities.$inferSelect;
 export type NotificationRow = typeof notifications.$inferSelect;
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;

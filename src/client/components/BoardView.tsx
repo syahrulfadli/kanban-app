@@ -6,35 +6,132 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { ColumnView } from "./ColumnView";
 import { AddItemForm } from "./AddItemForm";
 import { useBoard } from "../hooks/useBoard";
+import { useCollapsedColumns } from "../hooks/useCollapsedColumns";
 import { useSession } from "../lib/auth-client";
 import { navigate, paths } from "../lib/route";
 import { cn } from "../lib/cn";
 import type { ChannelStatus } from "../lib/realtime";
+import type { UserBrief } from "../../shared/types";
+import { Avatar } from "./Avatar";
 import { AppHeader } from "./AppHeader";
 import { BoardSkeleton } from "./Skeleton";
 
-function LiveIndicator({ status, viewers }: { status: ChannelStatus; viewers: number }) {
+/**
+ * Penanda kanal realtime, di ujung kanan kepala papan.
+ *
+ * Sendirian ia cuma keterangan: satu titik dan satu kata tentang koneksi.
+ * Begitu ada orang lain di papan yang sama, keterangan itu punya isi yang
+ * bisa ditanyakan — siapa — jadi ia berubah jadi tombol yang membuka
+ * daftarnya. Tidak ada tombol tambahan yang muncul di kepala papan untuk itu:
+ * yang menjawab "siapa yang di sini" adalah penanda yang sudah mengatakan
+ * "ada yang di sini".
+ */
+function LiveIndicator({
+  status,
+  viewers,
+  meId,
+}: {
+  status: ChannelStatus;
+  viewers: UserBrief[];
+  meId?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const people = viewers.length;
+  /* Sendirian, tidak ada daftar yang layak dibuka — "siapa saja di papan ini"
+     yang jawabannya cuma diri sendiri bukan pertanyaan. */
+  const shared = status === "live" && people > 1;
+
   const label =
     status === "live"
-      ? viewers > 1
-        ? `${viewers} orang di board ini`
+      ? people > 1
+        ? `${people} orang di board ini`
         : "Terhubung"
       : status === "connecting"
         ? "Menyambungkan…"
         : "Terputus — mencoba lagi";
 
+  // Orang terakhir pergi selagi daftarnya terbuka: daftarnya ikut tutup,
+  // bukan menggantung berisi satu nama.
+  useEffect(() => {
+    if (!shared) setOpen(false);
+  }, [shared]);
+
+  /* Pola yang sama dengan menu kolom dan menu profil: `pointerdown`, bukan
+     `click`, supaya daftarnya sudah tertutup sebelum kliknya mendarat. */
+  useEffect(() => {
+    if (!open) return;
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  const dot = (
+    <span
+      className={cn(
+        "size-1.5 shrink-0 rounded-full",
+        status === "live" && "bg-ok",
+        status === "connecting" && "animate-pulse bg-warn",
+        status === "offline" && "bg-danger",
+      )}
+    />
+  );
+
+  if (!shared) {
+    return (
+      <span className="chip shrink-0" title={label}>
+        {dot}
+        <span className="hidden sm:inline">{label}</span>
+      </span>
+    );
+  }
+
   return (
-    <span className="chip shrink-0" title={label}>
-      <span
-        className={cn(
-          "size-1.5 rounded-full",
-          status === "live" && "bg-ok",
-          status === "connecting" && "animate-pulse bg-warn",
-          status === "offline" && "bg-danger",
-        )}
-      />
-      <span className="hidden sm:inline">{label}</span>
-    </span>
+    <div ref={ref} className="relative shrink-0">
+      {/* Di layar sempit kalimatnya tidak muat, dan sebuah titik sendirian
+          tidak terbaca sebagai sesuatu yang bisa diketuk — jadi yang tersisa
+          di sana angkanya, bukan tidak ada apa-apa. */}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-label={`${label} — lihat siapa saja`}
+        title={label}
+        className="chip cursor-pointer transition-colors hover:bg-line-soft"
+      >
+        {dot}
+        <span className="hidden sm:inline">{label}</span>
+        <span className="tabular-nums sm:hidden">{people}</span>
+      </button>
+
+      {open && (
+        <div className="sheet absolute top-full right-0 z-30 mt-2 w-56 rounded-2xl p-1.5">
+          <p className="px-2.5 py-1.5 text-xs text-muted">Sedang membuka papan ini</p>
+
+          <ul className="flex flex-col">
+            {viewers.map((viewer) => (
+              <li key={viewer.id} className="flex items-center gap-2 rounded-xl px-2.5 py-1.5">
+                <Avatar person={viewer} size="sm" />
+                <span className="min-w-0 flex-1 truncate text-sm">{viewer.name}</span>
+                {viewer.id === meId && <span className="shrink-0 text-xs text-faint">Anda</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -52,6 +149,11 @@ interface BoardProps {
 export function BoardView({ boardId, openCardId }: BoardProps) {
   const { board, loading, error, refresh, actions, live } = useBoard(boardId);
   const { data: session } = useSession();
+
+  /* Kolom mana yang disusutkan hanya urusan layar ini — simpanannya di
+     peramban, bukan di papan. */
+  const columnIds = useMemo(() => (board?.columns ?? []).map((c) => c.id), [board]);
+  const { collapsed, toggle: toggleCollapse } = useCollapsedColumns(boardId, columnIds);
 
   /* Kartu yang terbuka tinggal di alamat, bukan di state: satu-satunya cara
      membuka dialog adalah pindah ke alamat kartunya. Harganya satu langkah
@@ -86,6 +188,19 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
   /* Satu dialog untuk seluruh papan, bukan satu per kartu: yang bisa ditanya
      hanya satu pada satu waktu. */
   const [pending, setPending] = useState<Pending | null>(null);
+
+  /* Nama label dibuka sepapan sekaligus, bukan per kartu.
+
+     Nama label baru berguna kalau bisa dibandingkan — "mana saja yang
+     Mendesak" adalah pertanyaan tentang papan, bukan tentang satu kartu — dan
+     satu kartu yang mekar sendirian di antara kartu-kartu berpotongan warna
+     justru terbaca sebagai kartu yang sedang disorot, bukan sebagai nama yang
+     sedang dibaca.
+
+     Tinggal di sini, bukan di modul: papan yang ditinggalkan sebaiknya
+     kembali ke keadaan istirahatnya, dan BoardView memang sudah dipasang
+     ulang tiap ganti board. */
+  const [labelsOpen, setLabelsOpen] = useState(false);
 
   const askDeleteCard = (cardId: string) => {
     const card = board?.columns.flatMap((col) => col.cards).find((c) => c.id === cardId);
@@ -213,8 +328,17 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
         <span className="text-faint">/</span>
         <h1 className="min-w-0 truncate text-sm font-medium">{board.title}</h1>
 
-        <LiveIndicator status={live.status} viewers={live.viewers} />
-        {error && <span className="text-xs text-danger">{error}</span>}
+        {/* Berlabuh di ujung kanan kepala papan, bukan menempel di belakang
+            judul: tempatnya jadi tetap — tidak bergeser mengikuti panjang nama
+            papan — dan sudut itu memang sudut keterangan, bukan sudut isi. */}
+        <span className="ml-auto flex min-w-0 items-center gap-2">
+          {error && <span className="min-w-0 truncate text-xs text-danger">{error}</span>}
+          <LiveIndicator
+            status={live.status}
+            viewers={live.viewers}
+            meId={session?.user.id}
+          />
+        </span>
       </AppHeader>
 
       {/* items-start: kolom setinggi isinya. Merentangkannya dulu punya alasan —
@@ -226,8 +350,12 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
           <ColumnView
             key={column.id}
             column={column}
+            collapsed={collapsed.has(column.id)}
+            onToggleCollapse={() => toggleCollapse(column.id)}
             onAddCard={(title) => actions.addCard(column.id, title)}
             onRenameColumn={(title) => actions.renameColumn(column.id, title)}
+            onRecolorColumn={(color) => actions.recolorColumn(column.id, color)}
+            onWatchColumn={(watching) => void actions.watchColumn(column.id, watching)}
             onDeleteColumn={() =>
               setPending({
                 kind: "column",
@@ -238,6 +366,8 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
             }
             onOpenCard={openCard}
             onDeleteCard={askDeleteCard}
+            labelsOpen={labelsOpen}
+            onToggleLabels={() => setLabelsOpen((v) => !v)}
           />
         ))}
 
@@ -245,7 +375,7 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
         <div className="glass-column h-fit w-72 shrink-0 border border-dashed border-line p-2">
           <AddItemForm
             placeholder="Nama kolom…"
-            submitLabel="+ Tambah kolom"
+            submitLabel="Tambah kolom"
             onSubmit={actions.addColumn}
           />
         </div>

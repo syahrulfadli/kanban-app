@@ -74,21 +74,26 @@ function Row({
   );
 }
 
+/* Ketiganya bicara tentang hal yang Anda awasi, kecuali yang terakhir — dan
+   perbedaan itulah yang perlu terbaca di sini. Dua kanal pertama mengikuti
+   mata: kartu yang Anda sentuh atau nyalakan sendiri, dan kolom yang Anda
+   awasi. Yang ketiga adalah siaran ke seluruh workspace, dan defaultnya mati
+   justru karena ia tidak menunggu Anda mengawasi apa pun. */
 const PREFS: { key: keyof Prefs; title: string; hint: string }[] = [
   {
     key: "comments",
     title: "Followup",
-    hint: "Saat ada yang menulis di kartu yang pernah Anda sentuh.",
+    hint: "Saat ada yang menulis di kartu yang Anda awasi.",
   },
   {
     key: "changes",
-    title: "Perubahan kartu",
-    hint: "Judul, deskripsi, label, checklist, dan perpindahan kolom.",
+    title: "Perubahan",
+    hint: "Judul, deskripsi, label, checklist, dan perpindahan kolom — di kartu dan kolom yang Anda awasi.",
   },
   {
     key: "newCards",
     title: "Kartu baru",
-    hint: "Setiap kartu baru di papan mana pun di workspace Anda.",
+    hint: "Setiap kartu baru di papan mana pun di workspace Anda, diawasi atau tidak.",
   },
 ];
 

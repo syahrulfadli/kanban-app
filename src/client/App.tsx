@@ -131,6 +131,24 @@ export default function App() {
     );
   }
 
+  /* Halaman pengantar tidak menunggu sesi dan tidak dihalangi olehnya.
+
+     Isinya menjelaskan kanban dan aplikasinya — itu tidak berhenti berlaku
+     begitu seseorang punya akun, dan tautan ke halaman ini yang dibuka orang
+     yang kebetulan sudah masuk tidak boleh mendarat di tempat lain. Yang
+     berubah cuma ajakannya: yang sudah masuk tidak perlu ditawari mendaftar.
+
+     Selagi sesinya masih diperiksa, catatan di perangkat ini yang menebak —
+     sama seperti yang dipakai cabang di bawah — supaya tombolnya tidak
+     sempat berganti kata di depan mata. */
+  if (route.name === "landing") {
+    return (
+      <Shell>
+        <LandingPage signedIn={isPending ? wasSignedIn() : Boolean(session)} />
+      </Shell>
+    );
+  }
+
   if (isPending) {
     /* Halaman masuk tidak menunggu apa pun, jadi ia langsung dipasang —
        elemennya sama persis dengan cabang di bawah, jadi React menyimpannya

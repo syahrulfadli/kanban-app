@@ -6,6 +6,7 @@ import {
   cardComments,
   cardLabels,
   cardParticipants,
+  cardWatches,
   cards,
   checklistItems,
   columns,
@@ -47,6 +48,7 @@ export interface CardExtras {
   checklist: ChecklistProgress;
   commentCount: number;
   participants: UserBrief[];
+  watching: boolean;
 }
 
 const EMPTY_EXTRAS = (): CardExtras => ({
@@ -54,6 +56,7 @@ const EMPTY_EXTRAS = (): CardExtras => ({
   checklist: { total: 0, done: 0 },
   commentCount: 0,
   participants: [],
+  watching: false,
 });
 
 /**
@@ -85,14 +88,18 @@ function bucket(map: Map<string, CardExtras>, cardId: string) {
 }
 
 /**
- * Label, progress checklist, jumlah followup, dan peserta untuk sekumpulan
- * kartu — empat query tetap, tidak peduli berapa kartu yang diminta.
+ * Label, progress checklist, jumlah followup, peserta, dan keadaan Awasi untuk
+ * sekumpulan kartu — lima query tetap, tidak peduli berapa kartu yang diminta.
+ *
+ * `viewerId` hanya dipakai keadaan Awasi, yang memang pertanyaan tentang orang
+ * yang sedang melihat, bukan tentang kartunya.
  */
 export async function loadCardExtras(
   db: Db,
   scope: CardScope,
+  viewerId: string,
 ): Promise<Map<string, CardExtras>> {
-  const [labelRows, checklistRows, commentRows, participantRows] = await Promise.all([
+  const [labelRows, checklistRows, commentRows, participantRows, watchRows] = await Promise.all([
     db
       .select({ cardId: cardLabels.cardId, label: labels })
       .from(cardLabels)
@@ -132,6 +139,12 @@ export async function loadCardExtras(
       .where(scoped(db, cardParticipants.cardId, scope))
       .orderBy(asc(cardParticipants.firstActiveAt))
       .all(),
+
+    db
+      .select({ cardId: cardWatches.cardId, watching: cardWatches.watching })
+      .from(cardWatches)
+      .where(and(scoped(db, cardWatches.cardId, scope), eq(cardWatches.userId, viewerId)))
+      .all(),
   ]);
 
   const map = new Map<string, CardExtras>();
@@ -147,6 +160,15 @@ export async function loadCardExtras(
   for (const { cardId, ...person } of participantRows) {
     bucket(map, cardId).participants.push(person);
   }
+
+  /* Aturan bawaannya: menyentuh kartu berarti mengawasinya. Dihitung dari
+     daftar peserta yang sudah ada di tangan, bukan dari query keenam. */
+  for (const extras of map.values()) {
+    extras.watching = extras.participants.some((p) => p.id === viewerId);
+  }
+
+  // Pilihan manual menimpanya — termasuk ketika pilihannya "jangan".
+  for (const row of watchRows) bucket(map, row.cardId).watching = row.watching;
 
   return map;
 }

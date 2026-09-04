@@ -3,7 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { asc, eq, ne, and } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { columns } from "../../db";
+import { columnWatches, columns, COLUMN_COLORS } from "../../db";
 import type { AppEnv } from "../auth";
 import { requireBoard, requireColumn } from "../guards";
 import { touchBoard } from "../realtime";
@@ -23,7 +23,8 @@ const app = new Hono<AppEnv>()
     async (c) => {
       const db = c.get("db");
       const { boardId, title } = c.req.valid("json");
-      const { board } = await requireBoard(db, boardId, c.get("user").id);
+      const userId = c.get("user").id;
+      const { board } = await requireBoard(db, boardId, userId);
 
       const last = await db
         .select({ position: columns.position })
@@ -32,31 +33,56 @@ const app = new Hono<AppEnv>()
         .orderBy(asc(columns.position))
         .all();
 
+      const now = new Date();
       const column = {
         id: nanoid(),
         boardId: board.id,
         title,
         position: positionBetween(last.at(-1)?.position ?? null, null),
-        createdAt: new Date(),
+        createdAt: now,
       };
 
-      await db.insert(columns).values(column);
+      /* Membuat kolom berarti mengawasinya — orang yang membuka tempat baru di
+         papan hampir selalu orang yang ingin tahu apa yang mendarat di sana. */
+      await db.batch([
+        db.insert(columns).values(column),
+        db.insert(columnWatches).values({ columnId: column.id, userId, createdAt: now }),
+      ] as never);
       await touchBoard(c, board.id);
 
-      return c.json(column, 201);
+      return c.json({ ...column, watching: true }, 201);
     },
   )
 
+  /* Tambal sebagian: judul dan warna datang dari dua gerakan yang berbeda
+     (ganti nama, pilih warna) dan tidak pernah dikirim bersama. Warna boleh
+     null — itulah cara kolom dikembalikan ke tanpa warna — jadi "ada di
+     payload" tidak bisa diwakili nilainya sendiri dan harus diperiksa
+     lewat kehadiran kuncinya. */
   .patch(
     "/:id",
-    zValidator("json", z.object({ title: z.string().trim().min(1).max(120) })),
+    zValidator(
+      "json",
+      z
+        .object({
+          title: z.string().trim().min(1).max(120).optional(),
+          color: z.enum(COLUMN_COLORS).nullable().optional(),
+        })
+        .refine((v) => v.title !== undefined || v.color !== undefined, {
+          message: "Tidak ada yang diubah",
+        }),
+    ),
     async (c) => {
       const db = c.get("db");
       const { column } = await requireColumn(db, c.req.param("id"), c.get("user").id);
+      const patch = c.req.valid("json");
 
       const updated = await db
         .update(columns)
-        .set({ title: c.req.valid("json").title })
+        .set({
+          ...(patch.title !== undefined && { title: patch.title }),
+          ...(patch.color !== undefined && { color: patch.color }),
+        })
         .where(eq(columns.id, column.id))
         .returning()
         .get();
@@ -107,6 +133,40 @@ const app = new Hono<AppEnv>()
 
       await touchBoard(c, column.boardId);
       return c.json(updated);
+    },
+  )
+
+  /**
+   * Awasi kolom ini, atau berhenti mengawasinya.
+   *
+   * Sengaja tidak memanggil `touchBoard`: yang berubah cuma keadaan satu orang,
+   * dan tidak ada gunanya memaksa seisi papan menarik ulang datanya hanya
+   * karena seseorang menyalakan matanya sendiri.
+   */
+  .post(
+    "/:id/watch",
+    zValidator("json", z.object({ watching: z.boolean() })),
+    async (c) => {
+      const db = c.get("db");
+      const userId = c.get("user").id;
+      const { column } = await requireColumn(db, c.req.param("id"), userId);
+      const { watching } = c.req.valid("json");
+
+      /* Kehadiran barisnya sudah berarti "diawasi", jadi berhenti mengawasi
+         cukup menghapusnya — tidak ada aturan bawaan yang perlu dibantah,
+         berbeda dengan kartu (lihat `card_watches` di skema). */
+      if (watching) {
+        await db
+          .insert(columnWatches)
+          .values({ columnId: column.id, userId, createdAt: new Date() })
+          .onConflictDoNothing();
+      } else {
+        await db
+          .delete(columnWatches)
+          .where(and(eq(columnWatches.columnId, column.id), eq(columnWatches.userId, userId)));
+      }
+
+      return c.json({ watching });
     },
   )
 
