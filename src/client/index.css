@@ -12,8 +12,15 @@
    di bawah; utility Tailwind ikut berubah karena semuanya membaca
    custom property yang sama.
    ══════════════════════════════════════════════════════════════════ */
+@font-face {
+  font-family: "Satoshi";
+  src: url("/fonts/Satoshi-Variable.woff2") format("woff2");
+  font-weight: 100 900;   /* satu berkas untuk semua bobot, kalau variabel */
+  font-display: swap;     /* teks terbaca duluan, fontnya menyusul */
+}
+
 @theme {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-sans: "Satoshi", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
   /* Tinta */
   --color-ink: #0B1220;
