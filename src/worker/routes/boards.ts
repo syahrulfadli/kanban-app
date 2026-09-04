@@ -3,13 +3,21 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { boards, cards, columnWatches, columns, labels } from "../../db";
+import {
+  boards,
+  cards,
+  columnWatches,
+  columns,
+  labels,
+  workspaceMembers,
+  workspaces,
+} from "../../db";
 import type { AppEnv } from "../auth";
 import { assertRole, requireBoard, requireMembership } from "../guards";
 import { notifyBoard } from "../realtime";
 import { VIEWER_PARAM } from "../board-room";
 import { extrasFor, loadCardExtras } from "../card-data";
-import type { BoardDetail, UserBrief } from "../../shared/types";
+import type { BoardDetail, MoveTargetWorkspace, UserBrief } from "../../shared/types";
 
 const DEFAULT_COLUMNS = ["To Do", "In Progress", "Done"];
 
@@ -73,6 +81,63 @@ const app = new Hono<AppEnv>()
       return c.json(board, 201);
     },
   )
+
+  /**
+   * Ke mana sebuah kolom atau kartu boleh dipindahkan: seluruh papan yang
+   * boleh dibuka orang ini, dikelompokkan per workspace, lengkap dengan kolom
+   * masing-masing.
+   *
+   * Satu tarikan untuk seluruh pemilih, bukan satu per papan yang dibuka:
+   * daftar ini dibaca saat dialognya muncul, dan orang yang memindahkan kartu
+   * belum tahu papan mana yang akan ia pilih. Isinya sengaja sesempit itu —
+   * id dan nama — jadi puluhan papan pun masih satu payload kecil.
+   *
+   * Berdiri sebelum "/:id" supaya "destinations" tidak terbaca sebagai id.
+   */
+  .get("/destinations", async (c) => {
+    const db = c.get("db");
+
+    const rows = await db
+      .select({
+        workspaceId: workspaces.id,
+        workspaceName: workspaces.name,
+        boardId: boards.id,
+        boardTitle: boards.title,
+        columnId: columns.id,
+        columnTitle: columns.title,
+      })
+      .from(workspaceMembers)
+      .innerJoin(workspaces, eq(workspaces.id, workspaceMembers.workspaceId))
+      .innerJoin(boards, eq(boards.workspaceId, workspaces.id))
+      /* Left join: papan yang belum punya kolom tetap harus muncul. Ia bukan
+         tujuan yang sah untuk kartu — kartu butuh kolom — tapi kolom boleh
+         mendarat di sana, dan papan yang hilang dari daftar terbaca sebagai
+         papan yang tidak boleh dibuka. */
+      .leftJoin(columns, eq(columns.boardId, boards.id))
+      .where(eq(workspaceMembers.userId, c.get("user").id))
+      .orderBy(asc(workspaces.name), asc(boards.title), asc(columns.position))
+      .all();
+
+    const spaces = new Map<string, MoveTargetWorkspace>();
+
+    for (const row of rows) {
+      let space = spaces.get(row.workspaceId);
+      if (!space) {
+        space = { id: row.workspaceId, name: row.workspaceName, boards: [] };
+        spaces.set(row.workspaceId, space);
+      }
+
+      let board = space.boards.at(-1);
+      if (board?.id !== row.boardId) {
+        board = { id: row.boardId, title: row.boardTitle, columns: [] };
+        space.boards.push(board);
+      }
+
+      if (row.columnId) board.columns.push({ id: row.columnId, title: row.columnTitle! });
+    }
+
+    return c.json([...spaces.values()]);
+  })
 
   /**
    * Kanal realtime board. Upgrade WebSocket dari browser tetap membawa cookie

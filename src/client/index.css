@@ -601,15 +601,30 @@ body {
   .add-item {
     color: var(--color-muted);
   }
+  /* Kadarnya di atas --color-line-soft, dan itu perbaikan bukan selera: di
+     tema terang kolom sudah putih 42% di atas ladang yang terang: garis
+     rambut 7% di atasnya bergeser terlalu sedikit untuk terbaca sebagai
+     "tombol ini sedang disentuh". Yang dipakai kadar --color-line — masih
+     satu sapuan abu, bukan kotak. */
   .add-item:hover {
-    background-color: var(--color-line-soft);
+    background-color: rgb(15 23 42 / 0.12);
     color: var(--color-ink);
   }
-  /* Kecuali latar hover-nya: garis putih tipis akan terbaca sebagai kabut di
-     atas rona, bukan sebagai rona yang menerang. Yang dipakai ronanya sendiri,
-     ditipiskan. */
+  /* Tema gelap tidak ikut: di sana yang menyentuh adalah cahaya, bukan abu,
+     dan kadar lamanya sudah pas di atas latar arang. */
+  [data-theme="dark"] .add-item:hover {
+    background-color: var(--color-line-soft);
+  }
+  /* Kolom berwarna butuh jawaban lain, dan bukan ronanya sendiri: isian kolom
+     SUDAH rona itu (--col dicampur 76% dengan arang), jadi menuangkan --col
+     murni di atasnya hanya menggeser kadar arangnya beberapa persen — hover
+     yang praktis tidak terlihat, berapa pun kadar yang dipakai. Yang menerangi
+     satu baris di atas isian pekat adalah CAHAYA: ronanya dicerahkan dulu
+     dengan putih, baru ditipiskan. Hasilnya tetap rona kolom itu, hanya
+     versi yang kena sorot. */
   [data-tinted="true"] .add-item:hover {
-    background-color: color-mix(in oklab, var(--col) 30%, transparent);
+    background-color: color-mix(in oklab,
+      color-mix(in oklab, var(--col) 55%, #FFFFFF) 42%, transparent);
   }
   /* Porsinya turun di tema gelap: ronanya sudah terang di sana, dan kadar yang
      sama akan melompat keluar dari kolomnya alih-alih menerangkan satu baris. */
@@ -711,6 +726,14 @@ body {
     color: var(--color-ink-soft);
     background-color: var(--plate-fill);
     box-shadow: inset 0 0 0 1px var(--color-line-soft);
+  }
+
+  /* Chip tanpa garis tepi. Untuk chip yang duduk di dalam wadah yang sudah
+     bergaris sendiri — kepala kolom, misalnya — di mana garis chip cuma
+     menambah satu lapis kotak di dalam kotak. Yang tersisa tinggal isian
+     tipisnya, cukup untuk memisahkan angka dari latar tanpa membingkainya. */
+  .chip-plain {
+    box-shadow: none;
   }
 
   /* ══════════════════════════════════════════════════════════════

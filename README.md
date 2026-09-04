@@ -141,11 +141,15 @@ board tidak bocor ke orang luar.
 | `GET PATCH` | `/api/boards/:id` | member |
 | `GET` | `/api/boards/:id/ws` | member (upgrade WebSocket) |
 | `DELETE` | `/api/boards/:id` | admin |
+| `GET` | `/api/boards/destinations` | member (papan tujuan untuk pindah kolom/kartu) |
 | `POST PATCH DELETE` | `/api/columns`, `/api/columns/:id` | member |
 | `POST` | `/api/columns/:id/move` | member |
+| `POST` | `/api/columns/:id/transfer` | member (pindah ke papan lain) |
 | `POST PATCH DELETE` | `/api/cards`, `/api/cards/:id` | member |
+| `GET` | `/api/cards/search?q=` | member (cari kartu lintas papan) |
 | `GET` | `/api/cards/:id` | member (isi lengkap kartu untuk dialog) |
 | `POST` | `/api/cards/:id/move` | member |
+| `POST` | `/api/cards/:id/transfer` | member (pindah ke papan lain) |
 | `POST DELETE` | `/api/cards/:id/labels`, `/api/cards/:id/labels/:labelId` | member |
 | `POST` | `/api/cards/:id/comments` | member |
 | `PATCH` | `/api/cards/comments/:id` | penulisnya |
@@ -203,6 +207,27 @@ sisipan di celah yang sama), server otomatis menomori ulang kolom tersebut.
 
 **Posisi dihitung di server.** Klien hanya mengirim `{ columnId, index }`; server yang
 menentukan angka `position`-nya.
+
+**Pencarian mencakup label dan orang.** Kotak cari di kapsul navigasi menyaring
+seluruh papan yang boleh dibuka — bukan hanya papan yang sedang terbuka — dan yang
+dicocokkan bukan hanya judul dan deskripsi, tapi juga nama label dan nama peserta
+kartunya: "kartu Rina yang Mendesak itu" adalah cara orang benar-benar mengingat
+kartu. Baris hasilnya menandai potongan yang cocok, memotong cuplikan deskripsi di
+sekitar kata yang ditemukan, dan memberi cincin pada label atau wajah yang jadi
+alasan kartu itu muncul. Implementasinya `LIKE` biasa yang dibatasi keanggotaan
+workspace, bukan FTS5: tabel bayangan FTS harus dijaga sinkron lewat trigger di
+setiap tulis, dan pada papan sebesar yang muat di free tier ongkos merawatnya lebih
+besar daripada pemindaiannya. Aturan "apa yang disebut cocok" tinggal di
+[src/shared/search.ts](src/shared/search.ts) supaya server yang menyaring dan klien
+yang menandai tidak pernah berbeda pendapat.
+
+**Pindah papan membawa labelnya.** Kolom dan kartu bisa dipindahkan ke papan lain
+(menu kolom, dan kenop pindah di kepala dialog kartu). Label dimiliki papan, jadi
+label yang menempel dicarikan padanannya di papan tujuan lewat nama dan warna, dan
+yang belum ada di sana dibuatkan — melepasnya begitu saja berarti membuang
+keterangan yang tidak bisa dipulihkan siapa pun. Perpindahan ini bukan optimistik:
+yang pindah lenyap dari papan yang sedang dibuka, dan dialognya menunggu jawaban
+server sebelum menutup.
 
 **Update optimistik.** Perubahan langsung terlihat di UI sebelum server merespons;
 kalau request gagal, state ditarik ulang dari server.
@@ -289,6 +314,15 @@ membuat ponsel bergetar — bukan apa yang tercatat. Kotak masuk tetap menjadi
 riwayat lengkap, karena kabar yang tidak sempat dilihat di ponsel justru itulah
 yang dicari orang saat membuka aplikasinya. Keramaiannya diatur penyaring
 workspace/papan, bukan dengan membuang kabarnya.
+
+**Kalimat notifikasi menyebut kartunya, kalimat lini masa tidak.** Baris lini
+masa sudah berdiri di dalam kartunya, jadi "memindahkan dari Backlog ke Selesai"
+di sana sudah jelas objeknya. Notifikasi dibaca di layar kunci dan di kotak
+masuk, jauh dari kartunya — kalimat tanpa objek memaksa orang menebak apa yang
+berpindah. Karena itu `describeNotification` di
+[src/shared/activity.ts](src/shared/activity.ts) menyusun kalimat yang utuh
+sendiri ("Budi memindahkan “Kartu A” dari “ABC” ke “XYZ”"), dan baris pertama
+notifikasinya diisi nama papan — bukan judul kartu, yang akan jadi pengulangan.
 
 **Isi notifikasi didenormalisasi.** Judul dan kalimatnya disalin ke baris
 `notifications` saat kejadian, bukan dirujuk ke kartunya. Baris ini justru

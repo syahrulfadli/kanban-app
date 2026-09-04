@@ -109,6 +109,48 @@ export interface BoardDetail extends Board {
   columns: ColumnSummary[];
 }
 
+/* ── Pencarian kartu ───────────────────────────────────────────────
+   Satu kartu yang cocok, beserta konteks tempatnya berada: hasil pencarian
+   dibaca jauh dari papannya, jadi baris yang cuma berisi judul memaksa orang
+   membukanya dulu untuk tahu ia sedang melihat kartu yang mana. */
+
+export interface CardSearchHit {
+  id: string;
+  title: string;
+  /** Potongan deskripsi di sekitar kata yang cocok; null kalau deskripsinya tidak ikut cocok. */
+  snippet: string | null;
+  boardId: string;
+  boardTitle: string;
+  workspaceName: string;
+  columnTitle: string;
+  labels: Label[];
+  participants: UserBrief[];
+  /**
+   * Label dan orang yang namanya sendiri ikut cocok. Merekalah alasan kartu
+   * ini muncul ketika judul dan deskripsinya tidak menyebut apa-apa — tanpa
+   * ditandai, barisnya terbaca sebagai hasil yang nyasar.
+   */
+  matchedLabelIds: string[];
+  matchedUserIds: string[];
+}
+
+/* ── Pindah papan ──────────────────────────────────────────────────
+   Tujuan yang boleh dipilih saat sebuah kolom atau kartu dipindahkan keluar
+   dari papannya. Sengaja sesempit ini: pemilihnya cuma perlu nama. */
+
+export interface MoveTargetBoard {
+  id: string;
+  title: string;
+  /** Terurut seperti di papannya. Kosong berarti papan itu belum punya kolom. */
+  columns: { id: string; title: string }[];
+}
+
+export interface MoveTargetWorkspace {
+  id: string;
+  name: string;
+  boards: MoveTargetBoard[];
+}
+
 export interface MemberSummary {
   userId: string;
   role: Role;
@@ -191,6 +233,7 @@ export const MAX_AVATAR_BASE64 = 200_000;
 export interface NotificationItem {
   id: string;
   kind: NotificationKind;
+  /** Nama papan — baris pertama notifikasi perangkat, bukan judul kartunya. */
   title: string;
   body: string;
   workspaceId: string;

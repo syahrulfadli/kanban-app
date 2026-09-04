@@ -7,6 +7,7 @@ import { columnWatches, columns, COLUMN_COLORS } from "../../db";
 import type { AppEnv } from "../auth";
 import { requireBoard, requireColumn } from "../guards";
 import { touchBoard } from "../realtime";
+import { relabelForBoard } from "../transfer";
 import { evenPositions, needsRebalance, positionBetween } from "../../shared/position";
 
 const app = new Hono<AppEnv>()
@@ -132,6 +133,63 @@ const app = new Hono<AppEnv>()
         .get();
 
       await touchBoard(c, column.boardId);
+      return c.json(updated);
+    },
+  )
+
+  /**
+   * Pindahkan kolom ini — beserta seluruh kartunya — ke papan lain.
+   *
+   * Kolomnya mendarat di ujung kanan papan tujuan. Sama seperti pindah kartu,
+   * tidak ada urutan yang bisa dipilih: yang memindahkan sedang melihat papan
+   * asal.
+   *
+   * Kartu di dalamnya tidak menerima catatan lini masa apa pun, dan itu bukan
+   * kelalaian: yang berpindah adalah kolomnya, bukan kartunya. Setiap kartu
+   * masih duduk di kolom yang sama, bersebelahan dengan kartu yang sama —
+   * tidak ada yang terjadi pada kartunya untuk diceritakan.
+   */
+  .post(
+    "/:id/transfer",
+    zValidator("json", z.object({ boardId: z.string().min(1) })),
+    async (c) => {
+      const db = c.get("db");
+      const userId = c.get("user").id;
+      const { column } = await requireColumn(db, c.req.param("id"), userId);
+      const { boardId } = c.req.valid("json");
+
+      if (boardId === column.boardId) {
+        return c.json({ error: "Kolom ini sudah ada di papan itu" }, 400);
+      }
+
+      const { board } = await requireBoard(db, boardId, userId);
+
+      const last = await db
+        .select({ position: columns.position })
+        .from(columns)
+        .where(eq(columns.boardId, board.id))
+        .orderBy(asc(columns.position))
+        .all();
+
+      const updated = await db
+        .update(columns)
+        .set({
+          boardId: board.id,
+          position: positionBetween(last.at(-1)?.position ?? null, null),
+        })
+        .where(eq(columns.id, column.id))
+        .returning()
+        .get();
+
+      /* Label kartu-kartunya ikut dicarikan padanan di papan tujuan. Tanpa ini
+         kartu-kartu itu akan memamerkan label yang tidak ada di palet papan
+         yang memuatnya — terpasang, tapi tidak bisa dilepas dari pemilih
+         label mana pun. */
+      await relabelForBoard(db, { columnId: column.id }, board.id);
+
+      await touchBoard(c, column.boardId);
+      await touchBoard(c, board.id);
+
       return c.json(updated);
     },
   )

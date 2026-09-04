@@ -57,9 +57,12 @@ interface Props {
  * jawaban itu harus bisa dibaca tanpa harus melayang di atasnya dulu, apalagi
  * di layar sentuh yang tidak punya cara untuk melayang sama sekali.
  *
- * Warnanya bisa ditimpa lewat `className`, dan memang harus: di kepala kolom
- * ia berdiri di antara tombol-tombol yang samar, di kepala dialog kartu di
- * antara yang lebih tegas.
+ * Yang bisa ditekan hanya di kepala dialog kartu. Kepala kolom memakai
+ * `EyeIcon` telanjang sebagai penanda dan menaruh sakelarnya di menu tiga
+ * titik, karena di sana matanya berdiri rapat dengan kenop-kenop lain dan
+ * satu ketukan nyasar akan memutus kabar dari kolom itu tanpa sengaja.
+ *
+ * Warnanya bisa ditimpa lewat `className`.
  */
 export function WatchToggle({ watching, onChange, subject, className, iconClassName }: Props) {
   const label = watching ? `Berhenti mengawasi ${subject}` : `Awasi ${subject}`;

@@ -25,6 +25,14 @@ export function describeActivity(kind: ActivityKind, detail: ActivityDetail | nu
       return { verb: d.to ? "memperbarui deskripsi" : "menghapus deskripsi" };
     case "card_moved":
       return { verb: `memindahkan dari ${d.from ?? "kolom lain"} ke`, subject: d.to ?? undefined };
+    /* Papan tujuan yang ditonjolkan, bukan kolomnya: kartu ini sudah tidak ada
+       di papan tempat baris ini pertama kali ditulis, dan yang pertama ingin
+       diketahui orang yang membacanya adalah ke mana ia pergi. */
+    case "card_transferred":
+      return {
+        verb: `memindahkan ke kolom ${d.to ?? "lain"} di papan`,
+        subject: d.text,
+      };
     case "label_added":
       return { verb: "menambahkan label", subject: d.text, color: d.color };
     case "label_removed":
@@ -88,6 +96,8 @@ export function describeNotification(
       return d.to ? `memperbarui deskripsi ${card}` : `menghapus deskripsi ${card}`;
     case "card_moved":
       return `memindahkan ${card} dari ${quoted(d.from, "kolom lain")} ke ${quoted(d.to, "kolom lain")}`;
+    case "card_transferred":
+      return `memindahkan ${card} ke kolom ${quoted(d.to, "lain")} di papan ${quoted(d.text, "lain")}`;
     case "label_added":
       return `menambahkan label ${quoted(d.text, "baru")} pada ${card}`;
     case "label_removed":

@@ -32,7 +32,14 @@ const BELL_SOLID = (
 /** Lebih dari seratus tidak lagi bisa dibaca sebagai jumlah — cukup "99+". */
 const badgeLabel = (unread: number) => (unread > 99 ? "99+" : String(unread));
 
-/** Satu baris kabar: pelakunya, judulnya, kalimatnya, lalu asal dan umurnya. */
+/**
+ * Satu baris kabar: pelakunya, kalimatnya, lalu asal dan umurnya.
+ *
+ * Kalimatnya berdiri sendiri — ia sudah menyebut kartu yang dibicarakan — jadi
+ * tidak ada baris judul terpisah di atasnya. Nama papan tersimpan di `title`
+ * untuk baris pertama notifikasi perangkat, dan di sini muncul sekali saja,
+ * di baris jejak paling bawah.
+ */
 function Row({
   item,
   onOpen,
@@ -61,13 +68,18 @@ function Row({
       )}
 
       <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-1.5">
-          <span className="truncate text-sm font-medium">{item.title}</span>
-          {unread && <span className="size-1.5 shrink-0 rounded-full bg-accent" aria-hidden />}
-        </span>
-
-        <span className="mt-0.5 line-clamp-2 block text-xs leading-relaxed text-muted">
-          {item.body}
+        <span className="flex items-start gap-1.5">
+          <span
+            className={cn(
+              "line-clamp-3 min-w-0 flex-1 text-sm leading-snug",
+              unread ? "text-ink" : "text-ink-soft",
+            )}
+          >
+            {item.body}
+          </span>
+          {unread && (
+            <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
+          )}
         </span>
 
         <span className="mt-1 block truncate text-[0.6875rem] text-faint">

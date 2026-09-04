@@ -3,6 +3,7 @@ import { monitorForElements } from "@atlaskit/pragmatic-drag-and-drop/element/ad
 import { extractClosestEdge } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
 import { CardModal } from "./CardModal";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { MoveDialog, type MoveSubject } from "./MoveDialog";
 import { ColumnView } from "./ColumnView";
 import { AddItemForm } from "./AddItemForm";
 import { useBoard } from "../hooks/useBoard";
@@ -189,6 +190,11 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
      hanya satu pada satu waktu. */
   const [pending, setPending] = useState<Pending | null>(null);
 
+  /* Begitu juga pemilih papan tujuan — dan ia tinggal di sini, bukan di kolom
+     atau di dialog kartu, karena yang berubah setelahnya adalah papan ini:
+     yang dipindahkan lenyap dari layar. */
+  const [moving, setMoving] = useState<MoveSubject | null>(null);
+
   /* Nama label dibuka sepapan sekaligus, bukan per kartu.
 
      Nama label baru berguna kalau bisa dibandingkan — "mana saja yang
@@ -205,6 +211,23 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
   const askDeleteCard = (cardId: string) => {
     const card = board?.columns.flatMap((col) => col.cards).find((c) => c.id === cardId);
     if (card) setPending({ kind: "card", id: card.id, title: card.title });
+  };
+
+  const askMoveCard = (cardId: string) => {
+    const card = board?.columns.flatMap((col) => col.cards).find((c) => c.id === cardId);
+    if (card) setMoving({ kind: "card", id: card.id, title: card.title });
+  };
+
+  const confirmMove = async (target: { boardId: string; columnId: string | null }) => {
+    if (!moving) return;
+
+    if (moving.kind === "column") await actions.transferColumn(moving.id, target.boardId);
+    else await actions.transferCard(moving.id, target.columnId!);
+
+    /* Dialognya baru ditutup setelah servernya menjawab — kalau ia menolak,
+       kegagalannya harus terbaca di tempat pilihannya dibuat, bukan sebagai
+       kalimat merah di kepala papan setelah dialognya lenyap. */
+    setMoving(null);
   };
 
   const confirmDelete = () => {
@@ -356,6 +379,14 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
             onRenameColumn={(title) => actions.renameColumn(column.id, title)}
             onRecolorColumn={(color) => actions.recolorColumn(column.id, color)}
             onWatchColumn={(watching) => void actions.watchColumn(column.id, watching)}
+            onMoveColumn={() =>
+              setMoving({
+                kind: "column",
+                id: column.id,
+                title: column.title,
+                cards: column.cards.length,
+              })
+            }
             onDeleteColumn={() =>
               setPending({
                 kind: "column",
@@ -412,7 +443,17 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
           shareUrl={`${location.origin}${location.pathname}${paths.card(boardId, open.cardId)}`}
           currentUser={{ ...session.user, image: session.user.image ?? null }}
           onClose={leaveCard}
+          onMove={() => askMoveCard(open.cardId)}
           onBoardChange={() => void refresh()}
+        />
+      )}
+
+      {moving && (
+        <MoveDialog
+          subject={moving}
+          boardId={boardId}
+          onCancel={() => setMoving(null)}
+          onMove={confirmMove}
         />
       )}
     </div>

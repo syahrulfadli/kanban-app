@@ -12,7 +12,7 @@ import {
 import { CardItem } from "./CardItem";
 import { AddItemForm } from "./AddItemForm";
 import { ColorSwatches } from "./ColorSwatches";
-import { EyeIcon, WatchToggle } from "./WatchToggle";
+import { EyeIcon } from "./WatchToggle";
 import { cn } from "../lib/cn";
 import { columnTint, labelTint } from "../lib/people";
 import type { BoardDetail, ColumnColor } from "../../shared/types";
@@ -98,10 +98,34 @@ function TrashIcon() {
   );
 }
 
+/**
+ * Anak panah yang keluar dari sebuah bidang — pindah ke papan lain.
+ *
+ * Bukan panah dua arah dan bukan tanda pindah-urutan: yang diceritakan ikon
+ * ini adalah keluar dari sini, bukan bergeser di dalam sini.
+ */
+function MoveOutIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="size-4 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M13 4H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6" />
+      <path d="m16 8 4 4-4 4M20 12H10" />
+    </svg>
+  );
+}
+
 /** Tiga titik mendatar — satu-satunya kenop yang tersisa di kepala kolom. */
 function MoreIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="size-4" fill="currentColor" aria-hidden>
+    <svg viewBox="0 0 24 24" className="size-5" fill="currentColor" aria-hidden>
       <circle cx="5" cy="12" r="1.6" />
       <circle cx="12" cy="12" r="1.6" />
       <circle cx="19" cy="12" r="1.6" />
@@ -117,6 +141,7 @@ interface Props {
   onRenameColumn: (title: string) => void;
   onRecolorColumn: (color: ColumnColor | null) => void;
   onWatchColumn: (watching: boolean) => void;
+  onMoveColumn: () => void;
   onDeleteColumn: () => void;
   onOpenCard: (cardId: string) => void;
   onDeleteCard: (cardId: string) => void;
@@ -133,6 +158,7 @@ export function ColumnView({
   onRenameColumn,
   onRecolorColumn,
   onWatchColumn,
+  onMoveColumn,
   onDeleteColumn,
   onOpenCard,
   onDeleteCard,
@@ -238,12 +264,12 @@ export function ColumnView({
             kena — dan judul kolom susut akan berbeda warna dari judul yang
             sama saat kolomnya terbentang.
 
-            Alasnya jauh lebih tebal daripada kepalanya: di atas teks sudah
-            ada tombol bentang setinggi 28px, dan tanpa ruang yang menandingi
-            bobotnya teks terbaca melorot ke dasar kolom. */}
+            Atas dan bawahnya kembali sama tebal begitu chip hitung berdiri di
+            kaki kolom: bobot yang dulu ditiru oleh padding sekarang ada
+            benda sungguhannya, satu di atas teks dan satu di bawahnya. */}
         <div
           ref={headerRef}
-          className="column-chrome flex min-h-0 cursor-grab flex-col items-center gap-2 px-2 pt-2.5 pb-6 active:cursor-grabbing"
+          className="column-chrome flex min-h-0 cursor-grab flex-col items-center gap-2 px-2 pt-2.5 pb-2.5 active:cursor-grabbing"
         >
           <button
             type="button"
@@ -253,7 +279,7 @@ export function ColumnView({
             onClick={onToggleCollapse}
             className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-full text-faint transition-colors hover:bg-line-soft hover:text-ink"
           >
-            <CollapseIcon expand className="size-4" />
+            <CollapseIcon expand className="size-5" />
           </button>
 
           <h2
@@ -262,6 +288,19 @@ export function ColumnView({
           >
             {column.title}
           </h2>
+
+          {/* Satu-satunya isi kolom yang masih terbaca saat disusutkan.
+              Berapa banyak kartu yang ada di dalamnya adalah hal yang paling
+              sering ditanyakan ke kolom yang sedang tidak dilihat isinya —
+              tanpa ini kolom susut cuma nama, dan orang harus membentangkannya
+              hanya untuk tahu bahwa isinya kosong.
+
+              Padding mendatarnya dipersempit dari chip biasa supaya lebar
+              kolom tetap ditentukan tombol bentang selebar 28px, bukan oleh
+              chip yang melar saat jumlah kartunya dua digit. */}
+          <span className="chip chip-plain shrink-0 px-2.5 py-0.5 font-normal tabular-nums">
+            {column.cards.length}
+          </span>
         </div>
       </section>
     );
@@ -308,12 +347,26 @@ export function ColumnView({
           </h2>
         )}
 
-        <span className="chip tabular-nums">{column.cards.length}</span>
+        {/* Angka kartu dan mata dirapatkan jadi satu keterangan tentang isi
+            kolom, dipisahkan dari deret kenop di kanannya. Mata hanya muncul
+            saat kolomnya diawasi, dan ia cuma penanda: tidak bisa ditekan.
+            Keadaan mati tidak perlu menempati kepala kolom — ia sudah terbaca
+            dari tidak adanya mata — dan menyalakan maupun mematikannya
+            sama-sama di dalam menu, supaya satu ketukan nyasar di kepala kolom
+            tidak diam-diam memutus kabar dari sini. */}
+        <div className="flex shrink-0 items-center gap-1.5">
+          {column.watching && (
+            <span title="Kolom ini Anda awasi" className="flex text-faint">
+              <EyeIcon watching className="size-4" label="Kolom ini Anda awasi" />
+            </span>
+          )}
+          <span className="chip chip-plain font-normal tabular-nums">{column.cards.length}</span>
+        </div>
 
         {/* Deret tombol dirapatkan sendiri: dengan lingkaran singgung selebar
             24px, jarak sebesar jarak antar-bagian kepala kolom cuma memakan
             ruang judul. */}
-        <div className="flex shrink-0 items-center gap-0.5">
+        <div className="flex shrink-0 items-center gap-1">
           {/* Susutkan kolom. Berdiri paling kiri di deret tombol karena ia yang
               paling ringan: tidak mengubah apa pun di papan, cuma menyingkirkan
               kolom ini dari pandangan orang yang menekannya. */}
@@ -325,22 +378,8 @@ export function ColumnView({
             onClick={onToggleCollapse}
             className="grid size-6 shrink-0 cursor-pointer place-items-center rounded-full text-faint transition-colors hover:bg-line-soft hover:text-ink"
           >
-            <CollapseIcon expand={false} className="size-4" />
+            <CollapseIcon expand={false} className="size-5" />
           </button>
-
-          {/* Mata hanya muncul saat kolomnya diawasi, dan di situ ia sekaligus
-              cara tercepat untuk berhenti. Keadaan mati tidak perlu menempati
-              kepala kolom: ia sudah terbaca dari tidak adanya mata, dan judul
-              kolom lebih butuh ruang itu daripada sebuah tombol yang menjawab
-              "tidak". Menyalakannya ada di dalam menu. */}
-          {column.watching && (
-            <WatchToggle
-              watching
-              onChange={onWatchColumn}
-              subject={`kolom “${column.title}”`}
-              className="size-6"
-            />
-          )}
 
           {/* Warna dan hapus turun ke menu bersama Awasi. Ketiganya jarang
               dipakai — sekali saat kolomnya dibentuk, lalu nyaris tidak pernah
@@ -369,7 +408,7 @@ export function ColumnView({
                 className="sheet absolute top-full right-0 z-30 mt-2 w-52 rounded-2xl p-1.5"
               >
                 <MenuItem
-                  icon={<EyeIcon watching={column.watching} className="size-4 shrink-0" />}
+                  icon={<EyeIcon watching={column.watching} className="size-5 shrink-0" />}
                   label={column.watching ? "Berhenti mengawasi" : "Awasi kolom"}
                   onClick={() => {
                     onWatchColumn(!column.watching);
@@ -408,6 +447,19 @@ export function ColumnView({
 
                 <span className="my-1 block h-px bg-line-soft" />
 
+                {/* Bertetangga dengan Hapus karena keduanya sama-sama
+                    mengeluarkan kolom ini dari papan — tapi di atasnya, dan
+                    tanpa warna bahaya: yang satu memindahkan, yang satu
+                    mengakhiri. */}
+                <MenuItem
+                  icon={<MoveOutIcon />}
+                  label="Pindah ke papan lain…"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onMoveColumn();
+                  }}
+                />
+
                 <MenuItem
                   icon={<TrashIcon />}
                   label="Hapus kolom"
@@ -423,7 +475,7 @@ export function ColumnView({
         </div>
       </div>
 
-      <ul className="flex min-h-14 flex-1 flex-col gap-2 overflow-y-auto px-3 pb-2">
+      <ul className="flex min-h-14 flex-1 flex-col gap-2 overflow-y-auto p-2">
         {column.cards.map((card) => (
           <CardItem
             key={card.id}
@@ -436,7 +488,7 @@ export function ColumnView({
         ))}
 
         {column.cards.length === 0 && (
-          <li className="column-chrome rounded-xl border border-dashed border-line px-3 py-6 text-center text-xs text-faint">
+          <li className="column-chrome rounded-xl border-2 border-dashed border-line px-3 py-6 text-center text-xs text-faint">
             Belum ada kartu
           </li>
         )}

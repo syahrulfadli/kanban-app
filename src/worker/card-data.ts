@@ -60,16 +60,20 @@ const EMPTY_EXTRAS = (): CardExtras => ({
 });
 
 /**
- * Lingkup pengambilan: satu kartu, atau semua kartu di sebuah board.
+ * Lingkup pengambilan: satu kartu, sekumpulan kartu, atau semua kartu di
+ * sebuah board.
  *
  * Lingkup board dipasang sebagai subquery `card_id IN (SELECT …)`, bukan daftar
  * id yang dibentangkan — satu parameter terikat berapa pun banyaknya kartu,
- * jadi board besar tidak menabrak batas parameter D1.
+ * jadi board besar tidak menabrak batas parameter D1. Lingkup `cardIds` justru
+ * membentangkannya, dan itu aman karena yang memakainya — hasil pencarian —
+ * memang sudah dibatasi segenggam baris.
  */
-export type CardScope = { boardId: string } | { cardId: string };
+export type CardScope = { boardId: string } | { cardId: string } | { cardIds: string[] };
 
 function scoped(db: Db, column: AnySQLiteColumn, scope: CardScope) {
   if ("cardId" in scope) return eq(column, scope.cardId);
+  if ("cardIds" in scope) return inArray(column, scope.cardIds);
 
   const ids = db
     .select({ id: cards.id })

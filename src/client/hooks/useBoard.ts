@@ -166,6 +166,21 @@ export function useBoard(boardId: string) {
         () => api.watchColumn(columnId, watching),
       ),
 
+    /* Pindah papan, kolom maupun kartu. Sengaja tidak lewat `optimistic`
+       seperti aksi papan lainnya: yang berpindah lenyap dari papan ini, dan
+       menghilangkannya lebih dulu berarti harus bisa mengembalikannya persis
+       ke tempatnya kalau server menolak. Yang menunggu jawabannya adalah
+       dialog pemilih tujuan, dan di sanalah kegagalannya terbaca. */
+    transferColumn: async (columnId: string, toBoardId: string) => {
+      await api.transferColumn(columnId, toBoardId);
+      await refresh();
+    },
+
+    transferCard: async (cardId: string, toColumnId: string) => {
+      await api.transferCard(cardId, toColumnId);
+      await refresh();
+    },
+
     deleteColumn: (columnId: string) => {
       const index = board?.columns.findIndex((col) => col.id === columnId) ?? -1;
       const column = index >= 0 ? board!.columns[index] : null;

@@ -145,6 +145,10 @@ export const ACTIVITY_KINDS = [
   "title_changed",
   "description_changed",
   "card_moved",
+  /* Pindah papan, bukan pindah kolom: catatannya sendiri karena kalimatnya
+     harus menyebut papan tujuan — tanpa itu, "dipindahkan ke Backlog" di lini
+     masa menunjuk kolom yang tidak ada di papan mana pun yang sedang dibuka. */
+  "card_transferred",
   "label_added",
   "label_removed",
   "checklist_added",
@@ -373,9 +377,14 @@ export const notifications = sqliteTable(
     cardId: text("card_id"),
     kind: text("kind", { enum: NOTIFICATION_KINDS }).notNull(),
     actorId: text("actor_id").references(() => user.id, { onDelete: "set null" }),
-    /** Judul kartu (atau nama papan untuk kartu baru), disalin saat kejadian. */
+    /**
+     * Baris pertama notifikasi perangkat: nama papannya, disalin saat kejadian.
+     * Bukan judul kartunya — kartu yang dibicarakan sudah disebut di dalam
+     * `body`, dan mengulangnya di sini menghabiskan satu dari dua baris yang
+     * tersedia di layar kunci.
+     */
     title: text("title").notNull(),
-    /** Kalimatnya: "Rina menambahkan label “Mendesak”". */
+    /** Kalimat utuh: "Rina menambahkan label “Mendesak” pada “Perbaiki login”". */
     body: text("body").notNull(),
     readAt: integer("read_at", { mode: "timestamp_ms" }),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),

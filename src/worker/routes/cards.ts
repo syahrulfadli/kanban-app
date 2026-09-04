@@ -1,18 +1,23 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { and, asc, eq, ne } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
+import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { nanoid } from "nanoid";
 import {
+  boards,
   cardActivities,
   cardComments,
   cardLabels,
+  cardParticipants,
   cardWatches,
   cards,
   checklistItems,
   columns,
   labels,
   user,
+  workspaceMembers,
+  workspaces,
   type Db,
 } from "../../db";
 import type { AppEnv } from "../auth";
@@ -26,9 +31,11 @@ import {
   requireLabel,
 } from "../guards";
 import { touchBoard } from "../realtime";
+import { relabelForBoard } from "../transfer";
 import {
-  notifyCard,
   notifyCardActivity,
+  notifyCardDeleted,
+  notifyComment,
   notifyNewCard,
   watchersBeforeDelete,
 } from "../notify";
@@ -41,7 +48,22 @@ import {
   type ActivityNote,
 } from "../card-data";
 import { evenPositions, needsRebalance, positionBetween } from "../../shared/position";
-import type { CardDetail, CardSummary, UserBrief } from "../../shared/types";
+import { MIN_QUERY_LENGTH, matchesQuery, snippetAround } from "../../shared/search";
+import type { CardDetail, CardSearchHit, CardSummary, UserBrief } from "../../shared/types";
+
+/**
+ * Sebanyak apa hasil pencarian dijawab sekaligus.
+ *
+ * Bukan halaman pertama dari sesuatu yang bisa ditelusuri lebih jauh: pencarian
+ * di aplikasi ini dipakai untuk menemukan satu kartu yang sudah ada di kepala
+ * orangnya, dan daftar yang lebih panjang dari ini dijawab dengan mengetik
+ * satu kata lagi, bukan dengan menggulir.
+ */
+const SEARCH_LIMIT = 20;
+
+/* `%` dan `_` punya arti khusus di dalam LIKE. Tanpa dilolosi, mengetik "_"
+   akan mencocokkan huruf apa pun — dan "%" mencocokkan segalanya. */
+const escapeLike = (value: string) => value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
 
 /** Kartu + segala yang menggantung padanya — payload untuk dialog kartu. */
 async function buildCardDetail(
@@ -308,6 +330,123 @@ const app = new Hono<AppEnv>()
     return c.body(null, 204);
   })
 
+  /**
+   * Cari kartu di seluruh papan yang boleh dibuka orang ini.
+   *
+   * Yang ikut dicocokkan bukan hanya judul dan deskripsi, tapi juga nama label
+   * dan nama orang yang menyentuh kartunya: "kartu Rina yang Mendesak itu"
+   * adalah cara orang benar-benar mengingat kartu, dan keduanya tidak pernah
+   * tertulis di judulnya.
+   *
+   * LIKE, bukan FTS5: tabel bayangan FTS harus dijaga tetap sinkron lewat
+   * trigger di setiap tulis, dan pada papan sebesar yang muat di free tier,
+   * pemindaian biasa yang dibatasi keanggotaan sudah jauh lebih cepat daripada
+   * ongkos merawatnya. Kalau kelak papannya membesar, di sinilah tempatnya
+   * diganti.
+   *
+   * Berdiri sebelum "/:id" supaya "search" tidak terbaca sebagai id kartu.
+   */
+  .get(
+    "/search",
+    zValidator(
+      "query",
+      z.object({ q: z.string().trim().min(MIN_QUERY_LENGTH).max(120) }),
+    ),
+    async (c) => {
+      const db = c.get("db");
+      const userId = c.get("user").id;
+      const { q } = c.req.valid("query");
+
+      const pattern = `%${escapeLike(q)}%`;
+      // SQLite mencocokkan LIKE tanpa memandang besar-kecil huruf untuk ASCII;
+      // aturan yang sama dipakai klien saat menandai potongan yang cocok.
+      const like = (column: AnySQLiteColumn) => sql`${column} LIKE ${pattern} ESCAPE '\\'`;
+
+      const byLabel = db
+        .select({ id: cardLabels.cardId })
+        .from(cardLabels)
+        .innerJoin(labels, eq(cardLabels.labelId, labels.id))
+        .where(like(labels.name));
+
+      const byPerson = db
+        .select({ id: cardParticipants.cardId })
+        .from(cardParticipants)
+        .innerJoin(user, eq(cardParticipants.userId, user.id))
+        .where(or(like(user.name), like(user.email)));
+
+      /* Keanggotaan workspace yang membatasi jangkauannya — join yang sama
+         dengan yang dipakai guard, dan satu-satunya yang menjaga pencarian
+         tidak berubah jadi cara membaca papan orang lain. */
+      const rows = await db
+        .select({
+          id: cards.id,
+          title: cards.title,
+          description: cards.description,
+          columnTitle: columns.title,
+          boardId: boards.id,
+          boardTitle: boards.title,
+          workspaceName: workspaces.name,
+        })
+        .from(cards)
+        .innerJoin(columns, eq(cards.columnId, columns.id))
+        .innerJoin(boards, eq(columns.boardId, boards.id))
+        .innerJoin(workspaces, eq(boards.workspaceId, workspaces.id))
+        .innerJoin(
+          workspaceMembers,
+          and(
+            eq(workspaceMembers.workspaceId, workspaces.id),
+            eq(workspaceMembers.userId, userId),
+          ),
+        )
+        .where(
+          or(
+            like(cards.title),
+            like(cards.description),
+            inArray(cards.id, byLabel),
+            inArray(cards.id, byPerson),
+          ),
+        )
+        /* Judul yang cocok naik ke atas — itu kartu yang memang dicari
+           namanya. Sisanya urut dari yang terakhir disentuh, karena di antara
+           kartu yang sama-sama menyebut kata itu, yang masih dikerjakan hampir
+           selalu yang dimaksud. */
+        .orderBy(desc(like(cards.title)), desc(cards.updatedAt))
+        .limit(SEARCH_LIMIT)
+        .all();
+
+      if (rows.length === 0) return c.json([] satisfies CardSearchHit[]);
+
+      const extras = await loadCardExtras(db, { cardIds: rows.map((row) => row.id) }, userId);
+
+      const hits: CardSearchHit[] = rows.map((row) => {
+        const { labels: attached, participants } = extrasFor(extras, row.id);
+
+        return {
+          id: row.id,
+          title: row.title,
+          snippet: snippetAround(row.description, q),
+          boardId: row.boardId,
+          boardTitle: row.boardTitle,
+          workspaceName: row.workspaceName,
+          columnTitle: row.columnTitle,
+          labels: attached,
+          participants,
+          /* Dihitung di sini, bukan lewat query keenam: label dan pesertanya
+             sudah ada di tangan, dan aturan cocoknya sama dengan yang barusan
+             dipakai SQL. */
+          matchedLabelIds: attached
+            .filter((label) => matchesQuery(label.name, q))
+            .map((label) => label.id),
+          matchedUserIds: participants
+            .filter((person) => matchesQuery(person.name, q) || matchesQuery(person.email, q))
+            .map((person) => person.id),
+        };
+      });
+
+      return c.json(hits);
+    },
+  )
+
   .get("/:id", async (c) => {
     const db = c.get("db");
     const userId = c.get("user").id;
@@ -485,6 +624,88 @@ const app = new Hono<AppEnv>()
     },
   )
 
+  /**
+   * Pindahkan kartu ke sebuah kolom di papan LAIN.
+   *
+   * Berdiri sendiri, tidak menumpang "/move", karena yang dikerjakannya memang
+   * bukan hal yang sama: perpindahan di dalam papan cuma menghitung posisi —
+   * dan itu dijalankan tiap kali seseorang menyeret kartu — sedangkan pindah
+   * papan harus ikut mengurus label yang menempel padanya, mengabari dua papan
+   * sekaligus, dan menyebut papan tujuan di lini masa.
+   *
+   * Tidak menerima `index`: kartunya mendarat di ujung kolom tujuan. Tidak ada
+   * urutan yang bisa dipilih orang yang memindahkannya — ia sedang melihat
+   * papan asal, bukan papan tujuan.
+   */
+  .post(
+    "/:id/transfer",
+    zValidator("json", z.object({ columnId: z.string().min(1) })),
+    async (c) => {
+      const db = c.get("db");
+      const userId = c.get("user").id;
+      const { card, boardId } = await requireCard(db, c.req.param("id"), userId);
+      const { columnId } = c.req.valid("json");
+
+      const target = await requireColumn(db, columnId, userId);
+      if (target.boardId === boardId) {
+        return c.json({ error: "Kolom tujuan ada di papan ini — pakai tarik-lepas" }, 400);
+      }
+
+      const board = await db
+        .select({ title: boards.title })
+        .from(boards)
+        .where(eq(boards.id, target.boardId))
+        .get();
+
+      const last = await db
+        .select({ position: cards.position })
+        .from(cards)
+        .where(eq(cards.columnId, columnId))
+        .orderBy(asc(cards.position))
+        .all();
+
+      const updated = await db
+        .update(cards)
+        .set({
+          columnId,
+          position: positionBetween(last.at(-1)?.position ?? null, null),
+          updatedBy: userId,
+          updatedAt: new Date(),
+        })
+        .where(eq(cards.id, card.id))
+        .returning()
+        .get();
+
+      // Label dimiliki papan: yang menempel di kartu ini harus dicarikan
+      // padanannya di papan tujuan — lihat catatan di worker/transfer.ts.
+      await relabelForBoard(db, { cardId: card.id }, target.boardId);
+
+      const note = {
+        kind: "card_transferred",
+        detail: { to: target.column.title, text: board?.title },
+      } as const;
+
+      await markCardActivity(db, card.id, userId, { touchCard: false, note });
+
+      // Dua papan yang berubah, dua papan yang harus menggambar ulang.
+      await touchBoard(c, boardId);
+      await touchBoard(c, target.boardId);
+
+      notifyCardActivity(c, {
+        cardId: card.id,
+        boardId: target.boardId,
+        cardTitle: card.title,
+        notes: note,
+        // Kartunya sudah pergi dari sana, jadi pengawas kolom asal tidak akan
+        // ditemukan lagi lewat kartu ini — padahal justru merekalah yang perlu
+        // tahu bahwa isinya berkurang satu.
+        fromColumnId: card.columnId,
+      });
+
+      return c.json({ ...updated, boardId: target.boardId });
+    },
+  )
+
   .delete("/:id", async (c) => {
     const db = c.get("db");
     const sessionUser = c.get("user");
@@ -496,11 +717,10 @@ const app = new Hono<AppEnv>()
 
     await db.delete(cards).where(eq(cards.id, card.id));
     await touchBoard(c, boardId);
-    notifyCard(c, "changes", {
+    notifyCardDeleted(c, {
       cardId: card.id,
       boardId,
       cardTitle: card.title,
-      body: `${sessionUser.name} menghapus kartu ini`,
       watchers,
     });
 
@@ -598,11 +818,11 @@ const app = new Hono<AppEnv>()
       await db.insert(cardComments).values(comment);
       await markCardActivity(db, card.id, sessionUser.id);
       await touchBoard(c, boardId);
-      notifyCard(c, "comments", {
+      notifyComment(c, {
         cardId: card.id,
         boardId,
         cardTitle: card.title,
-        body: `${sessionUser.name}: ${comment.body}`,
+        comment: comment.body,
       });
 
       return c.json({ ...comment, author: toBrief(sessionUser) }, 201);

@@ -26,6 +26,9 @@ interface Props {
   /** Alamat kartu ini — yang sama dengan yang sedang dipakai bilah alamat. */
   shareUrl: string;
   onClose: () => void;
+  /** Buka pemilih papan tujuan. Perpindahannya sendiri milik papan, bukan
+      dialog ini: kartunya akan hilang dari papan yang sedang dibuka. */
+  onMove: () => void;
   /** Muat ulang board, supaya muka kartu di papan ikut berubah. */
   onBoardChange: () => void;
 }
@@ -49,6 +52,7 @@ export function CardModal({
   currentUser,
   shareUrl,
   onClose,
+  onMove,
   onBoardChange,
 }: Props) {
   const [detail, setDetail] = useState<CardDetail | null>(null);
@@ -401,6 +405,23 @@ export function CardModal({
               className="size-8 text-muted"
             />
           )}
+
+          {/* Pindah papan berdiri di deret kenop kepala kartu, bukan di dalam
+              isinya: ia tidak mengubah apa pun tentang kartu ini, ia
+              memindahkan kartunya — sekelas dengan menyalin tautan dan
+              menutup, bukan dengan menyunting deskripsi. */}
+          <button
+            type="button"
+            onClick={onMove}
+            aria-label="Pindahkan kartu ke papan lain"
+            title="Pindahkan ke papan lain"
+            className="grid size-8 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-line-soft hover:text-ink"
+          >
+            <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M13 4H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6" />
+              <path d="m16 8 4 4-4 4M20 12H10" />
+            </svg>
+          </button>
 
           <button
             type="button"

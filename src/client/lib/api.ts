@@ -5,6 +5,7 @@ import type {
   Card,
   CardCommentDetail,
   CardDetail,
+  CardSearchHit,
   CardSummary,
   ChecklistItem,
   Column,
@@ -15,6 +16,7 @@ import type {
   Label,
   LabelColor,
   MemberSummary,
+  MoveTargetWorkspace,
   NotificationFeed,
   NotificationSettings,
   PushSettings,
@@ -120,12 +122,24 @@ export const api = {
   deleteColumn: (id: string, options?: SendOptions) =>
     send<void>(`/columns/${id}`, "DELETE", undefined, options),
 
+  /* Pindah papan. Dua alamat yang terpisah dari "/move", karena yang
+     dikerjakannya juga berbeda — lihat catatan di worker/routes/cards.ts. */
+  listMoveTargets: () => request<MoveTargetWorkspace[]>("/boards/destinations"),
+  transferColumn: (id: string, boardId: string) =>
+    send<Column>(`/columns/${id}/transfer`, "POST", { boardId }),
+  transferCard: (id: string, columnId: string) =>
+    send<Card & { boardId: string }>(`/cards/${id}/transfer`, "POST", { columnId }),
+
   /* Awasi. Dua alamat, satu bentuk — jawabannya mengulang keadaan yang
      tersimpan, jadi klien yang sudah menebak duluan tinggal mencocokkan. */
   watchColumn: (id: string, watching: boolean) =>
     send<{ watching: boolean }>(`/columns/${id}/watch`, "POST", { watching }),
   watchCard: (id: string, watching: boolean) =>
     send<{ watching: boolean }>(`/cards/${id}/watch`, "POST", { watching }),
+
+  /* Pencarian kartu lintas papan. Kata kuncinya dikirim apa adanya — server
+     yang melolosi karakter LIKE-nya. */
+  searchCards: (q: string) => request<CardSearchHit[]>(`/cards/search?q=${encodeURIComponent(q)}`),
 
   createCard: (columnId: string, title: string) =>
     send<CardSummary>("/cards", "POST", { columnId, title }),
