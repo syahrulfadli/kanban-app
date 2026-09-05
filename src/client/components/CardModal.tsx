@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CardChecklist } from "./CardChecklist";
+import { CardDue } from "./CardDue";
 import { CardFollowup } from "./CardFollowup";
 import { CardLabels } from "./CardLabels";
+import { CardPeople } from "./CardPeople";
 import { WatchToggle } from "./WatchToggle";
 import { AvatarStack } from "./Avatar";
 import { CardDetailSkeleton, SkeletonLine } from "./Skeleton";
+import { useStoredFlag } from "../hooks/useStoredFlag";
 import { api } from "../lib/api";
 import { optimisticActivity, type ActivityNote } from "../lib/activity";
 import { formatDateTime, formatRelative } from "../lib/format";
@@ -61,6 +64,11 @@ export function CardModal({
   const [editingDescription, setEditingDescription] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
+
+  /* Panel followup boleh disembunyikan, dan pilihannya diingat peramban —
+     bukan server. Yang diatur di sini cara satu orang membaca kartu, dan
+     kartu yang sama harus tetap tampil utuh bagi rekannya. */
+  const [followupHidden, toggleFollowup] = useStoredFlag("card:followup-hidden", false);
 
   /* Menyalin alamat kartu. Kartunya sudah punya alamat sendiri sejak dibuka,
      jadi tombol ini cuma memindahkannya ke clipboard — tidak ada tautan
@@ -308,6 +316,42 @@ export function CardModal({
       (item) => ({ kind: "checklist_added", detail: { text: item.text } }),
     );
 
+  /* Mengundang seseorang bukan menyunting kartu, tapi tetap lewat `run`:
+     berbeda dengan Awasi, undangan mengubah kartunya untuk semua orang —
+     wajahnya muncul di muka kartu dan namanya masuk lini masa. */
+  const addPerson = (person: UserBrief) =>
+    void run(
+      (card) => ({ ...card, members: [...card.members, person] }),
+      () => api.addCardMember(cardId, person.id),
+      { kind: "member_added", detail: { text: person.name } },
+    );
+
+  const removePerson = (person: UserBrief) =>
+    void run(
+      (card) => ({ ...card, members: card.members.filter((m) => m.id !== person.id) }),
+      () => api.removeCardMember(cardId, person.id),
+      { kind: "member_removed", detail: { text: person.name } },
+    );
+
+  const setDue = (dueAt: string | null) => {
+    if (!detail) return;
+
+    const before = detail.dueAt ? new Date(detail.dueAt) : null;
+    const after = dueAt ? new Date(dueAt) : null;
+    if ((before?.getTime() ?? null) === (after?.getTime() ?? null)) return;
+
+    void run(
+      (card) => ({ ...card, dueAt: after }),
+      () => api.updateCard(cardId, { dueAt }),
+      after
+        ? {
+            kind: "due_changed",
+            detail: { from: before?.toISOString() ?? null, to: after.toISOString() },
+          }
+        : { kind: "due_cleared" },
+    );
+  };
+
   const addComment = (body: string) =>
     void insert(
       () => api.addComment(cardId, body),
@@ -406,6 +450,23 @@ export function CardModal({
             />
           )}
 
+          {/* Sakelar panel followup. Di kepala kartu bersama kenop lain yang
+              bukan suntingan: yang diubahnya lebar bacaan, bukan isi kartu. */}
+          <button
+            type="button"
+            onClick={toggleFollowup}
+            aria-pressed={!followupHidden}
+            aria-label={followupHidden ? "Tampilkan panel followup" : "Sembunyikan panel followup"}
+            title={followupHidden ? "Tampilkan followup" : "Sembunyikan followup"}
+            className="grid size-8 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-line-soft hover:text-ink"
+          >
+            <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <rect x="3" y="4" width="18" height="16" rx="2.5" />
+              <path d="M15 4v16" />
+              {followupHidden && <path d="m18 10-2 2 2 2" />}
+            </svg>
+          </button>
+
           {/* Pindah papan berdiri di deret kenop kepala kartu, bukan di dalam
               isinya: ia tidak mengubah apa pun tentang kartu ini, ia
               memindahkan kartunya — sekelas dengan menyalin tautan dan
@@ -417,7 +478,7 @@ export function CardModal({
             title="Pindahkan ke papan lain"
             className="grid size-8 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-line-soft hover:text-ink"
           >
-            <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M13 4H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6" />
               <path d="m16 8 4 4-4 4M20 12H10" />
             </svg>
@@ -431,11 +492,11 @@ export function CardModal({
             className="grid size-8 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-line-soft hover:text-ink"
           >
             {linkCopied ? (
-              <svg viewBox="0 0 24 24" className="size-4 text-ok" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <svg viewBox="0 0 24 24" className="size-5 text-ok" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                 <path d="m5 12.5 4.5 4.5L19 7.5" />
               </svg>
             ) : (
-              <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                 <path d="M10 13.5a4 4 0 0 0 5.7.4l3-3a4 4 0 0 0-5.7-5.7l-1.6 1.6" />
                 <path d="M14 10.5a4 4 0 0 0-5.7-.4l-3 3a4 4 0 0 0 5.7 5.7l1.6-1.6" />
               </svg>
@@ -448,7 +509,7 @@ export function CardModal({
             aria-label="Tutup kartu"
             className="grid size-8 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-line-soft hover:text-ink"
           >
-            <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
+            <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
               <path d="M6 6 18 18M18 6 6 18" />
             </svg>
           </button>
@@ -478,6 +539,21 @@ export function CardModal({
                   onRename={renameLabel}
                   onDelete={deleteLabel}
                 />
+
+                {/* Orang dan tenggat berdampingan: keduanya jawaban atas
+                    pertanyaan yang sama — siapa, dan kapan — dan masing-masing
+                    isinya cuma sebaris. Di layar sempit mereka kembali
+                    bertumpuk. */}
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <CardPeople
+                    members={detail.members}
+                    workspaceId={detail.workspaceId}
+                    onAdd={addPerson}
+                    onRemove={removePerson}
+                  />
+
+                  <CardDue dueAt={detail.dueAt} onChange={setDue} />
+                </div>
 
                 <section className="flex flex-col gap-2">
                   <span className="section-label">Deskripsi</span>
@@ -519,6 +595,7 @@ export function CardModal({
                 />
               </div>
 
+              {!followupHidden && (
               <div className="flex flex-col border-t border-line-soft md:min-h-0 md:w-80 md:shrink-0 md:border-t-0 md:border-l">
                 <CardFollowup
                   comments={detail.comments}
@@ -529,6 +606,7 @@ export function CardModal({
                   onDelete={deleteComment}
                 />
               </div>
+              )}
             </div>
 
             {/* Kaki kartu: siapa yang terlibat, di kiri — lalu kapan kartu ini

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "./Avatar";
+import { useStoredFlag } from "../hooks/useStoredFlag";
 import { describeActivity } from "../lib/activity";
+import { cn } from "../lib/cn";
 import { labelTint } from "../lib/people";
 import { formatDateTime, formatRelative } from "../lib/format";
 import type { CardActivityDetail, CardCommentDetail } from "../../shared/types";
@@ -101,7 +103,19 @@ export function CardFollowup({
   const [editing, setEditing] = useState<string | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
 
-  const entries = weave(comments, activities);
+  /**
+   * Lini masa lengkap, atau percakapannya saja.
+   *
+   * Defaultnya percakapan. Jejak perubahan berguna ketika sedang ditanyakan —
+   * "sejak kapan ini di kolom itu", "siapa yang melepas labelnya" — tapi ia
+   * jauh lebih banyak daripada followup yang ditulis orang, dan di kartu yang
+   * ramai satu kalimat yang perlu dibaca tenggelam di antara belasan baris
+   * pencentangan checklist. Yang lebih sering dicari yang ditulis orang, jadi
+   * itulah yang berdiri di depan; sisanya sejauh satu ketukan.
+   */
+  const [details, toggleDetails] = useStoredFlag("card:timeline-details", false);
+
+  const entries = weave(comments, details ? activities : []);
 
   // Lini masa dibaca dari ujung terbaru: begitu ada baris baru, panel
   // menggulir sendiri ke bawah — persis kebiasaan membaca utas percakapan.
@@ -130,11 +144,35 @@ export function CardFollowup({
         {comments.length > 0 && (
           <span className="tabular-nums normal-case text-muted">{comments.length}</span>
         )}
+
+        {/* Sakelarnya duduk di kepala panel, bukan di kaki daftar: yang
+            diubahnya adalah apa yang sedang dibaca, dan pertanyaannya muncul
+            sebelum orang menggulir, bukan setelah sampai dasar. */}
+        <button
+          type="button"
+          aria-pressed={details}
+          onClick={toggleDetails}
+          title={
+            details
+              ? "Sembunyikan jejak perubahan kartu"
+              : "Tampilkan jejak perubahan kartu"
+          }
+          className={cn(
+            "ml-auto rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold tracking-normal normal-case transition-colors",
+            details ? "bg-line-soft text-ink" : "text-faint hover:text-ink",
+          )}
+        >
+          Detail
+        </button>
       </div>
 
       <div ref={scroller} className="min-h-0 px-5 pb-2 md:flex-1 md:overflow-y-auto md:px-4">
         {entries.length === 0 ? (
-          <p className="text-xs text-faint">Belum ada jejak apa pun pada kartu ini.</p>
+          <p className="text-xs text-faint">
+            {details
+              ? "Belum ada jejak apa pun pada kartu ini."
+              : "Belum ada followup. Tekan Detail untuk melihat perubahan kartu."}
+          </p>
         ) : (
           <ol className="timeline">
             {entries.map((entry) => {

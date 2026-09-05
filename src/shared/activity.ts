@@ -1,4 +1,5 @@
 import type { ActivityDetail, ActivityKind, LabelColor } from "./types";
+import { APP_TIME_ZONE, formatStamp } from "./datetime";
 
 /**
  * Satu baris lini masa dipecah jadi dua bagian: `verb` yang mengalir sebagai
@@ -49,6 +50,21 @@ export function describeActivity(kind: ActivityKind, detail: ActivityDetail | nu
       return { verb: "menghapus butir", subject: d.text };
     case "comment_deleted":
       return { verb: "menghapus sebuah followup" };
+    case "member_added":
+      return { verb: "mengundang", subject: d.text };
+    case "member_removed":
+      return { verb: "mengeluarkan", subject: d.text };
+    /* Tanggalnya diformat tanpa menyebut zona, jadi ia jatuh ke zona pembaca —
+       dan itu memang yang benar di sini: baris ini digambar di peramban orang
+       yang sedang membukanya, bukan di worker. Sisi server memakai pintu lain
+       (describeNotification), yang menyebut zonanya sendiri. */
+    case "due_changed":
+      return {
+        verb: d.from ? "memindahkan tenggat ke" : "menetapkan tenggat",
+        subject: d.to ? formatStamp(d.to) : undefined,
+      };
+    case "due_cleared":
+      return { verb: "menghapus tenggat" };
   }
 }
 
@@ -114,6 +130,16 @@ export function describeNotification(
       return `menghapus butir ${quoted(d.text, "checklist")} dari ${card}`;
     case "comment_deleted":
       return `menghapus sebuah followup di ${card}`;
+    case "member_added":
+      return `mengundang ${quoted(d.text, "seseorang")} ke ${card}`;
+    case "member_removed":
+      return `mengeluarkan ${quoted(d.text, "seseorang")} dari ${card}`;
+    case "due_changed":
+      return d.to
+        ? `menetapkan tenggat ${card} pada ${formatStamp(d.to, APP_TIME_ZONE)}`
+        : `mengubah tenggat ${card}`;
+    case "due_cleared":
+      return `menghapus tenggat ${card}`;
   }
 }
 

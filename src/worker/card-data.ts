@@ -5,6 +5,7 @@ import {
   cardActivities,
   cardComments,
   cardLabels,
+  cardMembers,
   cardParticipants,
   cardWatches,
   cards,
@@ -48,6 +49,7 @@ export interface CardExtras {
   checklist: ChecklistProgress;
   commentCount: number;
   participants: UserBrief[];
+  members: UserBrief[];
   watching: boolean;
 }
 
@@ -56,6 +58,7 @@ const EMPTY_EXTRAS = (): CardExtras => ({
   checklist: { total: 0, done: 0 },
   commentCount: 0,
   participants: [],
+  members: [],
   watching: false,
 });
 
@@ -92,8 +95,9 @@ function bucket(map: Map<string, CardExtras>, cardId: string) {
 }
 
 /**
- * Label, progress checklist, jumlah followup, peserta, dan keadaan Awasi untuk
- * sekumpulan kartu — lima query tetap, tidak peduli berapa kartu yang diminta.
+ * Label, progress checklist, jumlah followup, peserta, undangan, dan keadaan
+ * Awasi untuk sekumpulan kartu — enam query tetap, tidak peduli berapa kartu
+ * yang diminta.
  *
  * `viewerId` hanya dipakai keadaan Awasi, yang memang pertanyaan tentang orang
  * yang sedang melihat, bukan tentang kartunya.
@@ -103,53 +107,68 @@ export async function loadCardExtras(
   scope: CardScope,
   viewerId: string,
 ): Promise<Map<string, CardExtras>> {
-  const [labelRows, checklistRows, commentRows, participantRows, watchRows] = await Promise.all([
-    db
-      .select({ cardId: cardLabels.cardId, label: labels })
-      .from(cardLabels)
-      .innerJoin(labels, eq(cardLabels.labelId, labels.id))
-      .where(scoped(db, cardLabels.cardId, scope))
-      .orderBy(asc(labels.createdAt))
-      .all(),
+  const [labelRows, checklistRows, commentRows, participantRows, memberRows, watchRows] =
+    await Promise.all([
+      db
+        .select({ cardId: cardLabels.cardId, label: labels })
+        .from(cardLabels)
+        .innerJoin(labels, eq(cardLabels.labelId, labels.id))
+        .where(scoped(db, cardLabels.cardId, scope))
+        .orderBy(asc(labels.createdAt))
+        .all(),
 
-    db
-      .select({
-        cardId: checklistItems.cardId,
-        total: sql<number>`count(*)`,
-        done: sql<number>`sum(case when ${checklistItems.done} then 1 else 0 end)`,
-      })
-      .from(checklistItems)
-      .where(scoped(db, checklistItems.cardId, scope))
-      .groupBy(checklistItems.cardId)
-      .all(),
+      db
+        .select({
+          cardId: checklistItems.cardId,
+          total: sql<number>`count(*)`,
+          done: sql<number>`sum(case when ${checklistItems.done} then 1 else 0 end)`,
+        })
+        .from(checklistItems)
+        .where(scoped(db, checklistItems.cardId, scope))
+        .groupBy(checklistItems.cardId)
+        .all(),
 
-    db
-      .select({ cardId: cardComments.cardId, total: sql<number>`count(*)` })
-      .from(cardComments)
-      .where(scoped(db, cardComments.cardId, scope))
-      .groupBy(cardComments.cardId)
-      .all(),
+      db
+        .select({ cardId: cardComments.cardId, total: sql<number>`count(*)` })
+        .from(cardComments)
+        .where(scoped(db, cardComments.cardId, scope))
+        .groupBy(cardComments.cardId)
+        .all(),
 
-    db
-      .select({
-        cardId: cardParticipants.cardId,
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        image: user.image,
-      })
-      .from(cardParticipants)
-      .innerJoin(user, eq(cardParticipants.userId, user.id))
-      .where(scoped(db, cardParticipants.cardId, scope))
-      .orderBy(asc(cardParticipants.firstActiveAt))
-      .all(),
+      db
+        .select({
+          cardId: cardParticipants.cardId,
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          image: user.image,
+        })
+        .from(cardParticipants)
+        .innerJoin(user, eq(cardParticipants.userId, user.id))
+        .where(scoped(db, cardParticipants.cardId, scope))
+        .orderBy(asc(cardParticipants.firstActiveAt))
+        .all(),
 
-    db
-      .select({ cardId: cardWatches.cardId, watching: cardWatches.watching })
-      .from(cardWatches)
-      .where(and(scoped(db, cardWatches.cardId, scope), eq(cardWatches.userId, viewerId)))
-      .all(),
-  ]);
+      db
+        .select({
+          cardId: cardMembers.cardId,
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          image: user.image,
+        })
+        .from(cardMembers)
+        .innerJoin(user, eq(cardMembers.userId, user.id))
+        .where(scoped(db, cardMembers.cardId, scope))
+        .orderBy(asc(cardMembers.createdAt))
+        .all(),
+
+      db
+        .select({ cardId: cardWatches.cardId, watching: cardWatches.watching })
+        .from(cardWatches)
+        .where(and(scoped(db, cardWatches.cardId, scope), eq(cardWatches.userId, viewerId)))
+        .all(),
+    ]);
 
   const map = new Map<string, CardExtras>();
 
@@ -165,10 +184,19 @@ export async function loadCardExtras(
     bucket(map, cardId).participants.push(person);
   }
 
-  /* Aturan bawaannya: menyentuh kartu berarti mengawasinya. Dihitung dari
-     daftar peserta yang sudah ada di tangan, bukan dari query keenam. */
+  for (const { cardId, ...person } of memberRows) {
+    bucket(map, cardId).members.push(person);
+  }
+
+  /* Aturan bawaannya: menyentuh kartu berarti mengawasinya — begitu juga
+     diundang ke kartu itu. Keduanya dihitung dari daftar yang sudah ada di
+     tangan, bukan dari query ketujuh, dan keduanya harus sama persis dengan
+     apa yang dipakai `cardAudience` saat memilih penerima kabar: mata yang
+     menyala di muka kartu adalah janji bahwa kabarnya akan sampai. */
   for (const extras of map.values()) {
-    extras.watching = extras.participants.some((p) => p.id === viewerId);
+    extras.watching = [...extras.participants, ...extras.members].some(
+      (p) => p.id === viewerId,
+    );
   }
 
   // Pilihan manual menimpanya — termasuk ketika pilihannya "jangan".

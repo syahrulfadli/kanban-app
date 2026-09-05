@@ -129,6 +129,15 @@ export const cards = sqliteTable(
        tidak boleh ikut hilang hanya karena pembuatnya keluar dari tim. */
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    /**
+     * Tenggat kartu — pengingat sekaligus batas waktu, dan sengaja satu kolom
+     * untuk keduanya: yang membedakan "ingatkan saya" dari "harus selesai"
+     * cuma sikap orangnya terhadap tanggal yang sama, bukan datanya.
+     *
+     * Null berarti kartu tanpa tanggal, dan itulah keadaan istirahatnya:
+     * papan yang setiap kartunya bertenggat kehilangan gunanya tenggat.
+     */
+    dueAt: integer("due_at", { mode: "timestamp_ms" }),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
   },
@@ -157,6 +166,10 @@ export const ACTIVITY_KINDS = [
   "checklist_renamed",
   "checklist_removed",
   "comment_deleted",
+  "member_added",
+  "member_removed",
+  "due_changed",
+  "due_cleared",
 ] as const;
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
 
@@ -255,6 +268,43 @@ export const cardParticipants = sqliteTable(
   (t) => [
     primaryKey({ columns: [t.cardId, t.userId] }),
     index("card_participants_user_idx").on(t.userId),
+  ],
+);
+
+/**
+ * Orang yang diundang ke sebuah kartu.
+ *
+ * Bedanya dengan `card_participants` bukan isinya melainkan asalnya: baris
+ * peserta *disimpulkan* dari apa yang sudah terjadi, baris ini *dinyatakan* —
+ * seseorang menunjuk rekannya dan berkata "kartu ini urusanmu juga", sebelum
+ * orang itu menyentuh apa pun. Karena itu keduanya tidak bisa digabung:
+ * menggabungnya berarti mengundang seseorang meninggalkan jejak palsu bahwa
+ * ia pernah mengerjakan kartunya.
+ *
+ * Yang boleh diundang hanya anggota workspace pemilik papannya. Undangan ini
+ * tidak memberi akses apa pun — akses tetap lahir dari `workspace_members`;
+ * yang diberikannya adalah perhatian: undangan membuat kartunya diawasi
+ * (lihat `cardAudience` di worker/notify.ts) dan wajah orangnya muncul di
+ * muka kartu.
+ *
+ * `invitedBy` memakai `set null`: undangan tetap berlaku setelah yang
+ * mengundang keluar dari tim.
+ */
+export const cardMembers = sqliteTable(
+  "card_members",
+  {
+    cardId: text("card_id")
+      .notNull()
+      .references(() => cards.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    invitedBy: text("invited_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.cardId, t.userId] }),
+    index("card_members_user_idx").on(t.userId),
   ],
 );
 
@@ -483,6 +533,7 @@ export type Label = typeof labels.$inferSelect;
 export type CardComment = typeof cardComments.$inferSelect;
 export type ChecklistItem = typeof checklistItems.$inferSelect;
 export type CardParticipant = typeof cardParticipants.$inferSelect;
+export type CardMember = typeof cardMembers.$inferSelect;
 export type CardWatch = typeof cardWatches.$inferSelect;
 export type ColumnWatch = typeof columnWatches.$inferSelect;
 export type CardActivity = typeof cardActivities.$inferSelect;

@@ -3,6 +3,7 @@ import type { Context } from "hono";
 import { nanoid } from "nanoid";
 import {
   boards,
+  cardMembers,
   cardParticipants,
   cardWatches,
   cards,
@@ -234,14 +235,18 @@ async function memberIds(db: Db, workspaceId: string): Promise<Set<string>> {
 /**
  * Siapa yang mengawasi kartu ini, selain pelakunya.
  *
- * Tiga lapis, dan urutan penerapannya yang menentukan artinya:
+ * Empat lapis, dan urutan penerapannya yang menentukan artinya:
  *
  * 1. Peserta kartu mengawasi secara bawaan — inilah yang membuat pembuat dan
  *    kontributor kartu dikabari tanpa pernah menekan apa pun.
- * 2. Pengawas kolom tempat kartu itu sekarang berada ikut terbawa — dan, saat
+ * 2. Begitu juga orang yang diundang ke kartunya. Justru itu isi undangannya:
+ *    mengundang seseorang adalah cara mengatakan "ini perlu kamu ikuti", dan
+ *    undangan yang tidak membawa kabar apa-apa cuma sebuah wajah di muka
+ *    kartu.
+ * 3. Pengawas kolom tempat kartu itu sekarang berada ikut terbawa — dan, saat
  *    kartunya baru saja pindah, pengawas kolom yang ditinggalkannya juga —
  *    walau mereka belum pernah menyentuh kartunya.
- * 3. Pilihan manual di `card_watches` menimpa keduanya. Karena itulah
+ * 4. Pilihan manual di `card_watches` menimpa semuanya. Karena itulah
  *    mematikan Awasi di satu kartu tetap menyunyikannya sekalipun kolomnya
  *    sedang diawasi — yang dinyatakan orangnya selalu menang atas yang
  *    disimpulkan aplikasi.
@@ -258,39 +263,47 @@ async function cardAudience(
    */
   alsoColumnId?: string,
 ): Promise<string[]> {
-  const [participants, choices, columnWatchers, alsoWatchers, members] = await Promise.all([
-    db
-      .select({ userId: cardParticipants.userId })
-      .from(cardParticipants)
-      .where(eq(cardParticipants.cardId, cardId))
-      .all(),
+  const [participants, invited, choices, columnWatchers, alsoWatchers, members] =
+    await Promise.all([
+      db
+        .select({ userId: cardParticipants.userId })
+        .from(cardParticipants)
+        .where(eq(cardParticipants.cardId, cardId))
+        .all(),
 
-    db
-      .select({ userId: cardWatches.userId, watching: cardWatches.watching })
-      .from(cardWatches)
-      .where(eq(cardWatches.cardId, cardId))
-      .all(),
+      db
+        .select({ userId: cardMembers.userId })
+        .from(cardMembers)
+        .where(eq(cardMembers.cardId, cardId))
+        .all(),
 
-    db
-      .select({ userId: columnWatches.userId })
-      .from(columnWatches)
-      .innerJoin(cards, eq(cards.columnId, columnWatches.columnId))
-      .where(eq(cards.id, cardId))
-      .all(),
+      db
+        .select({ userId: cardWatches.userId, watching: cardWatches.watching })
+        .from(cardWatches)
+        .where(eq(cardWatches.cardId, cardId))
+        .all(),
 
-    alsoColumnId
-      ? db
-          .select({ userId: columnWatches.userId })
-          .from(columnWatches)
-          .where(eq(columnWatches.columnId, alsoColumnId))
-          .all()
-      : [],
+      db
+        .select({ userId: columnWatches.userId })
+        .from(columnWatches)
+        .innerJoin(cards, eq(cards.columnId, columnWatches.columnId))
+        .where(eq(cards.id, cardId))
+        .all(),
 
-    memberIds(db, workspaceId),
-  ]);
+      alsoColumnId
+        ? db
+            .select({ userId: columnWatches.userId })
+            .from(columnWatches)
+            .where(eq(columnWatches.columnId, alsoColumnId))
+            .all()
+        : [],
+
+      memberIds(db, workspaceId),
+    ]);
 
   const watching = new Set<string>();
   for (const row of participants) watching.add(row.userId);
+  for (const row of invited) watching.add(row.userId);
   for (const row of columnWatchers) watching.add(row.userId);
   for (const row of alsoWatchers) watching.add(row.userId);
   for (const row of choices) {

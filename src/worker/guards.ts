@@ -86,6 +86,10 @@ export async function requireCard(db: Db, cardId: string, userId: string) {
       card: cards,
       columnId: columns.id,
       boardId: boards.id,
+      /* Ikut terbawa join yang sudah ada di sini: undangan ke kartu dibatasi
+         anggota workspace pemilik papannya, dan tanpa ini setiap pemeriksaan
+         itu butuh satu query lagi untuk menanyakan hal yang sudah lewat. */
+      workspaceId: boards.workspaceId,
       role: workspaceMembers.role,
     })
     .from(cards)

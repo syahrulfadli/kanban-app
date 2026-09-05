@@ -66,6 +66,15 @@ export interface CardSummary extends Card {
   /** Terurut dari yang paling awal menyentuh kartu — pembuat selalu di depan. */
   participants: UserBrief[];
   /**
+   * Orang yang diundang ke kartu ini, urut waktu diundang.
+   *
+   * Terpisah dari `participants` karena asalnya memang berbeda — yang satu
+   * dinyatakan, yang satu disimpulkan (lihat `card_members` di skema). Muka
+   * kartu menggabung keduanya jadi satu deret wajah; yang membutuhkan
+   * pemisahannya adalah dialog kartu, tempat undangan bisa dicabut.
+   */
+  members: UserBrief[];
+  /**
    * Apakah orang yang sedang melihat mengawasi kartu ini — hanya kartunya
    * sendiri. Mengawasi kolomnya juga mengirim kabar tentang kartu ini, tapi
    * tidak dinyatakan di sini: mata yang muncul di setiap kartu sebuah kolom
@@ -86,6 +95,10 @@ export interface CardActivityDetail extends CardActivity {
 /** Isi lengkap satu kartu — hanya ditarik saat dialognya dibuka. */
 export interface CardDetail extends CardSummary {
   boardId: string;
+  /* Ikut dikirim demi pemilih orang: yang boleh diundang ke kartu adalah
+     anggota workspace pemilik papannya, dan daftar itu ditarik dari alamat
+     workspace — bukan dari kartunya. */
+  workspaceId: string;
   checklistItems: ChecklistItem[];
   comments: CardCommentDetail[];
   /** Jejak perubahan, terurut dari yang paling lama. */

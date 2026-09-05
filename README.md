@@ -3,7 +3,8 @@
 Papan kanban kolaboratif dengan drag & drop, berjalan penuh di free tier Cloudflare.
 
 Kartu bisa dibuka sebagai dialog: label berwarna, checklist dengan progress bar,
-thread followup, serta jejak siapa membuat dan mengubahnya.
+thread followup, orang yang diundang mengurusnya, tenggat, serta jejak siapa
+membuat dan mengubahnya.
 
 Bisa dipasang sebagai aplikasi (PWA) dan mengirim notifikasi push ke perangkat —
 peserta sebuah kartu dikabari saat ada followup baru atau kartunya berubah,
@@ -151,6 +152,7 @@ board tidak bocor ke orang luar.
 | `POST` | `/api/cards/:id/move` | member |
 | `POST` | `/api/cards/:id/transfer` | member (pindah ke papan lain) |
 | `POST DELETE` | `/api/cards/:id/labels`, `/api/cards/:id/labels/:labelId` | member |
+| `POST DELETE` | `/api/cards/:id/members`, `/api/cards/:id/members/:userId` | member (undang anggota workspace ke kartu) |
 | `POST` | `/api/cards/:id/comments` | member |
 | `PATCH` | `/api/cards/comments/:id` | penulisnya |
 | `DELETE` | `/api/cards/comments/:id` | penulisnya / admin |
@@ -273,7 +275,7 @@ bisa membacanya bisa memalsukan sesi login siapa saja. Pakai
 **Muka kartu digambar tanpa membuka kartunya.** `GET /api/boards/:id` sudah membawa
 label, progress checklist, jumlah followup, dan peserta setiap kartu — kalau tidak,
 papan berisi 60 kartu akan menembak 60 request tambahan hanya untuk menggambar
-progress bar. Semuanya diambil dalam empat query tetap yang menyaring lewat subquery
+progress bar. Semuanya diambil dalam enam query tetap yang menyaring lewat subquery
 `card_id IN (SELECT …)`, bukan daftar id yang dibentangkan, supaya jumlah kartu tidak
 pernah menabrak batas parameter terikat D1. Isi penuh kartu (butir checklist, isi
 followup) baru ditarik lewat `GET /api/cards/:id` saat dialognya dibuka.
@@ -284,6 +286,24 @@ atau menulis followup pada kartu itu. Urutannya memakai `first_active_at` — pe
 kartu selalu berdiri paling depan. Menghapus followup terakhir seseorang juga
 melepasnya dari deretan avatar, kecuali ia masih tercatat sebagai pembuat atau
 penyunting terakhir.
+
+**Undangan ke kartu tinggal di tabelnya sendiri.** `card_members` menyimpan orang
+yang *dinyatakan* mengurus sebuah kartu, terpisah dari `card_participants` yang
+*disimpulkan* dari aksi. Menggabungnya berarti mengundang seseorang meninggalkan
+jejak palsu bahwa ia pernah mengerjakan kartunya. Yang boleh diundang hanya anggota
+workspace pemilik papan — undangan tidak memberi akses apa pun (akses tetap lahir
+dari `workspace_members`), ia memberi perhatian: kartunya jadi diawasi dan wajah
+orangnya muncul di muka kartu, di depan para peserta.
+
+**Tenggat disimpan sebagai satu titik waktu, bukan tanggal.** `cards.due_at` berisi
+stempel waktu, dan yang berpindah tangan antara klien dan server selalu ISO beserta
+zonanya — tidak pernah tulisan di jam dinding. Kartu dan lini masa memformatnya di
+zona perambannya sendiri; kalimat notifikasi disusun di worker, yang berjalan di UTC,
+jadi ia memformat memakai `APP_TIME_ZONE` di [src/shared/datetime.ts](src/shared/datetime.ts)
+— tanpa itu tenggat pukul tujuh malam dikabarkan sebagai pukul dua siang. Ronanya
+hanya muncul saat waktunya menuntut sesuatu (lewat tenggat, atau kurang dari sehari
+lagi); tenggat yang masih jauh tetap berhuruf biasa, supaya yang mendesak tidak
+tenggelam di antara tanggal berwarna.
 
 **Warna label adalah kunci simbolik, bukan hex.** Yang tersimpan di database cuma
 `"red"`, `"violet"`, dan seterusnya; peta ke warna sesungguhnya tinggal di token CSS
@@ -303,9 +323,10 @@ dengan kunci milik perangkat penerima, dan mereka tidak punya kuncinya.
 
 **Yang dikabari adalah peserta kartu, bukan seluruh anggota board.** Daftar
 penerimanya diambil dari `card_participants` — tabel yang sama yang menggambar
-deretan avatar di muka kartu. Jadi "anggota sebuah kartu" tidak perlu ditugaskan
-manual: siapa pun yang pernah menyentuh kartu itu ikut mendengar kabarnya. Pelakunya
-sendiri selalu dikecualikan. Kanal `newCards` adalah satu-satunya yang menyapa
+deretan avatar di muka kartu — ditambah orang yang diundang lewat `card_members`.
+Jadi "anggota sebuah kartu" tidak harus ditugaskan manual: siapa pun yang pernah
+menyentuh kartu itu ikut mendengar kabarnya, dan mengundang seseorang adalah cara
+memasukkannya sebelum ia menyentuh apa pun. Pelakunya sendiri selalu dikecualikan. Kanal `newCards` adalah satu-satunya yang menyapa
 seluruh anggota workspace, dan karena itu defaultnya mati.
 
 **Kotak masuk mencatat semuanya; preferensi hanya mengatur perangkat.** Sakelar
@@ -414,4 +435,10 @@ per-entitas atau CRDT untuk benar-benar mulus.
 **Presence per-orang.** Sekarang hanya jumlah penonton, belum menampilkan siapa saja
 yang sedang membuka board.
 
-**Lain-lain:** due date & penugasan kartu, lampiran, undo, verifikasi email, hapus akun.
+**Pengingat tenggat yang berbunyi sendiri.** Tenggat sudah tersimpan dan terbaca di
+kartu, tapi tidak ada yang mengetuk bahu siapa pun saat waktunya tiba: itu butuh Cron
+Trigger (gratis di Workers) yang memindai kartu jatuh tempo, plus satu kolom penanda
+supaya kabarnya tidak dikirim dua kali. Sekarang tenggat mengingatkan lewat mata —
+ronanya berubah — bukan lewat perangkat.
+
+**Lain-lain:** lampiran, undo, verifikasi email, hapus akun.

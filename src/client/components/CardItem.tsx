@@ -12,7 +12,8 @@ import {
 import { AvatarStack } from "./Avatar";
 import { EyeIcon } from "./WatchToggle";
 import { cn } from "../lib/cn";
-import { labelTint } from "../lib/people";
+import { dueState, formatDateTime, formatDueShort } from "../lib/format";
+import { cardFaces, labelTint } from "../lib/people";
 import type { CardSummary } from "../../shared/types";
 
 /* Sisanya diringkas jadi "+n". Batasnya dihitung untuk bentuk terlipat —
@@ -88,7 +89,9 @@ export function CardItem({ card, labelsOpen, onToggleLabels, onOpen, onDelete }:
     onToggleLabels();
   };
 
-  const { checklist, labels, participants, commentCount, watching } = card;
+  const { checklist, labels, participants, members, commentCount, watching } = card;
+  const faces = cardFaces(members, participants);
+  const due = card.dueAt ? dueState(card.dueAt) : null;
   const percent = checklist.total ? Math.round((checklist.done / checklist.total) * 100) : 0;
   const complete = checklist.total > 0 && checklist.done === checklist.total;
   const shownLabels = labels.slice(0, VISIBLE_LABELS);
@@ -170,16 +173,49 @@ export function CardItem({ card, labelsOpen, onToggleLabels, onOpen, onDelete }:
           lain yang sejenis. Urutannya dari yang paling banyak berubah:
           checklist bergerak tiap centang, followup hanya saat ada yang
           menulis. */}
-      {(participants.length > 0 ||
+      {(faces.length > 0 ||
         commentCount > 0 ||
         card.description ||
         checklist.total > 0 ||
+        card.dueAt ||
         watching) && (
         <div className="mt-2.5 flex items-center gap-2">
-          {/* Avatar di sudut kiri bawah: siapa yang menyentuh kartu ini. */}
-          <AvatarStack people={participants} />
+          {/* Avatar di sudut kiri bawah: siapa yang diundang ke kartu ini, dan
+              siapa yang menyentuhnya. */}
+          <AvatarStack people={faces} />
 
           <span className="ml-auto flex items-center gap-2 text-faint">
+            {/* Tenggat berdiri paling depan di antara angka-angka ini: ia
+                satu-satunya yang berubah arti tanpa ada yang menyentuh
+                kartunya. Ronanya hanya muncul saat waktunya menuntut sesuatu —
+                kalau setiap tanggal berwarna, yang lewat tenggat berhenti
+                menonjol. */}
+            {card.dueAt && (
+              <span
+                className={cn(
+                  "flex items-center gap-1 text-[0.6875rem] font-semibold tabular-nums",
+                  due === "overdue" && "text-danger",
+                  due === "soon" && "text-warn",
+                )}
+                title={`Tenggat ${formatDateTime(card.dueAt)}`}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="size-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden
+                >
+                  <path d="M8 3v3M16 3v3M4 9h16" />
+                  <rect x="4" y="5" width="16" height="16" rx="2.5" />
+                </svg>
+                {formatDueShort(card.dueAt)}
+              </span>
+            )}
+
             {/* Progress checklist terbaca tanpa membuka kartu — itu
                 satu-satunya alasan angkanya ikut diangkut di payload board. */}
             {checklist.total > 0 && (

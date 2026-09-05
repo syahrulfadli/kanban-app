@@ -21,6 +21,7 @@ import type {
   NotificationSettings,
   PushSettings,
   Role,
+  UserBrief,
   WorkspaceSummary,
 } from "../../shared/types";
 import { CLIENT_ID, CLIENT_ID_HEADER } from "./realtime";
@@ -144,8 +145,12 @@ export const api = {
   createCard: (columnId: string, title: string) =>
     send<CardSummary>("/cards", "POST", { columnId, title }),
   getCard: (id: string) => request<CardDetail>(`/cards/${id}`),
-  updateCard: (id: string, patch: { title?: string; description?: string | null }) =>
-    send<Card>(`/cards/${id}`, "PATCH", patch),
+  /* `dueAt` dikirim sebagai ISO, dan null menghapusnya — jadi ia harus
+     benar-benar ada di payload, sama seperti warna kolom. */
+  updateCard: (
+    id: string,
+    patch: { title?: string; description?: string | null; dueAt?: string | null },
+  ) => send<Card>(`/cards/${id}`, "PATCH", patch),
   moveCard: (id: string, columnId: string, index: number) =>
     send<Card>(`/cards/${id}/move`, "POST", { columnId, index }),
   deleteCard: (id: string, options?: SendOptions) =>
@@ -161,6 +166,12 @@ export const api = {
     send<Label>(`/cards/${cardId}/labels`, "POST", { labelId }),
   detachLabel: (cardId: string, labelId: string) =>
     send<void>(`/cards/${cardId}/labels/${labelId}`, "DELETE"),
+
+  /* orang pada kartu — hanya anggota workspace papan itu yang boleh diundang */
+  addCardMember: (cardId: string, userId: string) =>
+    send<UserBrief>(`/cards/${cardId}/members`, "POST", { userId }),
+  removeCardMember: (cardId: string, userId: string) =>
+    send<void>(`/cards/${cardId}/members/${userId}`, "DELETE"),
 
   /* followup */
   addComment: (cardId: string, body: string) =>

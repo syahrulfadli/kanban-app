@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { ColumnColor, LabelColor } from "../../shared/types";
+import type { ColumnColor, LabelColor, UserBrief } from "../../shared/types";
 
 /* Inisial dari nama: dua kata pertama, atau dua huruf pertama kalau namanya
    satu kata. Jatuh ke email bila nama kosong, dan ke "?" bila keduanya kosong. */
@@ -66,3 +66,22 @@ export const labelTint = (color: LabelColor) =>
  */
 export const columnTint = (color: ColumnColor | null) =>
   (color ? { "--col": `var(--label-${color})` } : {}) as CSSProperties;
+
+/**
+ * Wajah-wajah di muka kartu: yang diundang dulu, lalu yang meninggalkan jejak.
+ *
+ * Satu deret, bukan dua, karena dari seberang papan pertanyaannya cuma satu —
+ * "kartu ini urusan siapa" — dan dua tumpuk avatar berdampingan memaksa orang
+ * mengingat mana yang mana sebelum bisa menjawabnya. Yang diundang berdiri di
+ * depan: mereka ditaruh di sana dengan sengaja, sedangkan jejak peserta bisa
+ * saja tertinggal dari satu suntingan judul setahun lalu.
+ *
+ * Orang yang diundang lalu ikut menggarap kartunya muncul sekali, di
+ * tempatnya sebagai undangan.
+ */
+export function cardFaces(members: UserBrief[], participants: UserBrief[]): UserBrief[] {
+  if (members.length === 0) return participants;
+
+  const invited = new Set(members.map((person) => person.id));
+  return [...members, ...participants.filter((person) => !invited.has(person.id))];
+}

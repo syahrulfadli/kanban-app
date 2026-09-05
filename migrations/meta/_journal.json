@@ -57,6 +57,13 @@
       "when": 1788491744485,
       "tag": "0007_watch",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1788578676157,
+      "tag": "0008_card_people_due",
+      "breakpoints": true
     }
   ]
 }

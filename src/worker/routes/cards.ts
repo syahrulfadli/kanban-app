@@ -9,6 +9,7 @@ import {
   cardActivities,
   cardComments,
   cardLabels,
+  cardMembers,
   cardParticipants,
   cardWatches,
   cards,
@@ -70,6 +71,7 @@ async function buildCardDetail(
   db: Db,
   cardId: string,
   boardId: string,
+  workspaceId: string,
   viewerId: string,
 ): Promise<CardDetail> {
   const [card, extrasMap, items, comments, activities] = await Promise.all([
@@ -131,6 +133,7 @@ async function buildCardDetail(
     ...card,
     ...extras,
     boardId,
+    workspaceId,
     checklistItems: items,
     comments: comments.map(({ comment, author }) => ({ ...comment, author })),
     activities: activities.map(({ activity, actor }) => ({
@@ -176,6 +179,9 @@ const app = new Hono<AppEnv>()
         position: positionBetween(existing.at(-1)?.position ?? null, null),
         createdBy: userId,
         updatedBy: userId,
+        // Kartu baru selalu lahir tanpa tenggat; ia dipasang belakangan, di
+        // dialognya, oleh orang yang sudah tahu kapan kartu ini harus selesai.
+        dueAt: null,
         createdAt: now,
         updatedAt: now,
       };
@@ -200,6 +206,7 @@ const app = new Hono<AppEnv>()
         checklist: { total: 0, done: 0 },
         commentCount: 0,
         participants: [toBrief(c.get("user"))],
+        members: [],
         // Membuat kartu berarti mengawasinya — lewat jejaknya sebagai peserta.
         watching: true,
       };
@@ -450,9 +457,9 @@ const app = new Hono<AppEnv>()
   .get("/:id", async (c) => {
     const db = c.get("db");
     const userId = c.get("user").id;
-    const { card, boardId } = await requireCard(db, c.req.param("id"), userId);
+    const { card, boardId, workspaceId } = await requireCard(db, c.req.param("id"), userId);
 
-    return c.json(await buildCardDetail(db, card.id, boardId, userId));
+    return c.json(await buildCardDetail(db, card.id, boardId, workspaceId, userId));
   })
 
   /**
@@ -492,6 +499,11 @@ const app = new Hono<AppEnv>()
       z.object({
         title: z.string().trim().min(1).max(500).optional(),
         description: z.string().max(5000).nullish(),
+        /* Tenggat tiba sebagai ISO — dengan zona, karena itu satu-satunya
+           bentuk yang tidak berubah arti di perjalanan. Null menghapusnya, dan
+           karena itu ia harus benar-benar terkirim, bukan dihilangkan dari
+           payload seperti nilai kosong lainnya. */
+        dueAt: z.iso.datetime().nullish(),
       }),
     ),
     async (c) => {
@@ -500,11 +512,16 @@ const app = new Hono<AppEnv>()
       const { card, boardId } = await requireCard(db, c.req.param("id"), userId);
       const body = c.req.valid("json");
 
+      const dueAt = body.dueAt ? new Date(body.dueAt) : null;
+      const dueChanged =
+        body.dueAt !== undefined && (card.dueAt?.getTime() ?? null) !== (dueAt?.getTime() ?? null);
+
       const updated = await db
         .update(cards)
         .set({
           ...(body.title !== undefined && { title: body.title }),
           ...(body.description !== undefined && { description: body.description }),
+          ...(body.dueAt !== undefined && { dueAt }),
           updatedBy: userId,
           updatedAt: new Date(),
         })
@@ -518,6 +535,19 @@ const app = new Hono<AppEnv>()
       }
       if (body.description !== undefined && (body.description ?? null) !== card.description) {
         notes.push({ kind: "description_changed", detail: { to: body.description ?? null } });
+      }
+      /* Tanggalnya dicatat sebagai ISO, bukan sebagai kalimat jadi: yang
+         membacanya nanti bisa berada di zona mana pun, dan hanya perambannya
+         yang tahu jam berapa itu baginya. */
+      if (dueChanged) {
+        notes.push(
+          dueAt
+            ? {
+                kind: "due_changed",
+                detail: { from: card.dueAt?.toISOString() ?? null, to: dueAt.toISOString() },
+              }
+            : { kind: "due_cleared" },
+        );
       }
 
       await markCardActivity(db, card.id, userId, { touchCard: false, note: notes });
@@ -723,6 +753,109 @@ const app = new Hono<AppEnv>()
       cardTitle: card.title,
       watchers,
     });
+
+    return c.body(null, 204);
+  })
+
+  /* ── Orang pada kartu ──────────────────────────────────────────────
+     Yang boleh diundang hanya anggota workspace pemilik papannya. Undangan
+     tidak memberi akses — orangnya sudah punya akses sejak jadi anggota; yang
+     diberikannya perhatian: wajahnya muncul di muka kartu dan kabar dari
+     kartu itu mulai sampai kepadanya (lihat `cardAudience` di notify.ts). */
+
+  .post(
+    "/:id/members",
+    zValidator("json", z.object({ userId: z.string().min(1) })),
+    async (c) => {
+      const db = c.get("db");
+      const actorId = c.get("user").id;
+      const { card, boardId, workspaceId } = await requireCard(db, c.req.param("id"), actorId);
+      const { userId: inviteeId } = c.req.valid("json");
+
+      /* Keanggotaan dan identitasnya ditanyakan sekaligus: yang dikembalikan
+         ke klien adalah wajah orangnya, dan yang menjaga rutenya adalah baris
+         keanggotaan yang sama. */
+      const invitee = await db
+        .select({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          image: user.image,
+        })
+        .from(workspaceMembers)
+        .innerJoin(user, eq(user.id, workspaceMembers.userId))
+        .where(
+          and(
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.userId, inviteeId),
+          ),
+        )
+        .get();
+
+      if (!invitee) {
+        return c.json({ error: "Orang itu bukan anggota workspace papan ini" }, 400);
+      }
+
+      // Mengundang orang yang sudah diundang bukan kesalahan — klien
+      // optimistik boleh mengulang tanpa memicu error.
+      const inserted = await db
+        .insert(cardMembers)
+        .values({
+          cardId: card.id,
+          userId: invitee.id,
+          invitedBy: actorId,
+          createdAt: new Date(),
+        })
+        .onConflictDoNothing()
+        .returning()
+        .get();
+
+      /* Undangan yang tidak mengubah apa pun juga tidak diceritakan: tanpa
+         penjagaan ini, klien yang mengulang kiriman akan menumpuk baris
+         "mengundang Rina" di lini masa kartu yang sama. */
+      const note = inserted
+        ? ({ kind: "member_added", detail: { text: invitee.name } } as const)
+        : undefined;
+
+      await markCardActivity(db, card.id, actorId, { note });
+      await touchBoard(c, boardId);
+      notifyCardActivity(c, {
+        cardId: card.id,
+        boardId,
+        cardTitle: card.title,
+        notes: note,
+      });
+
+      return c.json(invitee satisfies UserBrief, 201);
+    },
+  )
+
+  .delete("/:id/members/:userId", async (c) => {
+    const db = c.get("db");
+    const actorId = c.get("user").id;
+    const { card, boardId } = await requireCard(db, c.req.param("id"), actorId);
+    const inviteeId = c.req.param("userId");
+
+    // Namanya dibaca sebelum barisnya dilepas — lini masa menyimpan salinannya,
+    // sama seperti nama label yang dicabut.
+    const invitee = await db
+      .select({ name: user.name })
+      .from(cardMembers)
+      .innerJoin(user, eq(user.id, cardMembers.userId))
+      .where(and(eq(cardMembers.cardId, card.id), eq(cardMembers.userId, inviteeId)))
+      .get();
+
+    await db
+      .delete(cardMembers)
+      .where(and(eq(cardMembers.cardId, card.id), eq(cardMembers.userId, inviteeId)));
+
+    const note = invitee
+      ? ({ kind: "member_removed", detail: { text: invitee.name } } as const)
+      : undefined;
+
+    await markCardActivity(db, card.id, actorId, { note });
+    await touchBoard(c, boardId);
+    notifyCardActivity(c, { cardId: card.id, boardId, cardTitle: card.title, notes: note });
 
     return c.body(null, 204);
   })
