@@ -5,6 +5,7 @@ import {
   detectSupport,
   disablePush,
   enablePush,
+  PushSetupError,
   type PushSupport,
 } from "../lib/push";
 import { DEFAULT_NOTIFICATION_SETTINGS, type NotificationSettings } from "../../shared/types";
@@ -25,6 +26,9 @@ export function usePush() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Yang bisa dicoba pengguna, dan bunyi asli dari browser untuk dilaporkan. */
+  const [errorHints, setErrorHints] = useState<string[]>([]);
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   // Setelah komponennya dilepas, tidak ada state yang boleh disentuh lagi.
@@ -58,20 +62,37 @@ export function usePush() {
     })();
   }, []);
 
-  /** Bungkus aksi yang menyentuh jaringan: satu pada satu waktu, pesan seragam. */
-  const run = useCallback(async (action: () => Promise<string | null>) => {
-    setBusy(true);
-    setError(null);
-    setNotice(null);
-    try {
-      const message = await action();
-      if (alive.current) setNotice(message);
-    } catch (e) {
-      if (alive.current) setError(e instanceof Error ? e.message : "Terjadi kesalahan");
-    } finally {
-      if (alive.current) setBusy(false);
-    }
+  /**
+   * Kegagalan yang sudah membawa keterangannya sendiri (lihat PushSetupError)
+   * ditampilkan utuh; sisanya cukup kalimatnya.
+   */
+  const fail = useCallback((e: unknown, fallback: string) => {
+    if (!alive.current) return;
+
+    setError(e instanceof Error ? e.message : fallback);
+    setErrorHints(e instanceof PushSetupError ? e.hints : []);
+    setErrorDetail(e instanceof PushSetupError ? e.detail : null);
   }, []);
+
+  /** Bungkus aksi yang menyentuh jaringan: satu pada satu waktu, pesan seragam. */
+  const run = useCallback(
+    async (action: () => Promise<string | null>) => {
+      setBusy(true);
+      setError(null);
+      setErrorHints([]);
+      setErrorDetail(null);
+      setNotice(null);
+      try {
+        const message = await action();
+        if (alive.current) setNotice(message);
+      } catch (e) {
+        fail(e, "Terjadi kesalahan");
+      } finally {
+        if (alive.current) setBusy(false);
+      }
+    },
+    [fail],
+  );
 
   const enable = useCallback(async () => {
     if (!publicKey) return;
@@ -102,10 +123,10 @@ export function usePush() {
       } catch (e) {
         if (!alive.current) return;
         setPrefs(previous);
-        setError(e instanceof Error ? e.message : "Gagal menyimpan pilihan");
+        fail(e, "Gagal menyimpan pilihan");
       }
     },
-    [prefs],
+    [fail, prefs],
   );
 
   const test = useCallback(async () => {
@@ -129,6 +150,8 @@ export function usePush() {
     enabled,
     prefs,
     error,
+    errorHints,
+    errorDetail,
     notice,
     enable,
     disable,

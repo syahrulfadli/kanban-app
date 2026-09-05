@@ -81,6 +81,99 @@ export async function syncSubscription(subscription: PushSubscription): Promise<
 }
 
 /**
+ * Kegagalan yang datang dari browser sendiri, bukan dari server kita.
+ *
+ * `message` sudah berupa kalimat yang bisa dibaca orang, `hints` berisi apa
+ * yang bisa mereka coba, dan `detail` menyimpan bunyi asli dari browser —
+ * itulah yang berguna kalau nanti perlu dilaporkan.
+ */
+export class PushSetupError extends Error {
+  readonly detail: string;
+  readonly hints: string[];
+
+  constructor(message: string, detail: string, hints: string[] = []) {
+    super(message);
+    this.name = "PushSetupError";
+    this.detail = detail;
+    this.hints = hints;
+  }
+}
+
+/**
+ * Terjemahkan kegagalan `subscribe()` jadi keterangan yang bisa ditindaklanjuti.
+ *
+ * Yang paling sering muncul adalah "Registration failed - push service error":
+ * itu terjadi jauh sebelum ada permintaan ke server ini — browser gagal
+ * mendaftarkan dirinya ke layanan push miliknya sendiri (FCM milik Google untuk
+ * Chrome, WNS milik Microsoft untuk Edge di Windows). Karena itu ia muncul di
+ * satu perangkat dan tidak di perangkat lain walau browsernya sama: yang
+ * berbeda jaringannya, bukan aplikasinya.
+ */
+function explain(error: unknown): PushSetupError {
+  const detail = error instanceof Error ? error.message : String(error);
+  const name = error instanceof DOMException ? error.name : "";
+
+  if (name === "AbortError" || /push service|registration failed/i.test(detail)) {
+    return new PushSetupError(
+      "Browser gagal mendaftar ke layanan push miliknya sendiri, jadi langganannya tidak pernah terbentuk.",
+      detail,
+      [
+        "Coba jaringan lain — jaringan kantor, sekolah, VPN, dan sebagian ISP memblokir server notifikasi Google (FCM) maupun Microsoft (WNS).",
+        "Matikan VPN atau proxy, lalu coba lagi.",
+        "Pastikan notifikasi sistem menyala dan browsernya diizinkan menampilkannya.",
+        "Periksa jam dan tanggal perangkat: jam yang meleset membuat sambungan ke layanan push ditolak.",
+      ],
+    );
+  }
+
+  if (name === "NotAllowedError") {
+    return new PushSetupError(
+      "Notifikasi diblokir untuk situs ini.",
+      detail,
+      ["Izinkan lagi lewat pengaturan situs di browser, lalu muat ulang halaman ini."],
+    );
+  }
+
+  if (name === "InvalidStateError") {
+    return new PushSetupError(
+      "Masih ada langganan lama di perangkat ini yang memakai kunci berbeda.",
+      detail,
+      ["Muat ulang halaman ini, lalu nyalakan sekali lagi."],
+    );
+  }
+
+  return new PushSetupError("Gagal mendaftarkan perangkat ini.", detail);
+}
+
+/**
+ * Berlangganan, dengan satu kesempatan kedua.
+ *
+ * Sisa langganan yang setengah jadi bisa menggagalkan percobaan berikutnya
+ * tanpa pernah bilang apa-apa, jadi sebelum mengulang semuanya dibersihkan
+ * dulu. Kalau yang kedua juga gagal, yang dilaporkan tetap kegagalan pertama:
+ * itulah yang menjelaskan sebabnya, sedangkan yang kedua cuma gemanya.
+ */
+async function subscribe(
+  reg: ServiceWorkerRegistration,
+  key: Uint8Array<ArrayBuffer>,
+): Promise<PushSubscription> {
+  const options = { userVisibleOnly: true, applicationServerKey: key } as const;
+
+  try {
+    return await reg.pushManager.subscribe(options);
+  } catch (first) {
+    try {
+      const leftover = await reg.pushManager.getSubscription();
+      await leftover?.unsubscribe();
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      return await reg.pushManager.subscribe(options);
+    } catch {
+      throw explain(first);
+    }
+  }
+}
+
+/**
  * Minta izin, berlangganan ke push service, lalu daftarkan ke server.
  *
  * Izin hanya boleh diminta dari gestur pengguna — di beberapa browser jendela
@@ -90,11 +183,11 @@ export async function enablePush(publicKey: string): Promise<PushSubscription> {
   const permission = await Notification.requestPermission();
 
   if (permission !== "granted") {
-    throw new Error(
-      permission === "denied"
-        ? "Notifikasi diblokir untuk situs ini. Izinkan lagi lewat pengaturan browser."
-        : "Izin notifikasi belum diberikan",
-    );
+    throw permission === "denied"
+      ? new PushSetupError("Notifikasi diblokir untuk situs ini.", "permission: denied", [
+          "Izinkan lagi lewat pengaturan situs di browser, lalu muat ulang halaman ini.",
+        ])
+      : new PushSetupError("Izin notifikasi belum diberikan.", "permission: default");
   }
 
   const reg = await registration();
@@ -112,11 +205,9 @@ export async function enablePush(publicKey: string): Promise<PushSubscription> {
     await existing.unsubscribe();
   }
 
-  const subscription = await reg.pushManager.subscribe({
-    // Wajib true: browser tidak mengizinkan push yang tidak terlihat pengguna.
-    userVisibleOnly: true,
-    applicationServerKey: key,
-  });
+  // `userVisibleOnly: true` dipasang di dalam: browser tidak mengizinkan push
+  // yang tidak terlihat pengguna.
+  const subscription = await subscribe(reg, key);
 
   await syncSubscription(subscription);
   return subscription;

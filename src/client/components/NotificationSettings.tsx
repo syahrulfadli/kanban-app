@@ -166,7 +166,28 @@ export function NotificationSettings({ push }: { push: ReturnType<typeof usePush
         </>
       )}
 
-      {push.error && <p className="mt-3 text-xs text-danger">{push.error}</p>}
+      {push.error && (
+        <div className="mt-3 rounded-xl bg-danger/10 px-3 py-2.5">
+          <p className="text-xs leading-relaxed text-danger">{push.error}</p>
+
+          {/* Kegagalan pendaftaran hampir selalu urusan perangkat atau
+              jaringannya, bukan aplikasinya — jadi yang ditawarkan langkah
+              yang benar-benar bisa dicoba orangnya. */}
+          {push.errorHints.length > 0 && (
+            <ul className="mt-2 list-disc space-y-1 pl-4 text-xs leading-relaxed text-muted">
+              {push.errorHints.map((hint) => (
+                <li key={hint}>{hint}</li>
+              ))}
+            </ul>
+          )}
+
+          {push.errorDetail && (
+            <p className="mt-2 text-[0.6875rem] break-words text-faint">
+              Pesan asli browser: {push.errorDetail}
+            </p>
+          )}
+        </div>
+      )}
       {push.notice && <p className="mt-3 text-xs text-ok">{push.notice}</p>}
 
       {push.enabled && (
