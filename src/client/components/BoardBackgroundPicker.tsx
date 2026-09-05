@@ -115,12 +115,7 @@ function ImageOptions({
             teks mengikuti terang-gelap fotonya.
           </p>
         </div>
-        <Toggle
-          checked={overlay}
-          onChange={onOverlay}
-          labelledBy={overlayId}
-          className="h-5 w-9"
-        />
+        <Toggle checked={overlay} onChange={onOverlay} labelledBy={overlayId} size="sm" />
       </div>
 
       <p className="mt-3 text-xs font-medium">Kekaburan</p>
