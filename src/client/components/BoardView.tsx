@@ -379,10 +379,12 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
           sudah hilang bersama efeknya. `max-h-full` di kolom yang menahan
           kolom panjang supaya menggulir di dalam dirinya sendiri. */}
       <main className="flex flex-1 items-start gap-4 overflow-x-auto px-5 pt-1 pb-24">
-        {board.columns.map((column) => (
+        {board.columns.map((column, i) => (
           <ColumnView
             key={column.id}
             column={column}
+            prevColumnId={board.columns[i - 1]?.id ?? null}
+            nextColumnId={board.columns[i + 1]?.id ?? null}
             collapsed={collapsed.has(column.id)}
             onToggleCollapse={() => toggleCollapse(column.id)}
             onAddCard={(title) => actions.addCard(column.id, title)}

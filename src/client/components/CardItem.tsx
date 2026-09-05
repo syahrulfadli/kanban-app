@@ -34,6 +34,11 @@ export const GHOST_FALLBACK = 72;
 
 interface Props {
   card: CardSummary;
+  /* Tetangga langsung kartu ini di kolomnya. Dipakai untuk satu hal saja:
+     mengenali drop yang tidak memindahkan apa-apa — menjatuhkan sebuah kartu
+     tepat di atas tetangga bawahnya menghasilkan urutan yang persis sama. */
+  prevCardId: string | null;
+  nextCardId: string | null;
   /** Milik papan, bukan kartu ini — lihat catatan di BoardView. */
   labelsOpen: boolean;
   onToggleLabels: () => void;
@@ -41,7 +46,15 @@ interface Props {
   onDelete: () => void;
 }
 
-export function CardItem({ card, labelsOpen, onToggleLabels, onOpen, onDelete }: Props) {
+export function CardItem({
+  card,
+  prevCardId,
+  nextCardId,
+  labelsOpen,
+  onToggleLabels,
+  onOpen,
+  onDelete,
+}: Props) {
   const ref = useRef<HTMLLIElement>(null);
   const plateRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -50,6 +63,12 @@ export function CardItem({ card, labelsOpen, onToggleLabels, onOpen, onDelete }:
      ini, dan setinggi apa. Tingginya datang dari kartu yang diseret, bukan dari
      kartu ini — yang dibuka adalah ruang untuk tamunya. */
   const [slot, setSlot] = useState<{ edge: Edge; height: number } | null>(null);
+
+  /* Dibaca lewat ref, bukan lewat daftar kebergantungan efeknya: tetangga
+     berubah tiap kali ada yang menyusun ulang kolom, dan memasang ulang
+     pendaftaran drag-nya di tengah seretan orang lain tidak ada gunanya. */
+  const neighbours = useRef({ prevCardId, nextCardId });
+  neighbours.current = { prevCardId, nextCardId };
 
   // Kartu dibuka dengan klik, dan kartu yang sama juga diseret. Penanda ini
   // menelan klik yang menyusul sebuah drag, supaya menjatuhkan kartu di kolom
@@ -82,15 +101,39 @@ export function CardItem({ card, labelsOpen, onToggleLabels, onOpen, onDelete }:
       dropTargetForElements({
         element: el,
         canDrop: ({ source }) => source.data.type === "card",
+        /* Sisi terdekat dihitung terhadap PELATNYA, bukan terhadap slot yang
+           sedang melar oleh lubang yang dibukanya sendiri. Kalau diukur dari
+           slot, membuka lubang di bawah kartu akan menjauhkan tepi bawah dari
+           kursor, sisi terdekatnya berbalik jadi atas, lubangnya pindah ke
+           atas, tepi bawah kembali mendekat — dan seterusnya, puluhan kali
+           sedetik. Diukur dari pelat, tiap pilihan justru menguatkan dirinya
+           sendiri: lubang di atas mendorong pelatnya menjauh ke bawah, jadi
+           kursor yang tadi dekat tepi atas tetap dekat tepi atas. */
         getData: ({ input }) =>
-          attachClosestEdge(data, { element: el, input, allowedEdges: ["top", "bottom"] }),
+          attachClosestEdge(data, { element: plate, input, allowedEdges: ["top", "bottom"] }),
         onDrag: ({ self, source }) => {
           /* `self.data`, bukan `self`: yang menyimpan sisi terdekat adalah
              muatan yang dikembalikan getData, sementara `self` cuma rekaman
              sasarannya. Keduanya lolos pemeriksaan tipe — tanda simbolnya
              dicari di objek apa pun — dan yang salah diam-diam mengembalikan
              null selamanya. */
-          const next = source.data.cardId === card.id ? null : extractClosestEdge(self.data);
+          const edge = extractClosestEdge(self.data);
+          const { prevCardId, nextCardId } = neighbours.current;
+          const from = source.data.cardId;
+
+          /* Lubang hanya untuk drop yang benar-benar memindahkan sesuatu.
+             Kartu yang dijatuhkan di atas tetangga bawahnya — atau di bawah
+             tetangga atasnya — mendarat persis di tempatnya semula, dan ruang
+             yang terbuka di situ menjanjikan perubahan yang tidak akan
+             terjadi. Ini pula yang membuat kartu yang digeser sedikit ke
+             bawah tidak lagi membuka lubang di bawah kakinya sendiri. */
+          const next =
+            from === card.id ||
+            (edge === "top" && from === prevCardId) ||
+            (edge === "bottom" && from === nextCardId)
+              ? null
+              : edge;
+
           const height =
             typeof source.data.height === "number" ? source.data.height : GHOST_FALLBACK;
 

@@ -143,6 +143,10 @@ function MoreIcon() {
 
 interface Props {
   column: ColumnWithCards;
+  /* Tetangga langsung kolom ini di papan — sama gunanya dengan prevCardId di
+     CardItem: mengenali drop yang tidak menggeser urutan apa pun. */
+  prevColumnId: string | null;
+  nextColumnId: string | null;
   collapsed: boolean;
   onToggleCollapse: () => void;
   onAddCard: (title: string) => Promise<void>;
@@ -160,6 +164,8 @@ interface Props {
 
 export function ColumnView({
   column,
+  prevColumnId,
+  nextColumnId,
   collapsed,
   onToggleCollapse,
   onAddCard,
@@ -193,6 +199,16 @@ export function ColumnView({
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  /* Dibaca lewat ref — lihat catatan yang sama di CardItem. Kartu terakhir ikut
+     di sini karena ruang kosong kolom selalu berarti "taruh di kaki daftar":
+     kartu yang sudah berdiri paling bawah tidak akan ke mana-mana. */
+  const latest = useRef({ prevColumnId, nextColumnId, lastCardId: null as string | null });
+  latest.current = {
+    prevColumnId,
+    nextColumnId,
+    lastCardId: column.cards.at(-1)?.id ?? null,
+  };
+
   useEffect(() => {
     const el = ref.current;
     const plate = plateRef.current;
@@ -224,12 +240,24 @@ export function ColumnView({
         element: el,
         getData: ({ input, source }) =>
           source.data.type === "column"
-            ? attachClosestEdge(data, { element: el, input, allowedEdges: ["left", "right"] })
+            ? // Pelatnya, bukan pembungkusnya — lihat catatan di CardItem.
+              attachClosestEdge(data, { element: plate, input, allowedEdges: ["left", "right"] })
             : data,
         onDrag: ({ self, source, location }) => {
           if (source.data.type === "column") {
             // `self.data`, bukan `self` — lihat catatan di CardItem.
-            const next = source.data.columnId === column.id ? null : extractClosestEdge(self.data);
+            const edge = extractClosestEdge(self.data);
+            const { prevColumnId, nextColumnId } = latest.current;
+            const from = source.data.columnId;
+
+            // Kolom yang dijatuhkan di sisi tetangganya sendiri tidak bergeser.
+            const next =
+              from === column.id ||
+              (edge === "left" && from === prevColumnId) ||
+              (edge === "right" && from === nextColumnId)
+                ? null
+                : edge;
+
             const width =
               typeof source.data.width === "number" ? source.data.width : COLUMN_FALLBACK;
 
@@ -250,8 +278,9 @@ export function ColumnView({
           const innermost = location.current.dropTargets[0];
           const height =
             typeof source.data.height === "number" ? source.data.height : GHOST_FALLBACK;
+          const moves = source.data.cardId !== latest.current.lastCardId;
 
-          setCardSlot(innermost?.element === el ? height : null);
+          setCardSlot(innermost?.element === el && moves ? height : null);
         },
         onDragLeave: clear,
         onDrop: clear,
@@ -565,10 +594,12 @@ export function ColumnView({
         </div>
 
         <ul className="flex min-h-14 flex-1 flex-col gap-2 overflow-y-auto p-2">
-          {column.cards.map((card) => (
+          {column.cards.map((card, i) => (
             <CardItem
               key={card.id}
               card={card}
+              prevCardId={column.cards[i - 1]?.id ?? null}
+              nextCardId={column.cards[i + 1]?.id ?? null}
               labelsOpen={labelsOpen}
               onToggleLabels={onToggleLabels}
               onOpen={() => onOpenCard(card.id)}
