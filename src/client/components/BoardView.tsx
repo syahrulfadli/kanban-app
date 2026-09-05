@@ -432,7 +432,7 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
         ))}
 
         {/* Gelas kosong: hanya garis, menunggu diisi. */}
-        <div className="glass-column h-fit w-72 shrink-0 border border-dashed border-line p-2">
+        <div className="glass-column bg-white/50 dark:bg-zinc-700/70 h-fit w-72 shrink-0 border-2 border-dashed border-zinc-500/50 p-2">
           <AddItemForm
             placeholder="Nama kolom…"
             submitLabel="Tambah kolom"

@@ -1471,7 +1471,7 @@ body {
        breadcrumb di kepala papan duduk langsung di atasnya tanpa pelat kaca
        apa pun. Di tema terang kabutnya karena itu lebih tebal daripada yang
        terasa cukup saat melihat foto yang tenang. */
-    background-color: rgb(238 242 248 / 0.66);
+    background-color: rgb(145 145 145 / 0.23);
   }
 
   [data-theme="dark"] .board-bg[data-kind="image"]::after {
