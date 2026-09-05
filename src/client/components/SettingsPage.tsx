@@ -72,11 +72,12 @@ export function SettingsPage() {
           )}
         </Section>
 
-        {/* Yang diatur di sini hanya getaran di perangkat. Kotak masuk di
-            lonceng mencatat semuanya, apa pun pilihan sakelarnya. */}
+        {/* Yang diatur di sini hanya cara kabarnya mengetuk: nada di dalam
+            aplikasi, dan getaran di perangkat. Kotak masuk di lonceng mencatat
+            semuanya, apa pun pilihan sakelarnya. */}
         <Section
           title="Notifikasi"
-          hint="Mana yang boleh mengetuk perangkat ini, bahkan saat aplikasinya tertutup. Kotak masuk di lonceng tetap mencatat semua kabar."
+          hint="Bagaimana kabar baru memanggil Anda — bunyi selagi aplikasinya terbuka, dan notifikasi perangkat bahkan saat tertutup. Kotak masuk di lonceng tetap mencatat semua kabar."
         >
           <NotificationSettings push={push} />
         </Section>

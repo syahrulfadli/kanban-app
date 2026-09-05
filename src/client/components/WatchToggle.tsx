@@ -80,7 +80,7 @@ export function WatchToggle({ watching, onChange, subject, className, iconClassN
         className,
       )}
     >
-      <EyeIcon watching={watching} className={iconClassName ?? "size-4"} />
+      <EyeIcon watching={watching} className={iconClassName ?? "size-5"} />
     </button>
   );
 }

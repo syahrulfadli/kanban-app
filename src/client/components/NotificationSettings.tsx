@@ -1,6 +1,7 @@
 import { useId } from "react";
 import { cn } from "../lib/cn";
 import type { usePush } from "../hooks/usePush";
+import { useSound } from "../hooks/useSound";
 import type { NotificationSettings as Prefs } from "../../shared/types";
 import { ToggleListSkeleton } from "./Skeleton";
 
@@ -98,13 +99,33 @@ const PREFS: { key: keyof Prefs; title: string; hint: string }[] = [
 ];
 
 /**
- * Pengaturan notifikasi. Sakelar teratas berlaku untuk perangkat yang sedang
+ * Nada di dalam aplikasi. Berdiri sendiri dari push: ia berbunyi selagi
+ * aplikasinya terbuka, tanpa izin apa pun dari browser, jadi ia tetap
+ * ditawarkan di perangkat yang tidak bisa atau tidak mau menerima push.
+ */
+function SoundRow() {
+  const sound = useSound();
+
+  return (
+    <Row
+      title="Bunyi"
+      hint="Nada pendek saat kabar baru masuk selagi aplikasi ini terbuka. Berlaku di perangkat ini saja."
+      checked={sound.enabled}
+      onChange={(next) => {
+        sound.setEnabled(next);
+        // Menyalakannya sekaligus memperdengarkan nada yang baru saja dipilih.
+        if (next) sound.play();
+      }}
+    />
+  );
+}
+
+/**
+ * Notifikasi perangkat. Sakelar teratas berlaku untuk perangkat yang sedang
  * dipegang — langganan push memang milik perangkat, bukan milik akun — sedangkan
  * pilihan kanal di bawahnya berlaku untuk orangnya di semua perangkat.
- *
- * Judul dan penjelasan bagiannya datang dari SettingsPage.
  */
-export function NotificationSettings({ push }: { push: ReturnType<typeof usePush> }) {
+function PushSettings({ push }: { push: ReturnType<typeof usePush> }) {
   if (push.loading) {
     return <ToggleListSkeleton rows={4} />;
   }
@@ -205,6 +226,24 @@ export function NotificationSettings({ push }: { push: ReturnType<typeof usePush
           </button>
         </div>
       )}
+    </>
+  );
+}
+
+/**
+ * Pengaturan notifikasi: nada di dalam aplikasi, lalu notifikasi perangkat.
+ * Urutannya sengaja begitu — yang pertama selalu bisa dinyalakan siapa pun,
+ * yang kedua bergantung pada izin, browser, dan kunci di server.
+ *
+ * Judul dan penjelasan bagiannya datang dari SettingsPage.
+ */
+export function NotificationSettings({ push }: { push: ReturnType<typeof usePush> }) {
+  return (
+    <>
+      <SoundRow />
+      <div className="mt-1 border-t border-line-soft pt-1">
+        <PushSettings push={push} />
+      </div>
     </>
   );
 }
