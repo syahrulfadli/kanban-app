@@ -11,6 +11,7 @@
     "db:migrate:local": "wrangler d1 migrations apply kanban-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply kanban-db --remote",
     "vapid:keys": "node scripts/generate-vapid.mjs",
+    "vapid:check": "node scripts/check-vapid.mjs",
     "typecheck": "tsc -b --noEmit",
     "cf-typegen": "wrangler types",
     "auth:generate": "auth generate --config auth.config.ts --output src/db/auth-schema.ts"

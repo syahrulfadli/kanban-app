@@ -191,8 +191,9 @@ export const api = {
 
   /* notifikasi perangkat */
   getPushSettings: () => request<PushSettings>("/push"),
+  /** Jawabannya membawa kunci publik yang berlaku sekarang — lihat syncSubscription. */
   subscribePush: (subscription: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
-    send<void>("/push/subscribe", "POST", subscription),
+    send<{ publicKey: string | null }>("/push/subscribe", "POST", subscription),
   unsubscribePush: (endpoint: string) => send<void>("/push/unsubscribe", "POST", { endpoint }),
   updateNotificationPrefs: (patch: Partial<NotificationSettings>) =>
     send<NotificationSettings>("/push/prefs", "PATCH", patch),

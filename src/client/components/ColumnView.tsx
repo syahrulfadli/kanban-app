@@ -28,27 +28,18 @@ const COLUMN_GAP = 16;
 const COLUMN_FALLBACK = 288;
 
 /**
- * Garis tepi dengan anak panah yang menuju atau menjauhinya — ikon lipat panel
- * yang sama dengan yang dipakai bilah samping di mana-mana.
- *
- * Sepasang panah saling hadap sempat dicoba dan dibatalkan: pada ukuran kepala
- * kolom ia berakhir sebagai coretan menyilang, persis seperti tanda hapus yang
- * berdiri tiga tombol di sebelahnya.
+ * Dua siku di sudut yang berseberangan: menghadap ke dalam untuk menyusutkan,
+ * membuka ke luar untuk membentangkan — arah sikunya adalah arah kolomnya akan
+ * bergerak.
  */
 function CollapseIcon({ expand, className }: { expand: boolean; className?: string }) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M5 5v14" />
-      {expand ? <path d="M11 8l4 4-4 4" /> : <path d="M17 8l-4 4 4 4" />}
+    <svg viewBox="0 -960 960 960" className={className} fill="currentColor" aria-hidden>
+      {expand ? (
+        <path d="M280-280h130q12.75 0 21.38 8.63 8.62 8.63 8.62 21.38 0 12.76-8.62 21.37Q422.75-220 410-220H256.16q-15.37 0-25.76-10.4-10.4-10.39-10.4-25.76V-410q0-12.75 8.63-21.38 8.63-8.62 21.38-8.62 12.76 0 21.37 8.62Q280-422.75 280-410v130Zm400-400H550q-12.75 0-21.38-8.63-8.62-8.63-8.62-21.38 0-12.76 8.62-21.37Q537.25-740 550-740h153.84q15.37 0 25.76 10.4 10.4 10.39 10.4 25.76V-550q0 12.75-8.63 21.38-8.63 8.62-21.38 8.62-12.76 0-21.37-8.62Q680-537.25 680-550v-130Z" />
+      ) : (
+        <path d="M380-380H250q-12.75 0-21.37-8.63-8.63-8.63-8.63-21.38 0-12.76 8.63-21.37Q237.25-440 250-440h153.85q15.36 0 25.76 10.39Q440-419.21 440-403.85V-250q0 12.75-8.63 21.37-8.63 8.63-21.38 8.63-12.76 0-21.37-8.63Q380-237.25 380-250v-130Zm200-200h130q12.75 0 21.37 8.63 8.63 8.63 8.63 21.38 0 12.76-8.63 21.37Q722.75-520 710-520H556.15q-15.36 0-25.76-10.39Q520-540.79 520-556.15V-710q0-12.75 8.63-21.37 8.63-8.63 21.38-8.63 12.76 0 21.37 8.63Q580-722.75 580-710v130Z" />
+      )}
     </svg>
   );
 }

@@ -119,7 +119,10 @@ function LiveIndicator({
       </button>
 
       {open && (
-        <div className="sheet absolute top-full right-0 z-30 mt-2 w-56 rounded-2xl p-1.5">
+        /* Lahir di kepala papan, yang latarnya dibiarkan tembus — jadi lembar
+           ini tidak bersarang di dalam pane ber-frost mana pun, dan kacanya
+           boleh langsung mengaburkan papan di bawahnya. */
+        <div className="sheet sheet-frost absolute top-full right-0 z-30 mt-2 w-56 rounded-2xl p-1.5">
           <p className="px-2.5 py-1.5 text-xs text-muted">Sedang membuka papan ini</p>
 
           <ul className="flex flex-col">

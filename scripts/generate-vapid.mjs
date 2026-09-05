@@ -21,14 +21,24 @@ const pair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256
 const publicKey = b64url(new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey)));
 const { d: privateKey } = await crypto.subtle.exportKey("jwk", pair.privateKey);
 
+/* Dua bentuk, karena tempatnya menuntut bentuk berbeda: .dev.vars membaca
+   baris bergaya env (tanda kutip ikut dibuang), sedangkan `wrangler secret put`
+   menyimpan apa pun yang ditempel apa adanya — termasuk tanda kutipnya. */
 console.log(`
-Salin ke .dev.vars untuk pengembangan lokal:
+1) Untuk pengembangan lokal, salin dua baris ini ke .dev.vars:
 
 VAPID_PUBLIC_KEY="${publicKey}"
 VAPID_PRIVATE_KEY="${privateKey}"
 
-Untuk produksi, kunci privatnya dipasang sebagai secret (jangan masuk git):
+2) Untuk produksi, jalankan dua perintah ini lalu tempel NILAINYA SAJA saat
+   diminta — tanpa tanda kutip, tanpa nama variabelnya:
+
+  npx wrangler secret put VAPID_PUBLIC_KEY
+  ${publicKey}
 
   npx wrangler secret put VAPID_PRIVATE_KEY
-  npx wrangler secret put VAPID_PUBLIC_KEY
+  ${privateKey}
+
+Keduanya harus berasal dari satu pasang yang sama. Mengganti pasangannya
+membuat semua langganan perangkat yang sudah ada berhenti bekerja.
 `);

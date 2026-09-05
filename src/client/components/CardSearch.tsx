@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Avatar } from "./Avatar";
 import { useCardSearch } from "../hooks/useCardSearch";
+import { useDismiss } from "../hooks/useDismiss";
 import { useSession } from "../lib/auth-client";
 import { cn } from "../lib/cn";
 import { labelTint } from "../lib/people";
@@ -150,30 +152,13 @@ export function CardSearch() {
   const [active, setActive] = useState(0);
 
   const ref = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   const { hits, loading, error, ready, term } = useCardSearch(open ? query : "");
 
-  // Tutup kalau ditekan di luar panel atau saat Escape — pola yang sama dengan
-  // lonceng notifikasi: `pointerdown`, bukan `click`.
-  useEffect(() => {
-    if (!open) return;
-
-    const onPointerDown = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
+  useDismiss(open, () => setOpen(false), [ref, panelRef]);
 
   useEffect(() => {
     if (open) inputRef.current?.focus();
@@ -241,64 +226,70 @@ export function CardSearch() {
         </svg>
       </button>
 
-      {open && (
-        /* Berlabuh ke layar, bukan ke tombolnya. Kapsulnya mengambang di
-           tengah dasar layar, jadi panel selebar ini yang digantungkan pada
-           tombolnya sendiri akan menjulur keluar tepi di layar sempit. */
-        <div
-          role="dialog"
-          aria-label="Cari kartu"
-          className="sheet fixed bottom-24 left-1/2 w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl p-1.5"
-        >
-          <div className="p-1.5">
-            <input
-              ref={inputRef}
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={onKeyDown}
-              placeholder="Cari judul, deskripsi, label, atau orang…"
-              aria-label="Kata kunci pencarian kartu"
-              className="field"
-            />
-          </div>
-
-          {/* Hasil lama bertahan selama pencarian berikutnya berjalan — daftar
-              yang dikosongkan di setiap huruf berkedip lebih sering daripada
-              terbaca. Yang menandai bahwa isinya sudah basi cuma redupnya. */}
+      {open &&
+        /* Dipasang di <body>, bukan di sini. Berlabuh ke layar, bukan ke
+           tombolnya — kapsulnya mengambang di tengah dasar layar, jadi panel
+           selebar ini yang digantungkan pada tombolnya sendiri akan menjulur
+           keluar tepi di layar sempit — dan sekaligus keluar dari kapsul
+           ber-frost, supaya kacanya benar-benar mengaburkan halaman di
+           belakangnya (lihat catatan .sheet-frost). */
+        createPortal(
           <div
-            ref={listRef}
-            className={cn(
-              "max-h-[min(24rem,55vh)] overflow-y-auto px-1.5 pb-1.5 transition-opacity",
-              loading && "opacity-60",
-            )}
+            ref={panelRef}
+            role="dialog"
+            aria-label="Cari kartu"
+            className="sheet sheet-frost fixed bottom-24 left-1/2 z-45 w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl p-1.5"
           >
-            {!ready ? (
-              <p className="px-1 py-2 text-xs text-faint">
-                Ketik minimal {MIN_QUERY_LENGTH} huruf.
-              </p>
-            ) : error ? (
-              <p className="px-1 py-2 text-xs text-danger">{error}</p>
-            ) : hits.length > 0 ? (
-              <div className="flex flex-col">
-                {hits.map((hit, i) => (
-                  <Hit
-                    key={hit.id}
-                    hit={hit}
-                    query={term}
-                    active={i === active}
-                    onOpen={() => openHit(hit)}
-                  />
-                ))}
-              </div>
-            ) : (
-              <p className="px-1 py-2 text-xs text-faint">
-                {loading ? "Mencari…" : `Tidak ada kartu yang cocok dengan “${term}”.`}
-              </p>
-            )}
-          </div>
-        </div>
-      )}
+            <div className="p-1.5">
+              <input
+                ref={inputRef}
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={onKeyDown}
+                placeholder="Cari judul, deskripsi, label, atau orang…"
+                aria-label="Kata kunci pencarian kartu"
+                className="field"
+              />
+            </div>
+
+            {/* Hasil lama bertahan selama pencarian berikutnya berjalan — daftar
+                yang dikosongkan di setiap huruf berkedip lebih sering daripada
+                terbaca. Yang menandai bahwa isinya sudah basi cuma redupnya. */}
+            <div
+              ref={listRef}
+              className={cn(
+                "max-h-[min(24rem,55vh)] overflow-y-auto px-1.5 pb-1.5 transition-opacity",
+                loading && "opacity-60",
+              )}
+            >
+              {!ready ? (
+                <p className="px-1 py-2 text-xs text-faint">
+                  Ketik minimal {MIN_QUERY_LENGTH} huruf.
+                </p>
+              ) : error ? (
+                <p className="px-1 py-2 text-xs text-danger">{error}</p>
+              ) : hits.length > 0 ? (
+                <div className="flex flex-col space-y-2">
+                  {hits.map((hit, i) => (
+                    <Hit
+                      key={hit.id}
+                      hit={hit}
+                      query={term}
+                      active={i === active}
+                      onOpen={() => openHit(hit)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="px-1 py-2 text-xs text-faint">
+                  {loading ? "Mencari…" : `Tidak ada kartu yang cocok dengan “${term}”.`}
+                </p>
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

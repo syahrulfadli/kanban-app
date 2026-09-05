@@ -34,6 +34,61 @@ const TTL_SECONDS = 24 * 60 * 60;
 /** Umur token VAPID. Spesifikasi melarang lebih dari 24 jam. */
 const TOKEN_LIFETIME_MS = 12 * 60 * 60 * 1000;
 
+/**
+ * Kunci yang terpasang tidak bisa dipakai — ini salah pasang, bukan salah
+ * kirim. Dibedakan supaya pemanggilnya bisa menjawab dengan kalimat yang
+ * menjelaskan, alih-alih membiarkannya jatuh jadi 500 tanpa keterangan.
+ */
+export class VapidConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "VapidConfigError";
+  }
+}
+
+/**
+ * Bersihkan nilai secret dari bawaan yang tidak disengaja.
+ *
+ * `npm run vapid:keys` mencetak barisnya lengkap dengan tanda kutip karena itu
+ * bentuk yang benar untuk .dev.vars — tapi `wrangler secret put` membaca apa
+ * adanya, jadi tanda kutip yang ikut tersalin akan tersimpan sebagai bagian
+ * dari kuncinya. Spasi dan baris baru di ujung juga gampang ikut terbawa.
+ */
+const clean = (value: string | undefined): string =>
+  (value ?? "")
+    .trim()
+    .replace(/^["']|["']$/g, "")
+    .trim();
+
+/**
+ * Kunci publik yang boleh diketahui klien — sudah dibersihkan, jadi bentuknya
+ * sama persis dengan yang dipakai penanda tangan. Null berarti belum dipasang.
+ */
+export const vapidPublicKey = (env: Env): string | null => clean(env.VAPID_PUBLIC_KEY) || null;
+
+/**
+ * Alamat pengirim untuk klaim `sub` — mailto: atau https:, kata spesifikasinya.
+ * Kandidat dicoba berurutan supaya satu nilai yang salah tulis tidak mematikan
+ * seluruh fiturnya: alamat aplikasinya sendiri selalu jadi jaring terakhir.
+ */
+function subjectFrom(candidates: (string | undefined)[]): string {
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+
+    try {
+      const url = new URL(candidate);
+      if (url.protocol === "mailto:") return candidate;
+      if (url.protocol === "https:" || url.protocol === "http:") return url.origin;
+    } catch {
+      // Bukan alamat yang sah; coba kandidat berikutnya.
+    }
+  }
+
+  throw new VapidConfigError(
+    "Tidak ada alamat pengirim yang sah untuk VAPID. Isi VAPID_SUBJECT dengan mailto: atau https:, atau pastikan BETTER_AUTH_URL berupa alamat lengkap.",
+  );
+}
+
 /* ── Base64url ─────────────────────────────────────────────────────
    Semua kunci Web Push berpindah sebagai base64url tanpa padding —
    itulah bentuk yang dikeluarkan `PushSubscription` di browser. */
@@ -164,10 +219,34 @@ export async function encryptPayload(
  * kunci publiknya ikut disebut; keduanya dipecah dari titik yang sama.
  */
 async function importSigningKey(publicKey: string, privateKey: string): Promise<CryptoKey> {
-  const point = base64UrlToBytes(publicKey);
+  /* Nilai yang bukan base64url pun harus menyebut variabelnya: kesalahan
+     tersering adalah seluruh baris `VAPID_PRIVATE_KEY=…` ikut tersalin, dan
+     "Invalid character" dari atob tidak memberi tahu itu. */
+  const decode = (value: string, name: string) => {
+    try {
+      return base64UrlToBytes(value);
+    } catch {
+      throw new Error(`${name} bukan base64url yang sah — nama variabelnya ikut tersalin?`);
+    }
+  };
 
+  const point = decode(publicKey, "VAPID_PUBLIC_KEY");
+  const secret = decode(privateKey, "VAPID_PRIVATE_KEY");
+
+  /* Bentuk keduanya diperiksa sendiri lebih dulu. WebCrypto memang menolak
+     nilai yang salah, tapi keluhannya tidak menyebut variabel mana yang harus
+     dibetulkan — padahal justru itu satu-satunya yang perlu diketahui. */
   if (point.length !== 65 || point[0] !== 4) {
-    throw new Error("VAPID_PUBLIC_KEY bukan titik P-256 tak terkompresi");
+    throw new Error(
+      `VAPID_PUBLIC_KEY harus 65 bita diawali 0x04 (titik P-256 tak terkompresi), yang ada ${point.length} bita`,
+    );
+  }
+
+  if (secret.length !== 32) {
+    throw new Error(
+      `VAPID_PRIVATE_KEY harus 32 bita, yang ada ${secret.length} bita` +
+        (secret.length === 65 ? " — sepertinya kunci publik yang tersalin ke sini" : ""),
+    );
   }
 
   return crypto.subtle.importKey(
@@ -227,16 +306,28 @@ export interface Pusher {
  * Penyiap kiriman untuk satu request. Mengembalikan null kalau kunci VAPID
  * belum dipasang — notifikasi cuma mati, aplikasinya tetap jalan.
  */
-export async function createPusher(env: Env): Promise<Pusher | null> {
-  if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) return null;
+export async function createPusher(env: Env, origin?: string): Promise<Pusher | null> {
+  const publicKey = clean(env.VAPID_PUBLIC_KEY);
+  const privateKey = clean(env.VAPID_PRIVATE_KEY);
 
-  const publicKey = env.VAPID_PUBLIC_KEY;
-  const signingKey = await importSigningKey(publicKey, env.VAPID_PRIVATE_KEY);
+  // Belum dipasang sama sekali: fiturnya mati, dan itu bukan kesalahan.
+  if (!publicKey || !privateKey) return null;
+
+  let signingKey: CryptoKey;
+  try {
+    signingKey = await importSigningKey(publicKey, privateKey);
+  } catch (e) {
+    throw new VapidConfigError(
+      `Kunci VAPID tidak bisa dipakai (${e instanceof Error ? e.message : String(e)}). ` +
+        "Pastikan keduanya berasal dari satu pasang yang sama — `npm run vapid:keys` — dan tersimpan tanpa tanda kutip.",
+    );
+  }
 
   /* Kepada siapa push service boleh mengeluh kalau kiriman kita bermasalah.
-     Spesifikasi meminta mailto: atau https:, dan alamat aplikasinya sendiri
-     sudah memenuhi itu — tidak perlu rahasia tambahan. */
-  const subject = env.VAPID_SUBJECT || new URL(env.BETTER_AUTH_URL).origin;
+     Alamat aplikasinya sendiri sudah memenuhi syarat, jadi tidak perlu rahasia
+     tambahan; `origin` permintaan yang sedang berjalan jadi jaring terakhir
+     kalau BETTER_AUTH_URL belum terpasang benar. */
+  const subject = subjectFrom([clean(env.VAPID_SUBJECT), clean(env.BETTER_AUTH_URL), origin]);
 
   // Satu token berlaku untuk semua perangkat di push service yang sama, dan
   // menandatanganinya tidak gratis — jadi disimpan per origin.

@@ -69,15 +69,52 @@ export async function currentSubscription(): Promise<PushSubscription | null> {
   return (await registration()).pushManager.getSubscription();
 }
 
-/** Titipkan kunci perangkat ke server. Dipanggil ulang setiap aplikasi dibuka. */
-export async function syncSubscription(subscription: PushSubscription): Promise<void> {
+/** Kirim satu langganan ke server; jawabannya membawa kunci publik yang berlaku. */
+async function register(subscription: PushSubscription): Promise<string | null> {
   const keys = subscription.toJSON().keys;
-  if (!keys?.p256dh || !keys.auth) return;
+  if (!keys?.p256dh || !keys.auth) return null;
 
-  await api.subscribePush({
+  const { publicKey } = await api.subscribePush({
     endpoint: subscription.endpoint,
     keys: { p256dh: keys.p256dh, auth: keys.auth },
   });
+
+  return publicKey;
+}
+
+/**
+ * Titipkan kunci perangkat ke server, dan ikut menyadari kalau kunci VAPID
+ * server sudah berganti.
+ *
+ * Rotasi kunci mematikan setiap langganan yang terikat pada kunci lama, dan
+ * push service tidak pernah memberi tahu perangkatnya — ia hanya berhenti
+ * menerima apa pun. Tanpa pemeriksaan ini, satu-satunya jalan pulih adalah
+ * setiap orang mematikan lalu menyalakan sendiri sakelarnya di tiap perangkat,
+ * padahal tidak ada yang tampak rusak dari luar.
+ *
+ * Izinnya sudah diberikan sejak langganan pertama, jadi mendaftar ulang di
+ * sini tidak memunculkan jendela permintaan apa pun.
+ */
+export async function syncSubscription(subscription: PushSubscription): Promise<PushSubscription> {
+  const publicKey = await register(subscription);
+  if (!publicKey) return subscription;
+
+  const key = decodeKey(publicKey);
+  if (sameKey(subscription.options.applicationServerKey, key)) return subscription;
+
+  // Langganan lama harus dilepas dulu: satu pendaftaran service worker cuma
+  // boleh punya satu langganan, dan subscribe() menolak selama yang lama ada.
+  const stale = subscription.endpoint;
+  await subscription.unsubscribe();
+
+  const fresh = await subscribe(await registration(), key);
+  await register(fresh);
+  await api.unsubscribePush(stale).catch(() => {
+    // Baris lama tertinggal di server; kiriman berikutnya ke sana akan
+    // dijawab 410 dan barisnya dibuang saat itu.
+  });
+
+  return fresh;
 }
 
 /**

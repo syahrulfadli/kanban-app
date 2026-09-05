@@ -113,10 +113,16 @@
   --board-card-fill: rgb(255 255 255 / 0.58);
   --board-card-fill-hi: rgb(255 255 255 / 0.78);
 
-  /* Isian menu pop-up. Menu profil bersarang di dalam kapsul ber-frost,
-     dan di dalam backdrop root filter tidak menghitung apa pun — jadi
-     keterbacaannya harus datang dari isiannya sendiri. */
+  /* Isian menu pop-up. Nyaris pekat: dipakai lembar yang bersarang di dalam
+     pane ber-frost, dan di dalam backdrop root filter tidak menghitung apa
+     pun — jadi keterbacaannya harus datang dari isiannya sendiri.
+
+     --sheet-frost-fill dipakai lembar yang berhasil keluar dari sarang itu
+     dan punya blur sungguhan (lihat .sheet-frost): isiannya jauh lebih tipis
+     karena separuh keterbacaannya sekarang datang dari halaman yang kabur di
+     belakangnya, bukan dari cat. */
   --sheet-fill: rgb(255 255 255 / 0.94);
+  --sheet-frost-fill: rgb(255 255 255 / 0.72);
 
   /* Palet label. Satu token per warna, bukan kelas jadi: chip, titik pemilih
      warna, dan garis tepi semuanya menurunkan rona dari sumber yang sama —
@@ -234,6 +240,7 @@
   --board-card-fill-hi: rgb(4 6 10 / 0.36);
 
   --sheet-fill: rgb(22 25 32 / 0.95);
+  --sheet-frost-fill: rgb(22 25 32 / 0.72);
 
   /* Nada label di tema gelap naik beberapa tingkat: warna pekat tenggelam di
      latar gelap dan chip-nya berhenti terbaca sebagai warna. */
@@ -470,6 +477,23 @@ body {
     box-shadow: 0 2px 6px rgb(0 0 0 / 0.35),
                 0 18px 40px -18px rgb(0 0 0 / 0.75),
                 inset 0 0 0 1px var(--color-line-soft);
+  }
+
+  /* Lembar yang mengaburkan halaman di belakangnya, bukan menutupinya —
+     bahan yang sama dengan kapsul navigasi dan kolom, supaya semua yang
+     melayang di aplikasi ini terbaca sebagai benda dari satu material.
+
+     Hanya untuk lembar yang TIDAK bersarang di dalam pane ber-frost. Di dalam
+     pane seperti itu backdrop-filter tidak menghitung apa pun (lihat catatan
+     .glass-frost), dan yang tersisa cuma isian setengah bening — bukan kaca,
+     melainkan lembar yang bocor. Menu di kepala papan memang sudah lahir di
+     luar; panel pencarian, kotak masuk, dan menu profil lahir di dalam kapsul
+     navigasi dan karena itu dipasang di <body> lewat portal. Lembar yang
+     tidak bisa keluar dari sarangnya — menu kolom — tetap memakai .sheet
+     polos yang pekat. */
+  .sheet-frost {
+    background-color: var(--sheet-frost-fill);
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
   }
 
   /* Kenop sakelar tema. Butuh isian sendiri, bukan .glass-plate: dengan bevel

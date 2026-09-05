@@ -63,9 +63,14 @@ npm run db:migrate:remote
 npx wrangler secret put BETTER_AUTH_SECRET     # openssl rand -base64 32
 npx wrangler secret put BETTER_AUTH_URL        # https://<nama>.workers.dev
 
-# Notifikasi push (opsional) — sepasang kunci dari `npm run vapid:keys`
+# Notifikasi push (opsional) — sepasang kunci dari `npm run vapid:keys`.
+# Tempel NILAINYA saja: `wrangler secret put` menyimpan apa pun yang diketik,
+# termasuk tanda kutip dan nama variabel yang ikut tersalin.
 npx wrangler secret put VAPID_PUBLIC_KEY
 npx wrangler secret put VAPID_PRIVATE_KEY
+
+# Ragu pasangannya benar? `npm run vapid:check` membuktikannya dengan
+# menandatangani lalu memverifikasi — tanpa mencetak kunci privatnya.
 
 # 5. Deploy
 npm run deploy
@@ -95,6 +100,7 @@ endpoint `/api/config` yang memberi tahu klien provider mana yang aktif.
 | `npm run db:migrate:local` | Terapkan migrasi ke DB lokal |
 | `npm run db:migrate:remote` | Terapkan migrasi ke DB produksi |
 | `npm run vapid:keys` | Buat sepasang kunci VAPID untuk notifikasi push |
+| `npm run vapid:check` | Periksa pasangan kunci VAPID sebelum dipasang |
 | `npm run auth:generate` | Regenerate schema Better Auth |
 | `npm run cf-typegen` | Regenerate tipe binding Cloudflare |
 
@@ -378,6 +384,15 @@ Penggabungan ini dilakukan perangkat, gratis, dan tidak perlu state apa pun di s
 penerima, mengenkripsi, menembak push service. Orang yang menulis followup tidak
 menunggu Google menjawab. Kalau kunci VAPID belum dipasang, tidak ada satu query pun
 yang jalan untuk menemukan itu.
+
+**Mengganti kunci VAPID tidak lagi mematikan perangkat diam-diam.** Setiap
+langganan terikat pada kunci publik yang berlaku saat ia dibuat; begitu
+kuncinya dirotasi, push service berhenti menerima kiriman untuk langganan lama
+dan tidak pernah memberi tahu perangkatnya. Karena itu `POST /api/push/subscribe`
+menjawab dengan kunci yang berlaku sekarang, dan pendaftaran ulang yang jalan di
+setiap pembukaan aplikasi membandingkannya: kalau berbeda, perangkat itu
+berlangganan ulang sendiri. Izinnya sudah ada, jadi tidak ada jendela permintaan
+yang muncul lagi.
 
 **Langganan mati dibuang saat ketahuan.** Push service menjawab 404 atau 410 untuk
 perangkat yang langganannya sudah dicabut; barisnya dihapus saat itu juga. Tidak ada

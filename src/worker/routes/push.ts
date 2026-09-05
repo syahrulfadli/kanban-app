@@ -5,7 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { notificationPrefs, pushSubscriptions } from "../../db";
 import type { AppEnv } from "../auth";
-import { createPusher } from "../push";
+import { createPusher, vapidPublicKey, VapidConfigError } from "../push";
 import { DEFAULT_NOTIFICATION_SETTINGS, type NotificationSettings } from "../../shared/types";
 
 /** Bentuk `PushSubscription.toJSON()` di browser, seperlunya saja. */
@@ -35,7 +35,7 @@ const app = new Hono<AppEnv>()
       .get();
 
     return c.json({
-      publicKey: c.env.VAPID_PUBLIC_KEY || null,
+      publicKey: vapidPublicKey(c.env),
       prefs: prefs
         ? { comments: prefs.comments, changes: prefs.changes, newCards: prefs.newCards }
         : DEFAULT_NOTIFICATION_SETTINGS,
@@ -46,6 +46,11 @@ const app = new Hono<AppEnv>()
    * Daftarkan perangkat ini. Dikirim ulang setiap aplikasi dibuka: browser
    * boleh mengganti endpoint kapan saja, dan langganan yang sudah basi tidak
    * akan pernah memberi tahu siapa pun bahwa ia basi.
+   *
+   * Jawabannya membawa kunci publik yang berlaku sekarang. Itu yang membuat
+   * pergantian kunci di server bisa disadari perangkat: langganan lama terikat
+   * pada kunci lama dan diam-diam berhenti menerima apa pun, sedangkan tidak
+   * ada satu pun pihak yang akan memberitahukannya.
    */
   .post("/subscribe", zValidator("json", subscription), async (c) => {
     const { endpoint, keys } = c.req.valid("json");
@@ -76,7 +81,7 @@ const app = new Hono<AppEnv>()
         },
       });
 
-    return c.body(null, 204);
+    return c.json({ publicKey: vapidPublicKey(c.env) });
   })
 
   .post(
@@ -161,7 +166,19 @@ const app = new Hono<AppEnv>()
 
       if (!device) return c.json({ error: "Perangkat ini belum terdaftar" }, 404);
 
-      const pusher = await createPusher(c.env);
+      /* Kunci yang salah pasang dijawab dengan kalimatnya sendiri. Kalau
+         dibiarkan melempar, yang sampai ke pengguna cuma 500 tanpa keterangan —
+         padahal justru di sinilah keterangannya paling dibutuhkan: tombol ini
+         memang dipakai untuk membuktikan seluruh rantainya tersambung. */
+      let pusher;
+      try {
+        pusher = await createPusher(c.env, new URL(c.req.url).origin);
+      } catch (e) {
+        if (!(e instanceof VapidConfigError)) throw e;
+        console.error(e);
+        return c.json({ error: e.message }, 503);
+      }
+
       if (!pusher) return c.json({ error: "Server belum dipasangi kunci VAPID" }, 503);
 
       const result = await pusher.send(device, {

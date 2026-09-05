@@ -460,10 +460,16 @@ export function CardModal({
             title={followupHidden ? "Tampilkan followup" : "Sembunyikan followup"}
             className="grid size-8 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-line-soft hover:text-ink"
           >
-            <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <rect x="3" y="4" width="18" height="16" rx="2.5" />
-              <path d="M15 4v16" />
-              {followupHidden && <path d="m18 10-2 2 2 2" />}
+            <svg viewBox="0 -960 960 960" className="size-5" fill="currentColor" aria-hidden>
+              {/* Anak panahnya menunjuk ke arah panelnya akan bergerak: ke
+                  kiri saat masih tersembunyi (menarik panel masuk), ke kanan
+                  saat terbuka (mendorongnya keluar). */}
+              {followupHidden ? (
+                <path d="M461.92-379.92v-200.16q0-12.46-11.04-17.07-11.03-4.62-19.88 4.23l-87.61 87.61q-10.85 10.85-10.85 25.31 0 14.46 10.85 25.31L431-367.08q8.85 8.85 19.88 4.23 11.04-4.61 11.04-17.07Z" />
+              ) : (
+                <path d="M318.08-379.92q0 12.46 11.04 17.07 11.04 4.62 19.88-4.23l87.62-87.61q10.84-10.85 10.84-25.31 0-14.46-10.84-25.31L349-592.92q-8.84-8.85-19.88-4.23-11.04 4.61-11.04 17.07v200.16Z" />
+              )}
+              <path d="M212.31-140q-29.92 0-51.12-21.19Q140-182.39 140-212.31v-535.38q0-29.92 21.19-51.12Q182.39-820 212.31-820h535.38q29.92 0 51.12 21.19Q820-777.61 820-747.69v535.38q0 29.92-21.19 51.12Q777.61-140 747.69-140H212.31ZM640-200h120v-547.69q0-4.62-3.85-8.46-3.84-3.85-8.46-3.85H640v560Zm-60 0v-560H212.31q-4.62 0-8.46 3.85-3.85 3.84-3.85 8.46v535.38q0 4.62 3.85 8.46 3.84 3.85 8.46 3.85H580Z" />
             </svg>
           </button>
 

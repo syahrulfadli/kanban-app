@@ -16,7 +16,7 @@ import {
 } from "../db";
 import type { AppEnv } from "./auth";
 import type { ActivityNote } from "./card-data";
-import { createPusher } from "./push";
+import { createPusher, VapidConfigError } from "./push";
 import {
   describeCardDeleted,
   describeComment,
@@ -182,7 +182,18 @@ async function deliver(
   if (userIds.length === 0) return;
 
   const db = c.get("db");
-  const pusher = await createPusher(c.env);
+  /* Kunci yang salah pasang tidak boleh menjatuhkan seluruh pengiriman: kotak
+     masuk sudah tercatat sebelum ini, dan yang gagal hanya ketukan ke
+     perangkat. Cukup dicatat sekali di log, tidak diteruskan. */
+  let pusher;
+  try {
+    pusher = await createPusher(c.env, new URL(c.req.url).origin);
+  } catch (e) {
+    if (!(e instanceof VapidConfigError)) throw e;
+    console.error(e);
+    return;
+  }
+
   if (!pusher) return;
 
   const devices = await db

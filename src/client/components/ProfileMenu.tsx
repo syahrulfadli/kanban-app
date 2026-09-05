@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useDismiss } from "../hooks/useDismiss";
 import { signOut, useSession } from "../lib/auth-client";
 import { cn } from "../lib/cn";
 import { avatarTint, initials } from "../lib/people";
@@ -71,6 +73,7 @@ export function ProfileMenu() {
   const { data: session } = useSession();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   /* Perangkat yang sudah berlangganan notifikasi mendaftar ulang diam-diam
      tiap aplikasi dibuka: baris di server bisa saja hilang — database
@@ -87,24 +90,30 @@ export function ProfileMenu() {
       .catch(() => {});
   }, [userId]);
 
-  // Tutup kalau ditekan di luar menu atau saat Escape. `pointerdown`, bukan
-  // `click`, supaya menu sudah tertutup sebelum klik mendarat di bawahnya.
-  useEffect(() => {
+  useDismiss(open, () => setOpen(false), [ref, panelRef]);
+
+  /* Menunya dipasang di <body>, jadi ia kehilangan tombol yang tadinya
+     menempatkannya — letaknya sekarang diukur sendiri dari persegi avatar:
+     tepi kanan bertemu tepi kanan, dan alasnya berhenti tepat di atas
+     kapsulnya. Kapsul itu tidak ikut menggulir bersama halaman, jadi yang
+     bisa memindahkannya cuma jendela yang berubah ukuran. */
+  const [anchor, setAnchor] = useState<{ right: number; bottom: number } | null>(null);
+  useLayoutEffect(() => {
     if (!open) return;
 
-    const onPointerDown = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+    const place = () => {
+      const rect = ref.current?.getBoundingClientRect();
+      if (rect) {
+        setAnchor({
+          right: window.innerWidth - rect.right,
+          bottom: window.innerHeight - rect.top + 12,
+        });
+      }
     };
 
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
   }, [open]);
 
   if (!session) return null;
@@ -128,53 +137,60 @@ export function ProfileMenu() {
         {image ? <img src={image} alt="" /> : initials(name, email)}
       </button>
 
-      {open && (
+      {open &&
+        anchor &&
         /* Menu terbit ke ATAS: kapsulnya menempel di dasar layar, jadi ke
-           bawah tidak ada ruang. */
-        <div
-          role="menu"
-          className="sheet absolute right-0 bottom-full mb-3 w-56 rounded-2xl p-1.5"
-        >
-          <div className="px-2.5 py-2">
-            <p className="truncate text-sm font-medium">{name}</p>
-            <p className="truncate text-xs text-muted">{email}</p>
-          </div>
+           bawah tidak ada ruang. Dipasang di <body> supaya keluar dari kapsul
+           ber-frost — di dalamnya backdrop-filter tidak menghitung apa pun
+           (lihat catatan .sheet-frost). */
+        createPortal(
+          <div
+            ref={panelRef}
+            role="menu"
+            style={{ right: anchor.right, bottom: anchor.bottom }}
+            className="sheet sheet-frost fixed z-45 w-56 max-w-[calc(100vw-2rem)] rounded-2xl p-1.5"
+          >
+            <div className="px-2.5 py-2">
+              <p className="truncate text-sm font-medium">{name}</p>
+              <p className="truncate text-xs text-muted">{email}</p>
+            </div>
 
-          <span className="my-1 block h-px bg-line-soft" />
+            <span className="my-1 block h-px bg-line-soft" />
 
-          {/* Halaman pengantar tidak berhenti berguna setelah orang punya akun
-              — ia yang menjelaskan kanban dan isi aplikasi ini — tapi akar
-              sudah jadi milik daftar workspace begitu ada sesi. Jadi jalannya
-              ke sana ada di sini, satu ketukan dari halaman mana pun. */}
-          <Item
-            icon={ABOUT}
-            label="Pengantar"
-            onClick={() => {
-              setOpen(false);
-              navigate(paths.pengantar);
-            }}
-          />
+            {/* Halaman pengantar tidak berhenti berguna setelah orang punya akun
+                — ia yang menjelaskan kanban dan isi aplikasi ini — tapi akar
+                sudah jadi milik daftar workspace begitu ada sesi. Jadi jalannya
+                ke sana ada di sini, satu ketukan dari halaman mana pun. */}
+            <Item
+              icon={ABOUT}
+              label="Pengantar"
+              onClick={() => {
+                setOpen(false);
+                navigate(paths.pengantar);
+              }}
+            />
 
-          <Item
-            icon={GEAR}
-            label="Pengaturan"
-            onClick={() => {
-              setOpen(false);
-              navigate(paths.settings);
-            }}
-          />
+            <Item
+              icon={GEAR}
+              label="Pengaturan"
+              onClick={() => {
+                setOpen(false);
+                navigate(paths.settings);
+              }}
+            />
 
-          <Item
-            icon={EXIT}
-            label="Keluar"
-            danger
-            onClick={() => {
-              setOpen(false);
-              void signOut().then(() => navigate(paths.workspaces));
-            }}
-          />
-        </div>
-      )}
+            <Item
+              icon={EXIT}
+              label="Keluar"
+              danger
+              onClick={() => {
+                setOpen(false);
+                void signOut().then(() => navigate(paths.workspaces));
+              }}
+            />
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Avatar } from "./Avatar";
+import { useDismiss } from "../hooks/useDismiss";
 import { useNotifications } from "../hooks/useNotifications";
 import { useSession } from "../lib/auth-client";
 import { formatDateTime, formatRelative } from "../lib/format";
@@ -94,15 +96,16 @@ function Row({
 /**
  * Lonceng di kapsul navigasi, beserta kotak masuknya.
  *
- * Panelnya terbit dari loncengnya sendiri, bukan mengambang di tengah layar:
- * yang dibuka orang adalah lonceng itu, dan panel yang muncul di tempat lain
- * memutus hubungan antara yang ditekan dan yang terjadi.
+ * Panelnya mengambang di tengah dasar layar, sejajar dan sepersis panel
+ * pencarian di sebelahnya. Yang menjelaskan asalnya bukan letaknya, melainkan
+ * loncengnya sendiri: ikonnya memadat selama panel terbuka.
  */
 export function NotificationBell() {
   const { data: session } = useSession();
   const inbox = useNotifications(Boolean(session));
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   // Isinya baru ditarik saat panelnya dibuka — di luar itu yang berjalan cuma
   // penghitung lencana, yang jauh lebih murah.
@@ -111,25 +114,7 @@ export function NotificationBell() {
     if (open) void refresh();
   }, [open, refresh]);
 
-  // Tutup kalau ditekan di luar panel atau saat Escape. `pointerdown`, bukan
-  // `click`, supaya panel sudah tertutup sebelum klik mendarat di bawahnya.
-  useEffect(() => {
-    if (!open) return;
-
-    const onPointerDown = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
+  useDismiss(open, () => setOpen(false), [ref, panelRef]);
 
   // Pengunjung yang belum masuk tidak punya kotak masuk; loncengnya pun tidak.
   if (!session) return null;
@@ -179,126 +164,134 @@ export function NotificationBell() {
         )}
       </button>
 
-      {open && (
-        /* Terbit ke ATAS: kapsulnya menempel di dasar layar, jadi ke bawah
-           tidak ada ruang. Lebarnya dibatasi lebar layar supaya di ponsel
-           panelnya tidak menyembul keluar. */
-        <div
-          role="dialog"
-          aria-label="Kotak masuk notifikasi"
-          className="sheet absolute right-0 bottom-full mb-3 w-80 max-w-[calc(100vw-2rem)] rounded-2xl"
-        >
-          <div className="flex items-center gap-2 px-3 pt-3 pb-2">
-            <h2 className="text-sm font-semibold tracking-tight">Notifikasi</h2>
-            {inbox.unread > 0 && (
-              <button
-                type="button"
-                onClick={() => void inbox.markAllRead()}
-                className="ml-auto text-xs text-muted transition-colors hover:text-accent-ink"
-              >
-                Tandai terbaca
-              </button>
-            )}
-          </div>
+      {open &&
+        /* Berlabuh ke layar dan selebar panel pencarian — bukan digantungkan
+           pada loncengnya sendiri. Keduanya terbit dari kapsul yang sama dan
+           berisi daftar yang sama panjangnya; panel yang satu sempit dan
+           menempel ke kanan sementara yang lain lebar dan di tengah membuat
+           kapsul itu terbaca seperti dua benda berbeda.
 
-          {/* Penyaring. Papan mengikuti workspace yang dipilih; selama belum
-              ada yang dipilih, semuanya tampil berkelompok per workspace. */}
-          {scopes.length > 0 && (
-            <div className="flex gap-2 px-3 pb-2">
-              <select
-                aria-label="Saring menurut workspace"
-                value={filter.workspaceId ?? ""}
-                onChange={(e) =>
-                  inbox.applyFilter(e.target.value ? { workspaceId: e.target.value } : {})
-                }
-                className="field min-w-0 flex-1 py-1.5 text-xs"
-              >
-                <option value="">Semua workspace</option>
-                {scopes.map((scope) => (
-                  <option key={scope.workspaceId} value={scope.workspaceId}>
-                    {scope.workspaceName}
-                    {scope.unread > 0 ? ` (${scope.unread})` : ""}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                aria-label="Saring menurut papan"
-                value={filter.boardId ?? ""}
-                onChange={(e) => {
-                  const boardId = e.target.value;
-                  if (!boardId) {
-                    inbox.applyFilter(
-                      filter.workspaceId ? { workspaceId: filter.workspaceId } : {},
-                    );
-                    return;
-                  }
-                  // Memilih papan ikut menetapkan workspace-nya, supaya kedua
-                  // penyaring tidak pernah bercerita berbeda.
-                  const owner = scopes.find((scope) =>
-                    scope.boards.some((board) => board.id === boardId),
-                  );
-                  inbox.applyFilter({ workspaceId: owner?.workspaceId, boardId });
-                }}
-                className="field min-w-0 flex-1 py-1.5 text-xs"
-              >
-                <option value="">Semua papan</option>
-                {boardOptions.map((scope) => (
-                  <optgroup key={scope.workspaceId} label={scope.workspaceName}>
-                    {scope.boards.map((board) => (
-                      <option key={board.id} value={board.id}>
-                        {board.title}
-                        {board.unread > 0 ? ` (${board.unread})` : ""}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
+           Dipasang di <body> supaya keluar dari kapsul ber-frost: di dalamnya
+           backdrop-filter tidak menghitung apa pun (lihat .sheet-frost). */
+        createPortal(
+          <div
+            ref={panelRef}
+            role="dialog"
+            aria-label="Kotak masuk notifikasi"
+            className="sheet sheet-frost fixed bottom-24 left-1/2 z-45 w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl"
+          >
+            <div className="flex items-center gap-2 px-3 pt-3 pb-2">
+              <h2 className="text-sm font-semibold tracking-tight">Notifikasi</h2>
+              {inbox.unread > 0 && (
+                <button
+                  type="button"
+                  onClick={() => void inbox.markAllRead()}
+                  className="ml-auto text-xs text-muted transition-colors hover:text-accent-ink"
+                >
+                  Tandai terbaca
+                </button>
+              )}
             </div>
-          )}
 
-          <div className="max-h-[min(60vh,26rem)] overflow-y-auto px-1.5 pb-1.5 space-y-1">
-            {inbox.loading && inbox.items.length === 0 ? (
-              /* Hanya saat kotaknya benar-benar kosong. Kalau kabar lama masih
-                 terpampang, penyegaran berjalan diam-diam di belakangnya —
-                 mengganti yang sudah terbaca dengan kerangka justru membuat
-                 panel berkedip setiap kali dibuka. */
-              <InboxSkeleton />
-            ) : inbox.error ? (
-              <p className="px-2 py-6 text-center text-xs text-danger">{inbox.error}</p>
-            ) : inbox.items.length === 0 ? (
-              <p className="px-2 py-6 text-center text-xs leading-relaxed text-muted">
-                {filter.workspaceId || filter.boardId
-                  ? "Tidak ada notifikasi di penyaring ini."
-                  : "Belum ada notifikasi. Kabar dari kartu yang Anda ikuti akan muncul di sini."}
-              </p>
-            ) : (
-              <>
-                {inbox.items.map((item) => (
-                  <Row key={item.id} item={item} onOpen={openItem} />
-                ))}
+            {/* Penyaring. Papan mengikuti workspace yang dipilih; selama belum
+                ada yang dipilih, semuanya tampil berkelompok per workspace. */}
+            {scopes.length > 0 && (
+              <div className="flex gap-2 px-3 pb-2">
+                <select
+                  aria-label="Saring menurut workspace"
+                  value={filter.workspaceId ?? ""}
+                  onChange={(e) =>
+                    inbox.applyFilter(e.target.value ? { workspaceId: e.target.value } : {})
+                  }
+                  className="field min-w-0 flex-1 py-1.5 text-xs"
+                >
+                  <option value="">Semua workspace</option>
+                  {scopes.map((scope) => (
+                    <option key={scope.workspaceId} value={scope.workspaceId}>
+                      {scope.workspaceName}
+                      {scope.unread > 0 ? ` (${scope.unread})` : ""}
+                    </option>
+                  ))}
+                </select>
 
-                {/* Halaman berikutnya pun mendapat tempatnya lebih dulu, di
-                    ujung daftar — persis di mana kabar-kabar itu akan berdiri.
-                    Tombolnya tinggal padam; kalimatnya tidak perlu berubah
-                    karena kerangkanya sudah mengatakan hal yang sama. */}
-                {inbox.loadingMore && <InboxSkeleton rows={2} />}
-
-                {inbox.hasMore && (
-                  <button
-                    type="button"
-                    onClick={() => void inbox.loadMore()}
-                    disabled={inbox.loadingMore}
-                    className="mt-1 w-full rounded-xl px-2 py-2 text-xs text-muted transition-colors hover:bg-line-soft hover:text-ink-soft disabled:opacity-50"
-                  >
-                    Muat lebih banyak
-                  </button>
-                )}
-              </>
+                <select
+                  aria-label="Saring menurut papan"
+                  value={filter.boardId ?? ""}
+                  onChange={(e) => {
+                    const boardId = e.target.value;
+                    if (!boardId) {
+                      inbox.applyFilter(
+                        filter.workspaceId ? { workspaceId: filter.workspaceId } : {},
+                      );
+                      return;
+                    }
+                    // Memilih papan ikut menetapkan workspace-nya, supaya kedua
+                    // penyaring tidak pernah bercerita berbeda.
+                    const owner = scopes.find((scope) =>
+                      scope.boards.some((board) => board.id === boardId),
+                    );
+                    inbox.applyFilter({ workspaceId: owner?.workspaceId, boardId });
+                  }}
+                  className="field min-w-0 flex-1 py-1.5 text-xs"
+                >
+                  <option value="">Semua papan</option>
+                  {boardOptions.map((scope) => (
+                    <optgroup key={scope.workspaceId} label={scope.workspaceName}>
+                      {scope.boards.map((board) => (
+                        <option key={board.id} value={board.id}>
+                          {board.title}
+                          {board.unread > 0 ? ` (${board.unread})` : ""}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
             )}
-          </div>
-        </div>
-      )}
+
+            <div className="max-h-[min(60vh,26rem)] overflow-y-auto px-1.5 pb-1.5 space-y-1">
+              {inbox.loading && inbox.items.length === 0 ? (
+                /* Hanya saat kotaknya benar-benar kosong. Kalau kabar lama masih
+                   terpampang, penyegaran berjalan diam-diam di belakangnya —
+                   mengganti yang sudah terbaca dengan kerangka justru membuat
+                   panel berkedip setiap kali dibuka. */
+                <InboxSkeleton />
+              ) : inbox.error ? (
+                <p className="px-2 py-6 text-center text-xs text-danger">{inbox.error}</p>
+              ) : inbox.items.length === 0 ? (
+                <p className="px-2 py-6 text-center text-xs leading-relaxed text-muted">
+                  {filter.workspaceId || filter.boardId
+                    ? "Tidak ada notifikasi di penyaring ini."
+                    : "Belum ada notifikasi. Kabar dari kartu yang Anda ikuti akan muncul di sini."}
+                </p>
+              ) : (
+                <>
+                  {inbox.items.map((item) => (
+                    <Row key={item.id} item={item} onOpen={openItem} />
+                  ))}
+
+                  {/* Halaman berikutnya pun mendapat tempatnya lebih dulu, di
+                      ujung daftar — persis di mana kabar-kabar itu akan berdiri.
+                      Tombolnya tinggal padam; kalimatnya tidak perlu berubah
+                      karena kerangkanya sudah mengatakan hal yang sama. */}
+                  {inbox.loadingMore && <InboxSkeleton rows={2} />}
+
+                  {inbox.hasMore && (
+                    <button
+                      type="button"
+                      onClick={() => void inbox.loadMore()}
+                      disabled={inbox.loadingMore}
+                      className="mt-1 w-full rounded-xl px-2 py-2 text-xs text-muted transition-colors hover:bg-line-soft hover:text-ink-soft disabled:opacity-50"
+                    >
+                      Muat lebih banyak
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
