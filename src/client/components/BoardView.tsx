@@ -7,6 +7,7 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { MoveDialog, type MoveSubject } from "./MoveDialog";
 import { ColumnView } from "./ColumnView";
 import { AddItemForm } from "./AddItemForm";
+import { useBackdropInk } from "../hooks/useBackdropInk";
 import { useBoard } from "../hooks/useBoard";
 import { useCollapsedColumns } from "../hooks/useCollapsedColumns";
 import { playDropSound } from "../hooks/useSound";
@@ -162,6 +163,11 @@ interface BoardProps {
 export function BoardView({ boardId, openCardId }: BoardProps) {
   const { board, loading, error, refresh, actions, live } = useBoard(boardId);
   const { data: session } = useSession();
+
+  /* Tinta untuk teks yang duduk langsung di atas foto latar. Dipanggil dengan
+     latar yang mungkin belum datang — sebelum itu ia tidak menuliskan apa pun,
+     dan yang berlaku tetap tinta tema. */
+  useBackdropInk(board?.background ?? { kind: "default" });
 
   /* Kolom mana yang disusutkan hanya urusan layar ini — simpanannya di
      peramban, bukan di papan. */
@@ -368,7 +374,10 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
           digeser mendatar tidak menyeretnya ikut bergerak. */}
       <div aria-hidden className="board-bg" {...backgroundProps(board.background)} />
 
-      <AppHeader>
+      {/* Tinta kepala papan mengikuti bagian ATAS foto. Kelasnya selalu
+          terpasang; yang menentukan ada tidaknya efeknya adalah atribut di
+          <html>, yang cuma ada selagi papan ini berlatar foto. */}
+      <AppHeader className="on-photo on-photo-top">
         <span className="text-faint">/</span>
         <button
           onClick={() => navigate(paths.workspace(board.workspaceId))}
@@ -382,7 +391,10 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
         {/* Berlabuh di ujung kanan kepala papan, bukan menempel di belakang
             judul: tempatnya jadi tetap — tidak bergeser mengikuti panjang nama
             papan — dan sudut itu memang sudut keterangan, bukan sudut isi. */}
-        <span className="ml-auto flex min-w-0 items-center gap-2">
+        {/* Ujung kanan kepala papan berdiri di atas bagian foto yang lain
+            daripada breadcrumb di kiri, jadi ia menanyakan tintanya sendiri —
+            satu foto boleh gelap di satu sisi dan terang di sisi lain. */}
+        <span className="on-photo-top-end ml-auto flex min-w-0 items-center gap-2">
           {error && <span className="min-w-0 truncate text-xs text-danger">{error}</span>}
           <BoardBackgroundPicker
             boardId={boardId}
@@ -453,7 +465,7 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
           dari papan. `pointer-events-none` di pembungkusnya: yang boleh
           diketuk cuma tautannya sendiri, bukan pita kosong sepanjang layar. */}
       {photo && (
-        <div className="pointer-events-none fixed bottom-6 left-5 z-30 max-w-[45vw]">
+        <div className="on-photo-bottom pointer-events-none fixed bottom-6 left-5 z-30 max-w-[45vw]">
           <PhotoCredit image={photo} />
         </div>
       )}

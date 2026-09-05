@@ -53,6 +53,7 @@ export const thumbSrc = (url: string) => backgroundSrc(url, BACKGROUND_WIDTHS.th
 export function backgroundProps(background: BoardBackground): {
   "data-kind": BoardBackground["kind"];
   "data-gradient"?: string;
+  "data-overlay"?: "on" | "off";
   style?: CSSProperties;
 } {
   if (background.kind === "gradient") {
@@ -62,8 +63,13 @@ export function backgroundProps(background: BoardBackground): {
   if (background.kind === "image") {
     return {
       "data-kind": "image",
+      "data-overlay": background.overlay ? "on" : "off",
       style: {
         "--board-image": `url("${backgroundSrc(background.image.url, BACKGROUND_WIDTHS.full)}")`,
+        /* Satuannya ikut ke CSS, bukan angka telanjang: `blur()` menolak
+           angka tanpa satuan, dan 0 pun harus tetap `0px` supaya `inset`
+           yang menghitungnya tidak jadi nilai tak sah. */
+        "--board-blur": `${background.blur}px`,
       } as CSSProperties,
     };
   }

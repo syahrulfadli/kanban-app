@@ -1,3 +1,4 @@
+import { cn } from "../lib/cn";
 import { navigate, paths } from "../lib/route";
 
 /* Breadcrumb. Tidak lagi berupa pane kaca: bilah bertepi sendiri membelah
@@ -5,9 +6,17 @@ import { navigate, paths } from "../lib/route";
    halaman. Jadi latarnya dibiarkan tembus dan hanya tinggal jaraknya.
 
    Identitas dan tombol keluar pindah ke menu profil di kapsul bawah. */
-export function AppHeader({ children }: { children?: React.ReactNode }) {
+export function AppHeader({
+  children,
+  className,
+}: {
+  children?: React.ReactNode;
+  /* Papan berlatar foto menitipkan kelas tinta adaptif lewat sini. Halaman
+     lain tidak mengirim apa pun dan tetap memakai tinta tema. */
+  className?: string;
+}) {
   return (
-    <header className="flex shrink-0 items-center gap-2 px-5 pt-5 pb-3">
+    <header className={cn("flex shrink-0 items-center gap-2 px-5 pt-5 pb-3", className)}>
       <button
         onClick={() => navigate(paths.workspaces)}
         className="flex shrink-0 items-center gap-2 text-sm font-semibold tracking-tight"

@@ -4,6 +4,7 @@ import type {
   BackgroundImage,
   Board,
   BoardBackgroundKind,
+  BoardBlur,
   BoardGradient,
   Card,
   CardActivity,
@@ -18,7 +19,13 @@ import type {
   Role,
   Workspace,
 } from "../db/schema";
-import { BOARD_BACKGROUND_KINDS, BOARD_GRADIENTS, COLUMN_COLORS, LABEL_COLORS } from "../db/schema";
+import {
+  BOARD_BACKGROUND_KINDS,
+  BOARD_BLUR_LEVELS,
+  BOARD_GRADIENTS,
+  COLUMN_COLORS,
+  LABEL_COLORS,
+} from "../db/schema";
 
 export type {
   ActivityDetail,
@@ -26,6 +33,7 @@ export type {
   BackgroundImage,
   Board,
   BoardBackgroundKind,
+  BoardBlur,
   BoardGradient,
   Card,
   CardActivity,
@@ -40,7 +48,7 @@ export type {
   Role,
   Workspace,
 };
-export { BOARD_BACKGROUND_KINDS, BOARD_GRADIENTS, COLUMN_COLORS, LABEL_COLORS };
+export { BOARD_BACKGROUND_KINDS, BOARD_BLUR_LEVELS, BOARD_GRADIENTS, COLUMN_COLORS, LABEL_COLORS };
 
 /** Workspace beserta peran user yang sedang login di dalamnya. */
 export interface WorkspaceSummary extends Workspace {
@@ -140,9 +148,21 @@ export interface BackgroundImageBrief {
 export type BoardBackground =
   | { kind: "default" }
   | { kind: "gradient"; gradient: BoardGradient }
-  | { kind: "image"; image: BackgroundImageBrief };
+  /* Kabut dan kekaburan menempel pada varian gambar, bukan berdiri sendiri di
+     BoardDetail: keduanya tidak punya arti tanpa foto, dan bentuk yang
+     membiarkannya berdiri sendiri mengizinkan keadaan yang tidak bisa
+     digambar — "kabut mati" pada papan yang latarnya gradiasi. */
+  | { kind: "image"; image: BackgroundImageBrief; overlay: boolean; blur: BoardBlur };
 
 export const DEFAULT_BOARD_BACKGROUND: BoardBackground = { kind: "default" };
+
+/** Nama tingkat kekaburan yang dibaca orang. Angkanya piksel; ini namanya. */
+export const BOARD_BLUR_LABELS: Record<BoardBlur, string> = {
+  0: "Tajam",
+  6: "Tipis",
+  14: "Sedang",
+  28: "Tebal",
+};
 
 /** Nama gradiasi yang dibaca orang. Bentuknya tinggal di CSS, namanya di sini. */
 export const BOARD_GRADIENT_LABELS: Record<BoardGradient, string> = {

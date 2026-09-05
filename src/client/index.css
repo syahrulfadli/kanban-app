@@ -1456,6 +1456,12 @@ body {
   .board-bg[data-kind="image"] {
     background-color: #E6ECF5;
     background-image: var(--board-image);
+    /* Dikaburkan dari tepi yang MELEBIHI layar. Mengaburkan lembar yang pas
+       seukuran jendela menarik warna dari luar bidangnya, dan yang muncul di
+       keempat tepi adalah pita pudar — persis di tempat yang paling terlihat.
+       Lebihannya dua kali radius kaburnya, jadi pitanya jatuh di luar layar. */
+    inset: calc(-2 * var(--board-blur, 0px));
+    filter: blur(var(--board-blur, 0px));
   }
 
   [data-theme="dark"] .board-bg[data-kind="image"] {
@@ -1476,6 +1482,13 @@ body {
 
   [data-theme="dark"] .board-bg[data-kind="image"]::after {
     background-color: rgb(6 7 10 / 0.68);
+  }
+
+  /* Kabut dimatikan: fotonya utuh, dan sejak itu yang menjaga teks tetap
+     terbaca bukan lagi kabut melainkan tinta yang mengikuti fotonya —
+     lihat client/lib/backdrop.ts. */
+  .board-bg[data-overlay="off"]::after {
+    display: none;
   }
 
   /* Keping gradiasi di pemilih latar dan di panel admin. Membaca custom
@@ -1637,4 +1650,95 @@ body {
     background-color: rgb(10 12 16 / 0.5);
   }
   .photo-credit:hover { opacity: 1; }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Tinta di atas foto
+
+   Kepala papan dan barisan kredit di kaki halaman tidak duduk di atas
+   pelat kaca — mereka duduk di atas fotonya. Selama kabut menyala itu
+   tidak jadi soal: yang di bawah teks sudah hampir seluruhnya warna
+   tema. Begitu kabutnya dimatikan, tinta tema bertemu foto sembarang.
+
+   Yang menentukan bukan tema melainkan foto itu sendiri, diukur di petak
+   tempat teksnya benar-benar berdiri (client/lib/backdrop.ts) dan
+   dituliskan ke <html> sebagai data-ink-top / data-ink-bottom. Dua petak,
+   bukan satu: sebuah foto bisa terang di atas dan gelap di bawah, dan
+   satu jawaban untuk seluruh layar akan salah di salah satu ujungnya.
+
+   Yang ditimpa hanya token tinta — bukan seluruh palet. Pelat kaca di
+   dalamnya punya isian dan bayangannya sendiri yang sudah bekerja di
+   kedua tema, dan membalik semuanya akan membuat chip terang berisi
+   huruf terang.
+   ══════════════════════════════════════════════════════════════════ */
+@layer components {
+  .on-photo {
+    /* Bayangan setipis rambut, dan ia bukan hiasan: rata-rata boleh benar
+       sementara satu huruf kebetulan jatuh di atas dahan yang seterang
+       tintanya. Bayangan inilah yang menjaga tepinya tetap ada di situ. */
+    text-shadow: var(--photo-shadow, none);
+  }
+
+  /* `color` ditulis ulang, dan itu wajib — bukan kerapian. Substitusi var()
+     diselesaikan di elemen tempat ia ditulis, jadi warna yang DIWARISI dari
+     <body> sudah jadi warna sungguhan sebelum sampai ke sini: menimpa
+     --color-ink di elemen ini tidak berlaku surut terhadapnya. Anak yang
+     memakai utility text-* menyelesaikannya sendiri dan sudah benar; yang
+     butuh baris ini adalah teks yang tidak menyebut warna sama sekali — nama
+     aplikasi dan judul papan di breadcrumb.
+
+     Hanya di kepala papan. Di kaki halaman, kredit pembuat dan kredit foto
+     menyebut warnanya masing-masing dan sudah ikut terbalik dengan sendirinya;
+     menuliskannya lagi di sini justru akan menaikkan keduanya jadi tinta
+     penuh, dan kredit yang bicara sekeras judul bukan lagi kredit. */
+  .on-photo-top {
+    color: var(--color-ink);
+  }
+
+  /* Keping di dalamnya sudah punya alas sendiri, jadi bayangan di atasnya cuma
+     membuat hurufnya terlihat kotor. Isiannya yang ikut dibalik — sebuah keping
+     terang berisi huruf terang tidak terbaca oleh siapa pun. */
+  .on-photo .chip {
+    text-shadow: none;
+  }
+
+  [data-ink-top="light"] .on-photo-top,
+  [data-ink-top-end="light"] .on-photo-top-end,
+  [data-ink-bottom="light"] .on-photo-bottom {
+    --color-ink: #F7F9FC;
+    --color-ink-soft: #DDE4EF;
+    --color-muted: #C2CCDA;
+    --color-faint: #A2AEBF;
+    --color-line: rgb(255 255 255 / 0.16);
+    --color-line-soft: rgb(255 255 255 / 0.10);
+    --plate-fill: rgb(255 255 255 / 0.10);
+    --plate-fill-hi: rgb(255 255 255 / 0.16);
+    --photo-shadow: 0 1px 2px rgb(0 0 0 / 0.45);
+  }
+
+  [data-ink-top="dark"] .on-photo-top,
+  [data-ink-top-end="dark"] .on-photo-top-end,
+  [data-ink-bottom="dark"] .on-photo-bottom {
+    --color-ink: #0B1220;
+    --color-ink-soft: #2A3547;
+    --color-muted: #47536A;
+    --color-faint: #66738A;
+    --color-line: rgb(15 23 42 / 0.14);
+    --color-line-soft: rgb(15 23 42 / 0.08);
+    --plate-fill: rgb(255 255 255 / 0.62);
+    --plate-fill-hi: rgb(255 255 255 / 0.80);
+    --photo-shadow: 0 1px 2px rgb(255 255 255 / 0.45);
+  }
+
+  /* Kredit foto sudah punya alasnya sendiri, jadi ia tidak butuh bayangan —
+     dua-duanya sekaligus membuat hurufnya terlihat kotor. Alasnya yang
+     dibalik supaya tetap membaca sebagai keping di atas foto. */
+  [data-ink-bottom="light"] .photo-credit {
+    background-color: rgb(8 10 14 / 0.42);
+    text-shadow: none;
+  }
+  [data-ink-bottom="dark"] .photo-credit {
+    background-color: rgb(255 255 255 / 0.55);
+    text-shadow: none;
+  }
 }

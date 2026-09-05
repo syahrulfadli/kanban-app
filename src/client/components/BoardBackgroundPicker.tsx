@@ -1,14 +1,18 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useDismiss } from "../hooks/useDismiss";
 import { api, type BoardBackgroundPatch } from "../lib/api";
 import { thumbSrc } from "../lib/background";
 import { cn } from "../lib/cn";
+import { Toggle } from "./Toggle";
 import {
+  BOARD_BLUR_LABELS,
+  BOARD_BLUR_LEVELS,
   BOARD_GRADIENTS,
   BOARD_GRADIENT_LABELS,
   type BackgroundImageBrief,
   type BoardBackground,
+  type BoardBlur,
 } from "../../shared/types";
 
 /* Bingkai pemandangan — pegunungan dalam kotak. Lambang latar, bukan lambang
@@ -75,6 +79,70 @@ function DefaultSwatch() {
           "radial-gradient(60% 55% at 85% 80%, rgb(196 181 253 / 0.40), transparent 72%)",
       }}
     />
+  );
+}
+
+/**
+ * Dua pengaturan yang hanya berlaku untuk latar bergambar.
+ *
+ * Kabutnya menyala secara bawaan karena ia yang membuat tinta kartu terbaca di
+ * atas foto sembarang. Mematikannya adalah pilihan untuk melihat fotonya utuh,
+ * dan sejak itu warna teks di kepala papan dan di kaki halaman ditentukan oleh
+ * terang-gelap fotonya sendiri — itu terjadi sendiri, tanpa sakelar ketiga.
+ */
+function ImageOptions({
+  overlay,
+  blur,
+  onOverlay,
+  onBlur,
+}: {
+  overlay: boolean;
+  blur: BoardBlur;
+  onOverlay: (next: boolean) => void;
+  onBlur: (next: BoardBlur) => void;
+}) {
+  const overlayId = useId();
+
+  return (
+    <div className="mt-4 border-t border-line-soft pt-3">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <p id={overlayId} className="text-xs font-medium">
+            Kabut di atas gambar
+          </p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-muted">
+            Menjaga tulisan tetap terbaca. Dimatikan, fotonya tampil utuh dan warna
+            teks mengikuti terang-gelap fotonya.
+          </p>
+        </div>
+        <Toggle
+          checked={overlay}
+          onChange={onOverlay}
+          labelledBy={overlayId}
+          className="h-5 w-9"
+        />
+      </div>
+
+      <p className="mt-3 text-xs font-medium">Kekaburan</p>
+      <div className="mt-1.5 flex items-center gap-1">
+        {BOARD_BLUR_LEVELS.map((level) => (
+          <button
+            key={level}
+            type="button"
+            onClick={() => onBlur(level)}
+            aria-pressed={blur === level}
+            className={cn(
+              "flex-1 rounded-full px-2 py-1 text-[11px] transition-colors",
+              blur === level
+                ? "bg-accent-soft text-accent-ink"
+                : "text-muted hover:bg-line-soft",
+            )}
+          >
+            {BOARD_BLUR_LABELS[level]}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -261,6 +329,22 @@ export function BoardBackgroundPicker({ boardId, background, onChanged }: Props)
                     </Swatch>
                   ))}
                 </div>
+              )}
+
+              {/* Hanya muncul untuk latar bergambar, dan itu bukan penyembunyian
+                  melainkan kejujuran: gradiasi sudah setenang yang dibutuhkan,
+                  dan latar bawaan tidak menggambar apa pun untuk dikaburkan. */}
+              {background.kind === "image" && (
+                <ImageOptions
+                  overlay={background.overlay}
+                  blur={background.blur}
+                  onOverlay={(overlay) =>
+                    void choose({ kind: "image", value: background.image.id, overlay })
+                  }
+                  onBlur={(blur) =>
+                    void choose({ kind: "image", value: background.image.id, blur })
+                  }
+                />
               )}
             </div>
           </div>,

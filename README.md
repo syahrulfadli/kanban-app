@@ -7,9 +7,12 @@ thread followup, orang yang diundang mengurusnya, tenggat, serta jejak siapa
 membuat dan mengubahnya.
 
 Setiap papan boleh punya latarnya sendiri: bawaan, salah satu dari delapan
-gradiasi, atau foto Unsplash yang dikurasi lewat panel admin. Panel yang sama
-mengurus akun — daftar seluruh pengguna, mengangkat admin aplikasi, mengganti
-kata sandi yang lupa, dan menghapus akun.
+gradiasi, atau foto Unsplash yang dikurasi lewat panel admin. Foto boleh
+dikaburkan, dan kabut di atasnya boleh dimatikan supaya fotonya tampil utuh —
+sejak itu warna teks di kepala papan dan di kaki halaman ditentukan oleh
+terang-gelap fotonya sendiri, diukur di petak tempat teksnya benar-benar
+berdiri. Panel yang sama mengurus akun — daftar seluruh pengguna, mengangkat
+admin aplikasi, mengganti kata sandi yang lupa, dan menghapus akun.
 
 Bisa dipasang sebagai aplikasi (PWA) dan mengirim notifikasi push ke perangkat —
 peserta sebuah kartu dikabari saat ada followup baru atau kartunya berubah,

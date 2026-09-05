@@ -49,7 +49,15 @@ export function CreditFooter({ open }: { open: number }) {
         className="absolute inset-x-0 bottom-0 flex justify-center transition-[opacity,transform] duration-300 ease-[var(--ease-spring)] motion-reduce:transition-none"
         style={{ opacity: open, transform: `translateY(${(1 - open) * 12}px)` }}
       >
-        <p className={cn("credit", hidden ? "pointer-events-none" : "pointer-events-auto")}>
+        {/* `on-photo-bottom` hanya berarti di papan yang latarnya foto tanpa
+            kabut — di halaman lain atributnya tidak ada di <html> dan kelas ini
+            tidak menimpa apa pun. */}
+        <p
+          className={cn(
+            "credit on-photo on-photo-bottom",
+            hidden ? "pointer-events-none" : "pointer-events-auto",
+          )}
+        >
           <span className="text-accent">
             <ReactMark />
           </span>

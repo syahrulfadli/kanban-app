@@ -96,6 +96,19 @@ export type BoardBackgroundKind = (typeof BOARD_BACKGROUND_KINDS)[number];
  * tidak tinggal di database: gradiasi adalah bagian dari tema aplikasi, dan
  * tema yang bisa disunting dari panel akan menyimpang dari sisa palet.
  */
+/**
+ * Seberapa kabur foto latarnya, dalam piksel. Nilainya terbatas pada daftar
+ * ini — bukan angka bebas — supaya "sedang" berarti hal yang sama di setiap
+ * papan, dan supaya tidak ada yang bisa menyimpan 400 dan membuat papannya
+ * jadi bidang warna.
+ *
+ * 0 berarti tidak dikaburkan, dan itu keadaan istirahatnya: foto yang
+ * dikurasi dipilih karena rupanya, dan mengaburkannya sejak awal membuang
+ * alasan ia dipilih.
+ */
+export const BOARD_BLUR_LEVELS = [0, 6, 14, 28] as const;
+export type BoardBlur = (typeof BOARD_BLUR_LEVELS)[number];
+
 export const BOARD_GRADIENTS = [
   "fajar",
   "laut",
@@ -134,6 +147,20 @@ export const boards = sqliteTable(
       .notNull()
       .default("default"),
     backgroundValue: text("background_value"),
+    /**
+     * Kabut di atas foto, dan seberapa kabur fotonya. Keduanya hanya berarti
+     * untuk latar bergambar — gradiasi sudah setenang yang dibutuhkan, dan
+     * latar bawaan tidak menggambar apa pun.
+     *
+     * Kabutnya menyala secara bawaan karena ia yang membuat tinta kartu
+     * terbaca di atas foto sembarang. Mematikannya adalah pilihan sadar untuk
+     * melihat fotonya utuh, dan sejak itu warna teks di kepala papan
+     * ditentukan oleh terang-gelap fotonya sendiri — lihat client/lib/backdrop.ts.
+     */
+    backgroundOverlay: integer("background_overlay", { mode: "boolean" })
+      .notNull()
+      .default(true),
+    backgroundBlur: integer("background_blur").notNull().default(0),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
   },

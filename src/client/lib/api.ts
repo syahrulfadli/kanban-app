@@ -6,6 +6,7 @@ import type {
   BackgroundImageBrief,
   Board,
   BoardBackground,
+  BoardBlur,
   BoardDetail,
   BoardGradient,
   Card,
@@ -88,7 +89,10 @@ export interface BackgroundInput {
 export type BoardBackgroundPatch =
   | { kind: "default" }
   | { kind: "gradient"; value: BoardGradient }
-  | { kind: "image"; value: string };
+  /* Kabut dan kekaburan boleh dihilangkan dari payload: server hanya menulis
+     apa yang benar-benar disebut, jadi mengganti gambar tidak mengembalikan
+     kedua pilihan itu ke bawaan. */
+  | { kind: "image"; value: string; overlay?: boolean; blur?: BoardBlur };
 
 const queryString = (params: Readonly<Record<string, string | undefined>>) => {
   const search = new URLSearchParams(

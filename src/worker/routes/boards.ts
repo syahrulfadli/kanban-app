@@ -5,6 +5,7 @@ import { z } from "zod";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import {
+  BOARD_BLUR_LEVELS,
   BOARD_GRADIENTS,
   backgroundImages,
   boards,
@@ -41,9 +42,10 @@ const DEFAULT_COLUMNS = ["To Do", "In Progress", "Done"];
  */
 async function resolveBackground(
   db: Db,
-  kind: string,
-  value: string | null,
+  board: { backgroundKind: string; backgroundValue: string | null; backgroundOverlay: boolean; backgroundBlur: number },
 ): Promise<BoardBackground> {
+  const { backgroundKind: kind, backgroundValue: value } = board;
+
   if (kind === "gradient") {
     const gradient = BOARD_GRADIENTS.find((name) => name === value);
     return gradient ? { kind: "gradient", gradient } : { kind: "default" };
@@ -62,7 +64,14 @@ async function resolveBackground(
       .where(eq(backgroundImages.id, value))
       .get();
 
-    return image ? { kind: "image", image } : { kind: "default" };
+    /* Nilai kekaburan yang tidak dikenal jatuh ke 0, bukan dipakai apa adanya:
+       kolomnya integer biasa, dan satu baris yang pernah ditulis di luar rute
+       ini tidak boleh berakhir sebagai papan yang tidak bisa dibaca. */
+    const blur = BOARD_BLUR_LEVELS.find((px) => px === board.backgroundBlur) ?? 0;
+
+    return image
+      ? { kind: "image", image, overlay: board.backgroundOverlay, blur }
+      : { kind: "default" };
   }
 
   return { kind: "default" };
@@ -253,7 +262,7 @@ const app = new Hono<AppEnv>()
         .innerJoin(columns, eq(columns.id, columnWatches.columnId))
         .where(and(eq(columns.boardId, board.id), eq(columnWatches.userId, userId)))
         .all(),
-      resolveBackground(db, board.backgroundKind, board.backgroundValue),
+      resolveBackground(db, board),
     ]);
 
     const watchedColumns = new Set(watched.map((row) => row.columnId));
@@ -296,9 +305,26 @@ const app = new Hono<AppEnv>()
         title: z.string().trim().min(1).max(120).optional(),
         background: z
           .discriminatedUnion("kind", [
-            z.object({ kind: z.literal("default") }),
-            z.object({ kind: z.literal("gradient"), value: z.enum(BOARD_GRADIENTS) }),
-            z.object({ kind: z.literal("image"), value: z.string().min(1) }),
+            /* Ketat, bukan longgar: tanpa ini Zod membuang field yang tidak
+               dikenal diam-diam, jadi "matikan kabut" yang dikirim ke papan
+               bergradiasi akan dijawab 200 seolah tersimpan. Lebih baik klien
+               yang keliru mendengarnya sekarang. */
+            z.strictObject({ kind: z.literal("default") }),
+            z.strictObject({ kind: z.literal("gradient"), value: z.enum(BOARD_GRADIENTS) }),
+            /* Kabut dan kekaburan hanya ada di cabang gambar: keduanya tidak
+               punya arti tanpa foto. */
+            z.strictObject({
+              kind: z.literal("image"),
+              value: z.string().min(1),
+              overlay: z.boolean().optional(),
+              blur: z
+                .number()
+                .int()
+                .refine((px) => BOARD_BLUR_LEVELS.some((level) => level === px), {
+                  message: "Tingkat kekaburan itu tidak dikenal",
+                })
+                .optional(),
+            }),
           ])
           .optional(),
       }),
@@ -339,6 +365,18 @@ const app = new Hono<AppEnv>()
             backgroundValue:
               patch.background.kind === "default" ? null : patch.background.value,
           }),
+          /* Kabut dan kekaburan hanya ditulis kalau memang disebut. Latar yang
+             berganti dari gambar ke gradiasi lalu kembali ke gambar dengan
+             begitu menemukan pilihannya seperti ia tinggalkan, alih-alih
+             kembali ke bawaan setiap kali. */
+          ...(patch.background?.kind === "image" &&
+            patch.background.overlay !== undefined && {
+              backgroundOverlay: patch.background.overlay,
+            }),
+          ...(patch.background?.kind === "image" &&
+            patch.background.blur !== undefined && {
+              backgroundBlur: patch.background.blur,
+            }),
           updatedAt: new Date(),
         })
         .where(eq(boards.id, board.id))
@@ -349,11 +387,7 @@ const app = new Hono<AppEnv>()
 
       return c.json({
         ...updated,
-        background: await resolveBackground(
-          db,
-          updated.backgroundKind,
-          updated.backgroundValue,
-        ),
+        background: await resolveBackground(db, updated),
       });
     },
   )
