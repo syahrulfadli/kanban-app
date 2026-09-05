@@ -22,6 +22,16 @@ import type { CardSummary } from "../../shared/types";
    terbaca sebagai perubahan isi kartu, bukan cuma perubahan cara membacanya. */
 const VISIBLE_LABELS = 6;
 
+/* Jarak antarkartu di dalam kolom (gap-2). Lubang tempat jatuh membuka ruang
+   sebesar kartunya ditambah jarak ini — kalau tidak, kartu di sekitarnya masih
+   harus bergeser sedikit lagi saat kartunya benar-benar mendarat, dan yang
+   terlihat bukan kartu yang turun ke tempatnya melainkan papan yang berkedut. */
+const CARD_GAP = 8;
+
+/* Tinggi lubang kalau yang diseret entah kenapa tidak membawa ukurannya —
+   kira-kira setinggi kartu berjudul satu baris tanpa apa-apa lagi. */
+export const GHOST_FALLBACK = 72;
+
 interface Props {
   card: CardSummary;
   /** Milik papan, bukan kartu ini — lihat catatan di BoardView. */
@@ -33,8 +43,13 @@ interface Props {
 
 export function CardItem({ card, labelsOpen, onToggleLabels, onOpen, onDelete }: Props) {
   const ref = useRef<HTMLLIElement>(null);
+  const plateRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
-  const [edge, setEdge] = useState<Edge | null>(null);
+
+  /* Lubang tempat kartu yang sedang melayang akan mendarat: di sisi mana kartu
+     ini, dan setinggi apa. Tingginya datang dari kartu yang diseret, bukan dari
+     kartu ini — yang dibuka adalah ruang untuk tamunya. */
+  const [slot, setSlot] = useState<{ edge: Edge; height: number } | null>(null);
 
   // Kartu dibuka dengan klik, dan kartu yang sama juga diseret. Penanda ini
   // menelan klik yang menyusul sebuah drag, supaya menjatuhkan kartu di kolom
@@ -43,14 +58,21 @@ export function CardItem({ card, labelsOpen, onToggleLabels, onOpen, onDelete }:
 
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    const plate = plateRef.current;
+    if (!el || !plate) return;
 
     const data = { type: "card", cardId: card.id, columnId: card.columnId };
 
     return combine(
       draggable({
-        element: el,
-        getInitialData: () => data,
+        /* Pelatnya, bukan slot yang membungkusnya: yang terangkat sebagai
+           pratinjau seret harus kartunya saja, bukan kartu beserta lubang yang
+           mungkin sedang terbuka di sebelahnya. Tingginya dititipkan sekalian
+           — kolom mana pun yang disinggahi perlu tahu seberapa besar ruang yang
+           harus dibuka, dan setelah seretnya dimulai tidak ada lagi kesempatan
+           mengukur kartu yang sudah terangkat. */
+        element: plate,
+        getInitialData: () => ({ ...data, height: plate.getBoundingClientRect().height }),
         onDragStart: () => {
           dragged.current = true;
           setDragging(true);
@@ -62,10 +84,27 @@ export function CardItem({ card, labelsOpen, onToggleLabels, onOpen, onDelete }:
         canDrop: ({ source }) => source.data.type === "card",
         getData: ({ input }) =>
           attachClosestEdge(data, { element: el, input, allowedEdges: ["top", "bottom"] }),
-        onDrag: ({ self, source }) =>
-          setEdge(source.data.cardId === card.id ? null : extractClosestEdge(self)),
-        onDragLeave: () => setEdge(null),
-        onDrop: () => setEdge(null),
+        onDrag: ({ self, source }) => {
+          /* `self.data`, bukan `self`: yang menyimpan sisi terdekat adalah
+             muatan yang dikembalikan getData, sementara `self` cuma rekaman
+             sasarannya. Keduanya lolos pemeriksaan tipe — tanda simbolnya
+             dicari di objek apa pun — dan yang salah diam-diam mengembalikan
+             null selamanya. */
+          const next = source.data.cardId === card.id ? null : extractClosestEdge(self.data);
+          const height =
+            typeof source.data.height === "number" ? source.data.height : GHOST_FALLBACK;
+
+          /* Peristiwa ini datang di tiap gerakan kursor. Nilai yang tidak
+             berubah dikembalikan apa adanya supaya React berhenti di situ,
+             bukan merender ulang kartunya enam puluh kali sedetik. */
+          setSlot((prev) => {
+            if (!next) return null;
+            if (prev && prev.edge === next && prev.height === height) return prev;
+            return { edge: next, height };
+          });
+        },
+        onDragLeave: () => setSlot(null),
+        onDrop: () => setSlot(null),
       }),
     );
   }, [card.id, card.columnId]);
@@ -98,176 +137,181 @@ export function CardItem({ card, labelsOpen, onToggleLabels, onOpen, onDelete }:
   const hiddenLabels = labels.length - shownLabels.length;
 
   return (
+    /* Slot: kotak bening yang menampung kartunya sekaligus lubang tempat jatuh
+       yang sewaktu-waktu terbuka di atas atau di bawahnya. Ia — bukan pelat di
+       dalamnya — yang menjadi sasaran drop, supaya kursor yang melayang di atas
+       lubang masih terhitung melayang di atas kartu ini; alasan lengkapnya ada
+       di catatan .drop-ghost. */
     <li
       ref={ref}
-      /* Kartu adalah benda DI DALAM gelas, bukan jendela: pelat translusen
-         dengan cincin cahayanya sendiri, tanpa backdrop-filter. Kaca di dalam
-         kaca tidak akan menghasilkan apa-apa — lihat catatan .glass-frost. */
-      className={cn(
-        "glass board-card board-card-hover group rounded-xl p-3 transition-[background-color,transform]",
-        "cursor-grab text-left active:cursor-grabbing",
-        "has-[.stretch:focus-visible]:outline-2 has-[.stretch:focus-visible]:outline-offset-2 has-[.stretch:focus-visible]:outline-accent",
-        dragging && "opacity-40",
-      )}
+      className="relative"
+      style={
+        slot
+          ? slot.edge === "top"
+            ? { paddingTop: slot.height + CARD_GAP }
+            : { paddingBottom: slot.height + CARD_GAP }
+          : undefined
+      }
     >
-      {edge === "top" && <span aria-hidden className="drop-edge drop-edge-x -top-1.5" />}
-      {edge === "bottom" && <span aria-hidden className="drop-edge drop-edge-x -bottom-1.5" />}
-
-      {labels.length > 0 && (
-        <div className="label-row mb-2 flex flex-wrap items-center gap-1 pr-5" data-open={labelsOpen}>
-          {shownLabels.map((label) => (
-            /* Tiap chip adalah tombolnya sendiri, dan semuanya membuka
-               seluruh papan — sasaran klik jadi selebar setiap deretan warna
-               di layar, bukan satu tombol tambahan yang harus dicari dulu.
-
-               `relative z-10` menaikkannya di atas ::after milik .stretch,
-               kalau tidak klik ini mendarat di sasaran judul dan yang terbuka
-               justru kartunya. `title` menutup sisanya: nama label tetap
-               terbaca saat melayang, tanpa perlu dibuka. */
-            <button
-              key={label.id}
-              type="button"
-              onClick={toggleLabels}
-              aria-expanded={labelsOpen}
-              aria-label={`Label ${label.name}`}
-              title={label.name}
-              className={cn(
-                "label-chip relative z-10 cursor-[inherit]",
-                "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-              )}
-              style={labelTint(label.color)}
-            >
-              <span className="label-text truncate">{label.name}</span>
-            </button>
-          ))}
-          {hiddenLabels > 0 && (
-            <span
-              className="text-[0.6875rem] font-semibold text-faint"
-              title={labels
-                .slice(shownLabels.length)
-                .map((l) => l.name)
-                .join(", ")}
-            >
-              +{hiddenLabels}
-            </span>
-          )}
-        </div>
+      {slot && (
+        <span
+          aria-hidden
+          className="drop-ghost drop-ghost-card"
+          style={{
+            height: slot.height,
+            ...(slot.edge === "top" ? { top: 0 } : { bottom: 0 }),
+          }}
+        />
       )}
 
-      {/* Judul adalah tombolnya, tapi sasaran kliknya direntangkan ke seluruh
-          pelat lewat .stretch — jadi kartu bisa diklik di mana saja tanpa
-          menyarangkan tombol hapus di dalam elemen yang juga sebuah tombol. */}
-      <button
-        type="button"
-        onClick={open}
-        aria-label={`Buka kartu ${card.title}`}
-        className="stretch block w-full cursor-[inherit] pr-5 text-left text-sm leading-snug wrap-break-word whitespace-pre-wrap text-ink-soft outline-none"
+      {/* Kartu adalah benda DI DALAM gelas, bukan jendela: pelat translusen
+          dengan cincin cahayanya sendiri, tanpa backdrop-filter. Kaca di dalam
+          kaca tidak akan menghasilkan apa-apa — lihat catatan .glass-frost. */}
+      <div
+        ref={plateRef}
+        className={cn(
+          "glass board-card board-card-hover group rounded-xl p-3 transition-[background-color,transform]",
+          "cursor-grab text-left active:cursor-grabbing",
+          "has-[.stretch:focus-visible]:outline-2 has-[.stretch:focus-visible]:outline-offset-2 has-[.stretch:focus-visible]:outline-accent",
+          dragging && "opacity-40",
+        )}
       >
-        {card.title}
-      </button>
+        {labels.length > 0 && (
+          <div className="label-row mb-2 flex flex-wrap items-center gap-1 pr-5" data-open={labelsOpen}>
+            {shownLabels.map((label) => (
+              /* Tiap chip adalah tombolnya sendiri, dan semuanya membuka
+                 seluruh papan — sasaran klik jadi selebar setiap deretan warna
+                 di layar, bukan satu tombol tambahan yang harus dicari dulu.
 
-      {/* Baris kaki: siapa yang terlibat di kiri, dan di kanan semua yang
-          bisa dihitung tentang kartu ini — checklist, deskripsi, followup.
-          Progress checklist dulu berdiri sendiri selebar kartu; dipindah ke
-          sini ia berhenti bersaing dengan judul dan bergabung dengan angka
-          lain yang sejenis. Urutannya dari yang paling banyak berubah:
-          checklist bergerak tiap centang, followup hanya saat ada yang
-          menulis. */}
-      {(faces.length > 0 ||
-        commentCount > 0 ||
-        card.description ||
-        checklist.total > 0 ||
-        card.dueAt ||
-        watching) && (
-        <div className="mt-2.5 flex items-center gap-2">
-          {/* Avatar di sudut kiri bawah: siapa yang diundang ke kartu ini, dan
-              siapa yang menyentuhnya. */}
-          <AvatarStack people={faces} />
-
-          <span className="ml-auto flex items-center gap-2 text-faint">
-            {/* Tenggat berdiri paling depan di antara angka-angka ini: ia
-                satu-satunya yang berubah arti tanpa ada yang menyentuh
-                kartunya. Ronanya hanya muncul saat waktunya menuntut sesuatu —
-                kalau setiap tanggal berwarna, yang lewat tenggat berhenti
-                menonjol. */}
-            {card.dueAt && (
-              <span
+                 `relative z-10` menaikkannya di atas ::after milik .stretch,
+                 kalau tidak klik ini mendarat di sasaran judul dan yang terbuka
+                 justru kartunya. `title` menutup sisanya: nama label tetap
+                 terbaca saat melayang, tanpa perlu dibuka. */
+              <button
+                key={label.id}
+                type="button"
+                onClick={toggleLabels}
+                aria-expanded={labelsOpen}
+                aria-label={`Label ${label.name}`}
+                title={label.name}
                 className={cn(
-                  "flex items-center gap-1 text-[0.6875rem] font-semibold tabular-nums",
-                  due === "overdue" && "text-danger",
-                  due === "soon" && "text-warn",
+                  "label-chip relative z-10 cursor-[inherit]",
+                  "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
                 )}
-                title={`Tenggat ${formatDateTime(card.dueAt)}`}
+                style={labelTint(label.color)}
               >
-                <svg
-                  viewBox="0 0 24 24"
-                  className="size-3.5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden
-                >
-                  <path d="M8 3v3M16 3v3M4 9h16" />
-                  <rect x="4" y="5" width="16" height="16" rx="2.5" />
-                </svg>
-                {formatDueShort(card.dueAt)}
+                <span className="label-text truncate">{label.name}</span>
+              </button>
+            ))}
+            {hiddenLabels > 0 && (
+              <span
+                className="text-[0.6875rem] font-semibold text-faint"
+                title={labels
+                  .slice(shownLabels.length)
+                  .map((l) => l.name)
+                  .join(", ")}
+              >
+                +{hiddenLabels}
               </span>
             )}
+          </div>
+        )}
 
-            {/* Progress checklist terbaca tanpa membuka kartu — itu
-                satu-satunya alasan angkanya ikut diangkut di payload board. */}
-            {checklist.total > 0 && (
-              <span
-                className="flex items-center gap-1.5"
-                title={`Checklist ${checklist.done} dari ${checklist.total}`}
-              >
-                <span
-                  className="progress card-progress"
-                  role="progressbar"
-                  aria-valuenow={percent}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-label={`Checklist ${checklist.done} dari ${checklist.total}`}
-                >
-                  <span
-                    className="progress-bar"
-                    data-complete={complete}
-                    style={{ width: `${percent}%` }}
-                  />
-                </span>
+        {/* Judul adalah tombolnya, tapi sasaran kliknya direntangkan ke seluruh
+            pelat lewat .stretch — jadi kartu bisa diklik di mana saja tanpa
+            menyarangkan tombol hapus di dalam elemen yang juga sebuah tombol. */}
+        <button
+          type="button"
+          onClick={open}
+          aria-label={`Buka kartu ${card.title}`}
+          className="stretch block w-full cursor-[inherit] pr-5 text-left text-sm leading-snug wrap-break-word whitespace-pre-wrap text-ink-soft outline-none"
+        >
+          {card.title}
+        </button>
+
+        {/* Baris kaki: siapa yang terlibat di kiri, dan di kanan semua yang
+            bisa dihitung tentang kartu ini — checklist, deskripsi, followup.
+            Progress checklist dulu berdiri sendiri selebar kartu; dipindah ke
+            sini ia berhenti bersaing dengan judul dan bergabung dengan angka
+            lain yang sejenis. Urutannya dari yang paling banyak berubah:
+            checklist bergerak tiap centang, followup hanya saat ada yang
+            menulis. */}
+        {(faces.length > 0 ||
+          commentCount > 0 ||
+          card.description ||
+          checklist.total > 0 ||
+          card.dueAt ||
+          watching) && (
+          <div className="mt-2.5 flex items-center gap-2">
+            {/* Avatar di sudut kiri bawah: siapa yang diundang ke kartu ini, dan
+                siapa yang menyentuhnya. */}
+            <AvatarStack people={faces} />
+
+            <span className="ml-auto flex items-center gap-2 text-faint">
+              {/* Tenggat berdiri paling depan di antara angka-angka ini: ia
+                  satu-satunya yang berubah arti tanpa ada yang menyentuh
+                  kartunya. Ronanya hanya muncul saat waktunya menuntut sesuatu —
+                  kalau setiap tanggal berwarna, yang lewat tenggat berhenti
+                  menonjol. */}
+              {card.dueAt && (
                 <span
                   className={cn(
-                    "shrink-0 text-[0.6875rem] font-semibold tabular-nums",
-                    complete ? "text-ok" : "text-faint",
+                    "flex items-center gap-1 text-[0.6875rem] font-semibold tabular-nums",
+                    due === "overdue" && "text-danger",
+                    due === "soon" && "text-warn",
                   )}
+                  title={`Tenggat ${formatDateTime(card.dueAt)}`}
                 >
-                  {checklist.done}/{checklist.total}
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="size-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                  >
+                    <path d="M8 3v3M16 3v3M4 9h16" />
+                    <rect x="4" y="5" width="16" height="16" rx="2.5" />
+                  </svg>
+                  {formatDueShort(card.dueAt)}
                 </span>
-              </span>
-            )}
+              )}
 
-            {card.description && (
-              <svg
-                viewBox="0 0 24 24"
-                className="size-3.5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                aria-label="Punya deskripsi"
-                role="img"
-              >
-                <path d="M4 6h16M4 12h16M4 18h10" />
-              </svg>
-            )}
+              {/* Progress checklist terbaca tanpa membuka kartu — itu
+                  satu-satunya alasan angkanya ikut diangkut di payload board. */}
+              {checklist.total > 0 && (
+                <span
+                  className="flex items-center gap-1.5"
+                  title={`Checklist ${checklist.done} dari ${checklist.total}`}
+                >
+                  <span
+                    className="progress card-progress"
+                    role="progressbar"
+                    aria-valuenow={percent}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`Checklist ${checklist.done} dari ${checklist.total}`}
+                  >
+                    <span
+                      className="progress-bar"
+                      data-complete={complete}
+                      style={{ width: `${percent}%` }}
+                    />
+                  </span>
+                  <span
+                    className={cn(
+                      "shrink-0 text-[0.6875rem] font-semibold tabular-nums",
+                      complete ? "text-ok" : "text-faint",
+                    )}
+                  >
+                    {checklist.done}/{checklist.total}
+                  </span>
+                </span>
+              )}
 
-            {commentCount > 0 && (
-              <span
-                className="flex items-center gap-1 text-[0.6875rem] font-semibold tabular-nums"
-                title={`${commentCount} followup`}
-              >
+              {card.description && (
                 <svg
                   viewBox="0 0 24 24"
                   className="size-3.5"
@@ -275,43 +319,63 @@ export function CardItem({ card, labelsOpen, onToggleLabels, onOpen, onDelete }:
                   stroke="currentColor"
                   strokeWidth="2"
                   strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden
+                  aria-label="Punya deskripsi"
+                  role="img"
                 >
-                  <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z" />
+                  <path d="M4 6h16M4 12h16M4 18h10" />
                 </svg>
-                {commentCount}
-              </span>
-            )}
+              )}
 
-            {/* Di muka kartu mata cuma sebuah keterangan, bukan tombol —
-                menyalakan dan mematikannya ada di dalam dialog kartu. Ia ikut
-                berat yang sama dengan angka checklist dan followup di
-                sebelahnya, karena bagi orang yang menggarap papannya sendiri
-                mata ini akan tampak di hampir setiap kartu; sebagai penanda
-                mencolok ia akan berhenti berarti apa-apa. */}
-            {watching && (
-              <span title="Kartu ini Anda awasi" className="flex">
-                <EyeIcon watching className="size-3.5" label="Kartu ini Anda awasi" />
-              </span>
-            )}
-          </span>
-        </div>
-      )}
+              {commentCount > 0 && (
+                <span
+                  className="flex items-center gap-1 text-[0.6875rem] font-semibold tabular-nums"
+                  title={`${commentCount} followup`}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="size-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                  >
+                    <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z" />
+                  </svg>
+                  {commentCount}
+                </span>
+              )}
 
-      <button
-        type="button"
-        aria-label={`Hapus kartu ${card.title}`}
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete();
-        }}
-        className="absolute top-2 right-2 z-10 hidden size-5 place-items-center rounded-full text-faint transition-colors group-hover:grid hover:bg-danger/10 hover:text-danger"
-      >
-        <svg viewBox="0 0 24 24" className="size-3" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
-          <path d="M6 6 18 18M18 6 6 18" />
-        </svg>
-      </button>
+              {/* Di muka kartu mata cuma sebuah keterangan, bukan tombol —
+                  menyalakan dan mematikannya ada di dalam dialog kartu. Ia ikut
+                  berat yang sama dengan angka checklist dan followup di
+                  sebelahnya, karena bagi orang yang menggarap papannya sendiri
+                  mata ini akan tampak di hampir setiap kartu; sebagai penanda
+                  mencolok ia akan berhenti berarti apa-apa. */}
+              {watching && (
+                <span title="Kartu ini Anda awasi" className="flex">
+                  <EyeIcon watching className="size-3.5" label="Kartu ini Anda awasi" />
+                </span>
+              )}
+            </span>
+          </div>
+        )}
+
+        <button
+          type="button"
+          aria-label={`Hapus kartu ${card.title}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          className="absolute top-2 right-2 z-10 hidden size-5 place-items-center rounded-full text-faint transition-colors group-hover:grid hover:bg-danger/10 hover:text-danger"
+        >
+          <svg viewBox="0 0 24 24" className="size-3" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
+            <path d="M6 6 18 18M18 6 6 18" />
+          </svg>
+        </button>
+      </div>
     </li>
   );
 }

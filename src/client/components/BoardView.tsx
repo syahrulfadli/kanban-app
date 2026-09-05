@@ -8,6 +8,7 @@ import { ColumnView } from "./ColumnView";
 import { AddItemForm } from "./AddItemForm";
 import { useBoard } from "../hooks/useBoard";
 import { useCollapsedColumns } from "../hooks/useCollapsedColumns";
+import { playDropSound } from "../hooks/useSound";
 import { useSession } from "../lib/auth-client";
 import { navigate, paths } from "../lib/route";
 import { cn } from "../lib/cn";
@@ -268,6 +269,15 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
         const { board, actions } = latest.current;
         const target = location.current.dropTargets[0];
         if (!board || !target) return;
+
+        /* Klik pendek begitu benda yang digenggam mendarat — jawaban atas
+           gerakan tangan, bukan atas apa yang berubah di papan. Karena itu ia
+           berbunyi juga saat kartunya dikembalikan ke tempatnya semula, dan
+           tidak berbunyi sama sekali saat seretnya dibatalkan di luar papan:
+           yang dijawab pertanyaan "sudah lepas?", bukan "jadi pindah?" —
+           dan diam setelah melepas kartu terbaca sebagai aplikasi yang tidak
+           menangkap gerakannya. */
+        playDropSound();
 
         if (source.data.type === "card") {
           const cardId = source.data.cardId as string;

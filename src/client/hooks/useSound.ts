@@ -1,26 +1,15 @@
 import { useSyncExternalStore } from "react";
 
 /**
- * Nada pendek saat kabar baru masuk selagi aplikasinya terbuka.
+ * Bunyi-bunyi pendek di dalam aplikasi: kabar baru yang masuk, dan kartu atau
+ * kolom yang mendarat setelah diseret.
  *
  * Pilihannya milik perangkat, bukan akun — orang yang sama bisa ingin bunyi di
  * laptopnya dan diam di ponsel yang ada di meja rapat. Karena itu ia tinggal di
- * localStorage, sejalan dengan pilihan tema.
+ * localStorage, sejalan dengan pilihan tema. Satu sakelar untuk semuanya:
+ * yang dimatikan orang adalah "aplikasi ini bersuara", bukan salah satu nada.
  */
 const STORAGE_KEY = "kanban:sound";
-
-const SRC = "/sounds/notification.mp3";
-
-/** Nadanya sudah cukup menonjol di 320 kbps; separuh volume sudah terdengar. */
-const VOLUME = 0.5;
-
-/**
- * Jarak minimal antarbunyi. Beberapa kabar bisa mendarat sekaligus — satu
- * tarikan berkala yang menemukan tiga kabar baru, atau papan yang sedang ramai
- * — dan tiga lonceng yang saling tumpang tindih terdengar seperti kerusakan,
- * bukan seperti pemberitahuan.
- */
-const THROTTLE_MS = 3_000;
 
 function readPref(): boolean {
   try {
@@ -35,40 +24,67 @@ function readPref(): boolean {
 let enabled = readPref();
 const listeners = new Set<() => void>();
 
-/* Satu elemen dipakai berulang: membuat Audio baru tiap kabar berarti
-   mengunduh berkasnya lagi di browser yang tidak menyimpannya di cache. */
-let audio: HTMLAudioElement | null = null;
-let lastPlayedAt = 0;
+/**
+ * Satu nada, siap dibunyikan dari mana pun.
+ *
+ * Elemennya dipakai berulang: membuat Audio baru tiap bunyi berarti mengunduh
+ * berkasnya lagi di browser yang tidak menyimpannya di cache — dan nada drop
+ * bisa diminta berkali-kali dalam satu menit.
+ *
+ * `throttleMs` adalah jarak minimal antarbunyi, dan angkanya berbeda jauh
+ * antarnada: lihat masing-masing pemanggilan di bawah.
+ */
+function tone(src: string, volume: number, throttleMs: number) {
+  let audio: HTMLAudioElement | null = null;
+  let lastPlayedAt = 0;
 
-function element() {
-  if (!audio) {
-    audio = new Audio(SRC);
-    audio.volume = VOLUME;
-    audio.preload = "auto";
-  }
-  return audio;
+  /* Aman dipanggil dari mana pun: kalau pilihannya mati, bunyinya baru saja
+     terdengar, atau browser menolak memutar, panggilan ini tidak melakukan
+     apa-apa dan tidak melempar. */
+  return () => {
+    if (!enabled) return;
+
+    const now = Date.now();
+    if (now - lastPlayedAt < throttleMs) return;
+    lastPlayedAt = now;
+
+    if (!audio) {
+      audio = new Audio(src);
+      audio.volume = volume;
+      audio.preload = "auto";
+    }
+
+    // Nada yang belum selesai diulang dari awal, bukan ditumpuk.
+    audio.currentTime = 0;
+    /* Browser melarang memutar suara sebelum halamannya pernah disentuh, dan
+       penolakan itu wajar terjadi pada kabar pertama di tab yang baru dibuka —
+       bukan sesuatu yang perlu diadukan ke siapa pun. */
+    void audio.play().catch(() => {});
+  };
 }
 
 /**
- * Bunyikan nadanya sekali. Aman dipanggil dari mana pun: kalau pilihannya mati,
- * bunyinya baru saja terdengar, atau browser menolak memutar, panggilan ini
- * tidak melakukan apa-apa dan tidak melempar.
+ * Kabar baru masuk.
+ *
+ * Nadanya sudah cukup menonjol di 320 kbps; separuh volume sudah terdengar.
+ *
+ * Jeda tiga detik karena beberapa kabar bisa mendarat sekaligus — satu tarikan
+ * berkala yang menemukan tiga kabar baru, atau papan yang sedang ramai — dan
+ * tiga lonceng yang saling tumpang tindih terdengar seperti kerusakan, bukan
+ * seperti pemberitahuan.
  */
-export function playNotificationSound() {
-  if (!enabled) return;
+export const playNotificationSound = tone("/sounds/notification.mp3", 0.5, 3_000);
 
-  const now = Date.now();
-  if (now - lastPlayedAt < THROTTLE_MS) return;
-  lastPlayedAt = now;
-
-  const player = element();
-  // Nada yang belum selesai diulang dari awal, bukan ditumpuk.
-  player.currentTime = 0;
-  /* Browser melarang memutar suara sebelum halamannya pernah disentuh, dan
-     penolakan itu wajar terjadi pada kabar pertama di tab yang baru dibuka —
-     bukan sesuatu yang perlu diadukan ke siapa pun. */
-  void player.play().catch(() => {});
-}
+/**
+ * Kartu atau kolom mendarat di tempatnya.
+ *
+ * Ini bunyi jawaban atas satu gerakan tangan, bukan kabar: ia harus terdengar
+ * tiap kali sesuatu dilepaskan, jadi jeda antarbunyinya cuma sepanjang yang
+ * dibutuhkan untuk menangkis lepasan ganda dari satu ketukan. Volumenya di
+ * bawah nada kabar — orang bisa memindahkan dua puluh kartu berturut-turut,
+ * dan bunyi yang menonjol akan berubah jadi gangguan pada kartu kelima.
+ */
+export const playDropSound = tone("/sounds/drop.mp3", 0.35, 80);
 
 /**
  * Pilihan bunyi di luar React — untuk yang perlu menanyakannya di dalam timer

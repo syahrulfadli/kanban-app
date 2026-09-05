@@ -102,6 +102,10 @@ const PREFS: { key: keyof Prefs; title: string; hint: string }[] = [
  * Nada di dalam aplikasi. Berdiri sendiri dari push: ia berbunyi selagi
  * aplikasinya terbuka, tanpa izin apa pun dari browser, jadi ia tetap
  * ditawarkan di perangkat yang tidak bisa atau tidak mau menerima push.
+ *
+ * Satu sakelar untuk semua bunyi aplikasi, termasuk klik saat kartu dijatuhkan
+ * — memisahkannya jadi dua baris berarti menawarkan pilihan yang tidak pernah
+ * ditanyakan siapa pun, di halaman yang sudah panjang.
  */
 function SoundRow() {
   const sound = useSound();
@@ -109,7 +113,7 @@ function SoundRow() {
   return (
     <Row
       title="Bunyi"
-      hint="Nada pendek saat kabar baru masuk selagi aplikasi ini terbuka. Berlaku di perangkat ini saja."
+      hint="Nada pendek saat kabar baru masuk, dan saat kartu atau kolom mendarat setelah diseret. Berlaku di perangkat ini saja."
       checked={sound.enabled}
       onChange={(next) => {
         sound.setEnabled(next);

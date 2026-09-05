@@ -1260,29 +1260,58 @@ body {
   .credit:hover .credit-mark { animation: none; }
   .progress-bar { transition: none; }
   .label-row .label-chip, .label-row .label-text { transition: none; }
+  /* Lubangnya tetap muncul — ia keterangan, bukan hiasan; yang dilepas cuma
+     cara munculnya. */
+  .drop-ghost { animation: none; }
 }
 
-/* Penanda sisi drop. Bukan garis rata: menyala di tengah lalu memudar ke
-   ujung, supaya terbaca sebagai berkas cahaya di antara dua pane kaca. */
+/* Bayangan tempat jatuh.
+
+   Bukan garis setipis rambut di antara dua kartu, melainkan lubang seukuran
+   benda yang sedang digenggam: papannya membuka ruang selagi kartunya masih di
+   udara, jadi yang terbaca bukan "di sini batasnya" melainkan "sebesar ini,
+   di sini" — dan pertanyaan muat atau tidak muat sudah terjawab sebelum
+   jarinya dilepas.
+
+   Ruangnya dibuka oleh padding pada sasaran drop-nya sendiri, bukan oleh
+   elemen baru yang disisipkan di antara kartu. Ini bukan soal selera: elemen
+   yang disisipkan akan mendorong kartu yang disinggahi menjauh dari kursor,
+   kursornya lalu keluar dari sasaran yang tadi membuka ruang itu, ruangnya
+   tertutup, kartunya kembali ke bawah kursor — dan bayangannya berkedip-kedip
+   puluhan kali sedetik. Dengan padding, lubangnya ada DI DALAM sasarannya:
+   kursor yang melayang di atas lubang masih melayang di atas kartu yang
+   membukanya, dan tepi terdekatnya pun tidak berubah karena kotaknya tidak
+   pernah bergeser maupun berganti ukuran saat bayangannya pindah sisi.
+
+   Rupanya sengaja cuma garis putus dan setipis-tipis rona: ia sebuah lubang,
+   dan lubang tidak boleh lebih menonjol daripada kartu yang sedang diseret
+   di atasnya. */
 @layer components {
-  .drop-edge {
-    position: absolute;
-    border-radius: 9999px;
-    box-shadow: 0 0 8px 1px color-mix(in oklab, var(--color-accent) 55%, transparent);
+  .drop-ghost {
+    border-radius: 0.75rem;
+    border: 1.5px dashed color-mix(in oklab, var(--color-accent) 42%, transparent);
+    background-color: color-mix(in oklab, var(--color-accent) 7%, transparent);
     pointer-events: none;
+    animation: drop-ghost-in 120ms ease-out;
   }
-  .drop-edge-x {
+
+  /* Di tepi atas atau bawah kartu yang disinggahi, selebar kolomnya. */
+  .drop-ghost-card {
+    position: absolute;
     inset-inline: 0;
-    height: 2px;
-    background: linear-gradient(to right, transparent, var(--color-accent) 18%,
-                                var(--color-accent) 82%, transparent);
   }
-  .drop-edge-y {
+
+  /* Di sisi kiri atau kanan kolom yang disinggahi, setinggi kolomnya. */
+  .drop-ghost-column {
+    position: absolute;
     inset-block: 0;
-    width: 2px;
-    background: linear-gradient(to bottom, transparent, var(--color-accent) 18%,
-                                var(--color-accent) 82%, transparent);
+    border-radius: 1rem;
   }
+}
+
+@keyframes drop-ghost-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
