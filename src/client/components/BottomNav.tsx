@@ -22,9 +22,9 @@ export function BottomNav({ locked = false }: { locked?: boolean }) {
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex flex-col items-center px-4 pb-5">
       <nav className="glass glass-frost pointer-events-auto flex items-center gap-2 rounded-full p-1.5">
+        <ProfileMenu />
         <CardSearch />
         <NotificationBell />
-        <ProfileMenu />
         <ThemeSwitch />
       </nav>
 
