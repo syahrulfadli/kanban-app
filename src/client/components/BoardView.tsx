@@ -103,7 +103,13 @@ function LiveIndicator({
   }
 
   return (
-    <div ref={ref} className="relative shrink-0">
+  /* `flex`, bukan blok biasa: .chip itu inline-flex, dan sebuah tombol inline
+     di dalam div blok ikut membentuk baris teks — tingginya jadi tinggi tombol
+     ditambah sisa leading, dan sisa itu berubah mengikuti isi tombolnya. Yang
+     disejajarkan `items-center` di kepala papan adalah pembungkus ini, jadi
+     sisa yang berbeda-beda itu menggeser tombolnya sendiri. Dengan `flex`,
+     pembungkusnya setinggi tombolnya persis. */
+    <div ref={ref} className="relative flex shrink-0">
       {/* Di layar sempit kalimatnya tidak muat, dan sebuah titik sendirian
           tidak terbaca sebagai sesuatu yang bisa diketuk — jadi yang tersisa
           di sana angkanya, bukan tidak ada apa-apa. */}

@@ -155,7 +155,13 @@ export function BoardBackgroundPicker({ boardId, background, onChanged }: Props)
   const selectedImage = background.kind === "image" ? background.image.id : null;
 
   return (
-    <div ref={ref} className="relative shrink-0">
+  /* `flex`, bukan blok biasa: .chip itu inline-flex, dan sebuah tombol inline
+     di dalam div blok ikut membentuk baris teks — tingginya jadi tinggi tombol
+     ditambah sisa leading, dan sisa itu berubah mengikuti isi tombolnya. Yang
+     disejajarkan `items-center` di kepala papan adalah pembungkus ini, jadi
+     sisa yang berbeda-beda itu menggeser tombolnya sendiri. Dengan `flex`,
+     pembungkusnya setinggi tombolnya persis. */
+    <div ref={ref} className="relative flex shrink-0">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
