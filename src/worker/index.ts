@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { createDb } from "../db";
 import { createAuth, requireAuth, type AppEnv } from "./auth";
+import admin, { adminAccess } from "./routes/admin";
 import boards from "./routes/boards";
 import columns from "./routes/columns";
 import cards from "./routes/cards";
@@ -43,6 +44,11 @@ app.route("/api/invitations", invitePreview);
 const api = new Hono<AppEnv>()
   .use("*", requireAuth)
   .route("/workspaces", workspaces)
+  /* Panel admin. `admin-access` berdiri terpisah karena ia justru yang
+     menjawab "boleh saya membuka panelnya" — di dalam /admin, jawabannya
+     selalu 404 bagi yang bertanya karena tidak tahu. */
+  .route("/admin-access", adminAccess)
+  .route("/admin", admin)
   .route("/invitations", invitations)
   .route("/boards", boards)
   .route("/columns", columns)

@@ -1407,3 +1407,234 @@ body {
      mengganggu di sini. */
   .skeleton::after { display: none; }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   Latar papan
+
+   Sebuah papan boleh berlatar sendiri: gradiasi bawaan, atau gambar
+   Unsplash yang dikurasi lewat panel admin. Latarnya digambar sebagai
+   lembar `fixed` di belakang isi halaman, bukan dengan menimpa latar
+   <body>: papan yang digeser mendatar tidak boleh menyeret latarnya, dan
+   halaman lain di aplikasi ini tetap memakai ladang cahaya yang sama.
+
+   Bentuk setiap gradiasi tinggal di sini, bukan di JavaScript. Yang
+   dikirim React cuma namanya (data-gradient), dan itu yang membuat satu
+   gradiasi bisa punya wujud terang dan wujud gelap tanpa ada yang perlu
+   menghitung warna saat runtime. Resepnya sengaja sama dengan latar
+   <body>: satu warna dasar dan beberapa noda radial yang tipis — di tema
+   gelap jauh lebih tipis lagi, karena kaca di atasnya sudah gelap.
+   ══════════════════════════════════════════════════════════════════ */
+@layer components {
+  .board-bg {
+    position: fixed;
+    inset: 0;
+    z-index: -10;
+    background-color: var(--field-base);
+    background-image: var(--field-image);
+    background-position: center;
+    background-size: cover;
+    pointer-events: none;
+  }
+
+  /* Latar bawaan tidak menggambar apa pun: yang terlihat justru <body> di
+     bawahnya, dan lembar kosong ini yang menjaga papan berlatar dan papan
+     bawaan punya susunan elemen yang sama. */
+  .board-bg[data-kind="default"] {
+    background-color: transparent;
+    background-image: none;
+  }
+
+  /* Gambar. Kabut tipis di atasnya — bukan demi rasa, melainkan supaya
+     tinta kartu tetap terbaca di atas foto yang kebetulan terang atau
+     ramai. Cukup untuk membaca, tidak sampai menghapus fotonya.
+
+     Warna dasarnya sengaja warna dasar aplikasi, bukan tinta: ia yang
+     terlihat selama foto belum mendarat — dan foto Unsplash ditarik dari
+     jaringan orang lain, jadi "belum mendarat" bukan keadaan langka. Dengan
+     ini papan yang menunggu tampak seperti papan berlatar bawaan, bukan
+     seperti pelat abu yang rusak. */
+  .board-bg[data-kind="image"] {
+    background-color: #E6ECF5;
+    background-image: var(--board-image);
+  }
+
+  [data-theme="dark"] .board-bg[data-kind="image"] {
+    background-color: #08090C;
+  }
+
+  .board-bg[data-kind="image"]::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    /* Tebalnya ditentukan foto yang paling sulit, bukan yang paling ramah:
+       hutan siang hari punya belang terang-gelap di seluruh bidangnya, dan
+       breadcrumb di kepala papan duduk langsung di atasnya tanpa pelat kaca
+       apa pun. Di tema terang kabutnya karena itu lebih tebal daripada yang
+       terasa cukup saat melihat foto yang tenang. */
+    background-color: rgb(238 242 248 / 0.66);
+  }
+
+  [data-theme="dark"] .board-bg[data-kind="image"]::after {
+    background-color: rgb(6 7 10 / 0.68);
+  }
+
+  /* Keping gradiasi di pemilih latar dan di panel admin. Membaca custom
+     property yang sama dengan lembar besarnya, jadi yang terlihat di
+     keping memang yang akan terpasang di papan. */
+  .bg-swatch {
+    background-color: var(--field-base);
+    background-image: var(--field-image);
+    background-position: center;
+    background-size: cover;
+  }
+
+  /* ── Delapan gradiasi ──────────────────────────────────────────── */
+
+  [data-gradient="fajar"] {
+    --field-base: #F7EDE6;
+    --field-image:
+      radial-gradient(60% 46% at 16% 10%, rgb(254 205 170 / 0.55), transparent 70%),
+      radial-gradient(54% 40% at 84% 24%, rgb(253 186 186 / 0.42), transparent 70%),
+      radial-gradient(62% 46% at 46% 90%, rgb(254 231 189 / 0.45), transparent 72%);
+  }
+  [data-theme="dark"] [data-gradient="fajar"] {
+    --field-base: #0D0A09;
+    --field-image:
+      radial-gradient(60% 46% at 16% 10%, rgb(255 168 108 / 0.11), transparent 70%),
+      radial-gradient(54% 40% at 84% 24%, rgb(255 130 130 / 0.08), transparent 70%),
+      radial-gradient(62% 46% at 46% 90%, rgb(255 205 130 / 0.07), transparent 72%);
+  }
+
+  [data-gradient="laut"] {
+    --field-base: #E2EDF3;
+    --field-image:
+      radial-gradient(58% 44% at 12% 12%, rgb(125 211 252 / 0.50), transparent 70%),
+      radial-gradient(56% 42% at 88% 28%, rgb(153 246 228 / 0.42), transparent 70%),
+      radial-gradient(64% 46% at 50% 92%, rgb(147 197 253 / 0.36), transparent 72%);
+  }
+  [data-theme="dark"] [data-gradient="laut"] {
+    --field-base: #070A0D;
+    --field-image:
+      radial-gradient(58% 44% at 12% 12%, rgb(96 180 235 / 0.12), transparent 70%),
+      radial-gradient(56% 42% at 88% 28%, rgb(104 206 194 / 0.09), transparent 70%),
+      radial-gradient(64% 46% at 50% 92%, rgb(110 160 240 / 0.08), transparent 72%);
+  }
+
+  /* Yang paling pendiam dari kedelapannya, dan memang harus ada satu:
+     papan yang isinya sudah ramai warna label butuh latar yang tidak ikut
+     bicara. */
+  [data-gradient="kabut"] {
+    --field-base: #ECEEF2;
+    --field-image:
+      radial-gradient(62% 48% at 20% 8%, rgb(203 213 225 / 0.60), transparent 72%),
+      radial-gradient(56% 42% at 82% 30%, rgb(226 232 240 / 0.55), transparent 72%),
+      radial-gradient(60% 46% at 44% 92%, rgb(186 202 220 / 0.35), transparent 74%);
+  }
+  [data-theme="dark"] [data-gradient="kabut"] {
+    --field-base: #0A0B0E;
+    --field-image:
+      radial-gradient(62% 48% at 20% 8%, rgb(148 163 184 / 0.10), transparent 72%),
+      radial-gradient(56% 42% at 82% 30%, rgb(180 190 205 / 0.07), transparent 72%),
+      radial-gradient(60% 46% at 44% 92%, rgb(120 140 165 / 0.06), transparent 74%);
+  }
+
+  [data-gradient="lumut"] {
+    --field-base: #E7EFE7;
+    --field-image:
+      radial-gradient(58% 44% at 14% 10%, rgb(187 226 178 / 0.52), transparent 70%),
+      radial-gradient(54% 40% at 86% 26%, rgb(153 246 228 / 0.38), transparent 70%),
+      radial-gradient(62% 46% at 48% 90%, rgb(214 232 180 / 0.42), transparent 72%);
+  }
+  [data-theme="dark"] [data-gradient="lumut"] {
+    --field-base: #070A08;
+    --field-image:
+      radial-gradient(58% 44% at 14% 10%, rgb(120 200 130 / 0.10), transparent 70%),
+      radial-gradient(54% 40% at 86% 26%, rgb(104 206 194 / 0.08), transparent 70%),
+      radial-gradient(62% 46% at 48% 90%, rgb(170 205 110 / 0.07), transparent 72%);
+  }
+
+  [data-gradient="senja"] {
+    --field-base: #EFE8F1;
+    --field-image:
+      radial-gradient(58% 44% at 16% 12%, rgb(196 181 253 / 0.50), transparent 70%),
+      radial-gradient(54% 42% at 86% 26%, rgb(253 186 186 / 0.38), transparent 70%),
+      radial-gradient(64% 46% at 44% 92%, rgb(254 215 170 / 0.36), transparent 72%);
+  }
+  [data-theme="dark"] [data-gradient="senja"] {
+    --field-base: #0A080D;
+    --field-image:
+      radial-gradient(58% 44% at 16% 12%, rgb(168 124 255 / 0.12), transparent 70%),
+      radial-gradient(54% 42% at 86% 26%, rgb(255 130 130 / 0.08), transparent 70%),
+      radial-gradient(64% 46% at 44% 92%, rgb(255 180 110 / 0.07), transparent 72%);
+  }
+
+  [data-gradient="pasir"] {
+    --field-base: #F2EDE2;
+    --field-image:
+      radial-gradient(60% 46% at 18% 10%, rgb(250 232 196 / 0.62), transparent 72%),
+      radial-gradient(54% 40% at 84% 28%, rgb(231 221 203 / 0.55), transparent 72%),
+      radial-gradient(62% 46% at 46% 90%, rgb(245 214 178 / 0.40), transparent 74%);
+  }
+  [data-theme="dark"] [data-gradient="pasir"] {
+    --field-base: #0C0A07;
+    --field-image:
+      radial-gradient(60% 46% at 18% 10%, rgb(230 195 130 / 0.10), transparent 72%),
+      radial-gradient(54% 40% at 84% 28%, rgb(200 185 160 / 0.07), transparent 72%),
+      radial-gradient(62% 46% at 46% 90%, rgb(225 170 110 / 0.06), transparent 74%);
+  }
+
+  [data-gradient="nila"] {
+    --field-base: #E6EAF6;
+    --field-image:
+      radial-gradient(58% 44% at 14% 10%, rgb(165 180 252 / 0.52), transparent 70%),
+      radial-gradient(56% 42% at 86% 26%, rgb(147 197 253 / 0.42), transparent 70%),
+      radial-gradient(62% 46% at 48% 92%, rgb(196 181 253 / 0.34), transparent 72%);
+  }
+  [data-theme="dark"] [data-gradient="nila"] {
+    --field-base: #07080D;
+    --field-image:
+      radial-gradient(58% 44% at 14% 10%, rgb(126 148 255 / 0.13), transparent 70%),
+      radial-gradient(56% 42% at 86% 26%, rgb(110 165 240 / 0.09), transparent 70%),
+      radial-gradient(62% 46% at 48% 92%, rgb(168 124 255 / 0.07), transparent 72%);
+  }
+
+  [data-gradient="sakura"] {
+    --field-base: #F5E9EE;
+    --field-image:
+      radial-gradient(58% 44% at 16% 10%, rgb(251 207 232 / 0.58), transparent 70%),
+      radial-gradient(54% 40% at 86% 26%, rgb(254 205 211 / 0.46), transparent 70%),
+      radial-gradient(62% 46% at 46% 92%, rgb(233 213 255 / 0.34), transparent 72%);
+  }
+  [data-theme="dark"] [data-gradient="sakura"] {
+    --field-base: #0C070A;
+    --field-image:
+      radial-gradient(58% 44% at 16% 10%, rgb(255 145 200 / 0.11), transparent 70%),
+      radial-gradient(54% 40% at 86% 26%, rgb(255 168 186 / 0.08), transparent 70%),
+      radial-gradient(62% 46% at 46% 92%, rgb(190 150 255 / 0.07), transparent 72%);
+  }
+
+  /* Kredit fotografer, di sudut papan. Wajib ada — menaut gambar Unsplash
+     tanpa menyebut pemotretnya melanggar ketentuan mereka — tapi tidak
+     boleh ikut menuntut perhatian: sebaris kecil yang baru menajam saat
+     disentuh. */
+  /* Alasnya sendiri, bukan sekadar teks pucat: kredit ini melayang di atas
+     foto, dan foto tidak bisa dijanjikan terang atau gelap di sudut mana pun.
+     Tanpa alas, ia terbaca di satu foto dan lenyap di foto berikutnya. */
+  .photo-credit {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 9999px;
+    background-color: rgb(255 255 255 / 0.55);
+    color: var(--color-muted);
+    font-size: 0.6875rem;
+    line-height: 1.1;
+    opacity: 0.8;
+    transition: opacity 150ms ease;
+  }
+  [data-theme="dark"] .photo-credit {
+    background-color: rgb(10 12 16 / 0.5);
+  }
+  .photo-credit:hover { opacity: 1; }
+}

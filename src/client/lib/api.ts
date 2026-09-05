@@ -1,7 +1,13 @@
 import type {
+  AdminAccess,
+  AdminBackgroundImage,
+  AdminUserPage,
   AvatarMime,
+  BackgroundImageBrief,
   Board,
+  BoardBackground,
   BoardDetail,
+  BoardGradient,
   Card,
   CardCommentDetail,
   CardDetail,
@@ -60,13 +66,31 @@ const send = <T,>(path: string, method: string, body?: unknown, init?: RequestIn
 type SendOptions = { keepalive?: boolean };
 
 /** Penyaring kotak masuk; field yang kosong tidak ikut dikirim. */
-export interface NotificationFilter {
+export interface NotificationFilter extends Record<string, string | undefined> {
   workspaceId?: string;
   boardId?: string;
   cursor?: string;
 }
 
-const queryString = (params: NotificationFilter) => {
+/** Isi formulir gambar latar di panel admin — bentuk yang sama untuk tambah dan sunting. */
+export interface BackgroundInput {
+  name: string;
+  url: string;
+  photographer: string;
+  photographerUrl?: string | null;
+}
+
+/**
+ * Latar yang dikirim ke server. Bukan `BoardBackground`: yang dikirim cukup
+ * kunci gradiasi atau id gambar, sedangkan yang diterima kembali membawa
+ * gambarnya utuh.
+ */
+export type BoardBackgroundPatch =
+  | { kind: "default" }
+  | { kind: "gradient"; value: BoardGradient }
+  | { kind: "image"; value: string };
+
+const queryString = (params: Readonly<Record<string, string | undefined>>) => {
   const search = new URLSearchParams(
     Object.entries(params).filter((entry): entry is [string, string] => Boolean(entry[1])),
   );
@@ -108,6 +132,13 @@ export const api = {
     send<Board>("/boards", "POST", { workspaceId, title }),
   getBoard: (id: string) => request<BoardDetail>(`/boards/${id}`),
   renameBoard: (id: string, title: string) => send<Board>(`/boards/${id}`, "PATCH", { title }),
+
+  /* Latar papan. Dikirim sebagai objek bertanda, sama seperti yang diterima
+     server: bentuk inilah yang tidak bisa mengatakan "gambar" tanpa gambar. */
+  setBoardBackground: (id: string, background: BoardBackgroundPatch) =>
+    send<Board & { background: BoardBackground }>(`/boards/${id}`, "PATCH", { background }),
+  /** Gambar yang boleh dipilih — yang aktif saja, urut seperti di panel admin. */
+  listBackgrounds: () => request<BackgroundImageBrief[]>("/boards/backgrounds"),
   deleteBoard: (id: string, options?: SendOptions) =>
     send<void>(`/boards/${id}`, "DELETE", undefined, options),
 
@@ -205,6 +236,27 @@ export const api = {
   deleteAvatar: () => send<void>("/profile/avatar", "DELETE"),
   createPassword: (newPassword: string) =>
     send<void>("/profile/password", "POST", { newPassword }),
+
+  /* panel admin — semuanya 404 bagi yang bukan admin aplikasi */
+  getAdminAccess: () => request<AdminAccess>("/admin-access"),
+
+  listAdminBackgrounds: () => request<AdminBackgroundImage[]>("/admin/backgrounds"),
+  createBackground: (body: BackgroundInput) =>
+    send<AdminBackgroundImage>("/admin/backgrounds", "POST", body),
+  updateBackground: (id: string, patch: Partial<BackgroundInput> & { active?: boolean }) =>
+    send<AdminBackgroundImage>(`/admin/backgrounds/${id}`, "PATCH", patch),
+  /** Jawabannya seluruh daftar yang sudah diurutkan ulang, bukan satu baris. */
+  moveBackground: (id: string, index: number) =>
+    send<AdminBackgroundImage[]>(`/admin/backgrounds/${id}/move`, "POST", { index }),
+  deleteBackground: (id: string) => send<void>(`/admin/backgrounds/${id}`, "DELETE"),
+
+  listAdminUsers: (params: { q?: string; cursor?: string } = {}) =>
+    request<AdminUserPage>(`/admin/users${queryString(params)}`),
+  setUserAdmin: (id: string, admin: boolean) =>
+    send<void>(`/admin/users/${id}/admin`, "POST", { admin }),
+  resetUserPassword: (id: string, newPassword: string) =>
+    send<void>(`/admin/users/${id}/password`, "POST", { newPassword }),
+  deleteUser: (id: string) => send<void>(`/admin/users/${id}`, "DELETE"),
 
   /* checklist */
   addChecklistItem: (cardId: string, text: string) =>

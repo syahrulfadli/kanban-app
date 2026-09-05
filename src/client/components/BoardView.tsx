@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { monitorForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { extractClosestEdge } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
+import { BoardBackgroundPicker, PhotoCredit } from "./BoardBackgroundPicker";
 import { CardModal } from "./CardModal";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { MoveDialog, type MoveSubject } from "./MoveDialog";
@@ -11,6 +12,7 @@ import { useCollapsedColumns } from "../hooks/useCollapsedColumns";
 import { playDropSound } from "../hooks/useSound";
 import { useSession } from "../lib/auth-client";
 import { navigate, paths } from "../lib/route";
+import { backgroundPhoto, backgroundProps } from "../lib/background";
 import { cn } from "../lib/cn";
 import type { ChannelStatus } from "../lib/realtime";
 import type { UserBrief } from "../../shared/types";
@@ -351,8 +353,15 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
     );
   }
 
+  const photo = backgroundPhoto(board.background);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {/* Lembar latar papan. Berdiri di luar aliran isi dan di belakangnya,
+          jadi kaca di atasnya punya sesuatu untuk dikaburkan dan papan yang
+          digeser mendatar tidak menyeretnya ikut bergerak. */}
+      <div aria-hidden className="board-bg" {...backgroundProps(board.background)} />
+
       <AppHeader>
         <span className="text-faint">/</span>
         <button
@@ -369,6 +378,11 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
             papan — dan sudut itu memang sudut keterangan, bukan sudut isi. */}
         <span className="ml-auto flex min-w-0 items-center gap-2">
           {error && <span className="min-w-0 truncate text-xs text-danger">{error}</span>}
+          <BoardBackgroundPicker
+            boardId={boardId}
+            background={board.background}
+            onChanged={() => void refresh()}
+          />
           <LiveIndicator
             status={live.status}
             viewers={live.viewers}
@@ -426,6 +440,17 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
           />
         </div>
       </main>
+
+      {/* Kredit fotografer. Di sudut kiri bawah, sejajar kapsul navigasi yang
+          mengambang di tengah — tempat yang tidak ditempati apa pun, dan
+          cukup jauh dari kolom terakhir supaya tidak terbaca sebagai bagian
+          dari papan. `pointer-events-none` di pembungkusnya: yang boleh
+          diketuk cuma tautannya sendiri, bukan pita kosong sepanjang layar. */}
+      {photo && (
+        <div className="pointer-events-none fixed bottom-6 left-5 z-30 max-w-[45vw]">
+          <PhotoCredit image={photo} />
+        </div>
+      )}
 
       {pending && (
         <ConfirmDialog

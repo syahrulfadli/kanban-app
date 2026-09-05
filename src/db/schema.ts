@@ -77,6 +77,37 @@ export type LabelColor = (typeof LABEL_COLORS)[number];
 export const COLUMN_COLORS = LABEL_COLORS;
 export type ColumnColor = LabelColor;
 
+/* ── Latar papan ───────────────────────────────────────────────────
+   Tiga cara sebuah papan bisa berlatar, dan ketiganya sengaja disimpan
+   sebagai sepasang kolom (`kind` + `value`) alih-alih tiga kolom terpisah:
+   sebuah papan hanya boleh berlatar satu hal pada satu waktu, dan tiga kolom
+   yang saling meniadakan cepat atau lambat akan terisi dua sekaligus. */
+
+export const BOARD_BACKGROUND_KINDS = ["default", "gradient", "image"] as const;
+export type BoardBackgroundKind = (typeof BOARD_BACKGROUND_KINDS)[number];
+
+/**
+ * Gradiasi bawaan — kunci simbolik, bukan warna: nilainya tinggal di CSS
+ * (lihat `.board-bg[data-gradient]` di index.css), jadi setiap gradiasi punya
+ * satu bentuk untuk tema terang dan satu untuk tema gelap tanpa ada yang
+ * perlu dihitung di JavaScript.
+ *
+ * Berbeda dari gambar Unsplash yang dikurasi lewat panel admin, daftar ini
+ * tidak tinggal di database: gradiasi adalah bagian dari tema aplikasi, dan
+ * tema yang bisa disunting dari panel akan menyimpang dari sisa palet.
+ */
+export const BOARD_GRADIENTS = [
+  "fajar",
+  "laut",
+  "kabut",
+  "lumut",
+  "senja",
+  "pasir",
+  "nila",
+  "sakura",
+] as const;
+export type BoardGradient = (typeof BOARD_GRADIENTS)[number];
+
 /**
  * Posisi memakai fractional indexing (real, bukan integer berurutan):
  * memindahkan satu kartu cukup meng-update satu baris, bukan seluruh kolom.
@@ -90,6 +121,19 @@ export const boards = sqliteTable(
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
+    /* Latar papan. "default" berarti ladang cahaya yang sama dengan sisa
+       aplikasi — dan itu keadaan istirahatnya, bukan sekadar "belum dipilih".
+       `backgroundValue` berisi kunci gradiasi atau id gambar, dan null untuk
+       "default".
+
+       Sengaja bukan foreign key ke `background_images`: kolomnya menampung
+       dua jenis nilai, dan D1 tidak punya foreign key bersyarat. Yang menjaga
+       konsistensinya adalah rute penghapusan gambar, yang mengembalikan papan
+       pemakainya ke "default" — lihat routes/admin.ts. */
+    backgroundKind: text("background_kind", { enum: BOARD_BACKGROUND_KINDS })
+      .notNull()
+      .default("default"),
+    backgroundValue: text("background_value"),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
   },
@@ -523,6 +567,72 @@ export const userAvatars = sqliteTable("user_avatars", {
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });
 
+/**
+ * Gambar latar yang dikurasi manual dari Unsplash.
+ *
+ * Yang disimpan hanya alamatnya, bukan berkasnya: batasan aplikasi ini nol
+ * biaya, dan Unsplash sudah menyajikan gambarnya sendiri lewat CDN yang boleh
+ * ditaut langsung. Alamatnya wajib menunjuk ke images.unsplash.com — bukan
+ * kepicikan, melainkan supaya panel ini tidak berubah jadi pintu untuk
+ * menempelkan alamat gambar dari mana saja ke halaman setiap pemakai.
+ *
+ * Nama fotografer ikut disimpan karena memang harus: menaut gambar Unsplash
+ * tanpa menyebut pemotretnya melanggar ketentuan mereka, dan kredit itu yang
+ * digambar di sudut papan.
+ */
+export const backgroundImages = sqliteTable(
+  "background_images",
+  {
+    id: text("id").primaryKey(),
+    /** Nama yang dibaca pemilih — "Kabut pegunungan", bukan nama berkas. */
+    name: text("name").notNull(),
+    /**
+     * Alamat dasar di images.unsplash.com, tanpa parameter ukuran. Ukurannya
+     * ditambahkan klien saat menggambar (lihat client/lib/background.ts), jadi
+     * pemilih menarik keping kecil dan papan menarik yang besar dari baris
+     * yang sama.
+     */
+    url: text("url").notNull(),
+    photographer: text("photographer").notNull(),
+    /** Profil fotografernya di Unsplash. Boleh kosong; kreditnya tetap tampil. */
+    photographerUrl: text("photographer_url"),
+    position: real("position").notNull(),
+    /* Nonaktif berarti hilang dari pemilih, bukan hilang dari papan yang
+       sudah memakainya: mencabut latar yang sudah dipilih orang lain adalah
+       perubahan pada papan mereka, dan itu bukan yang diminta admin ketika ia
+       menekan "nonaktifkan". Yang mencabut adalah penghapusan. */
+    active: integer("active", { mode: "boolean" }).notNull().default(true),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [index("background_images_position_idx").on(t.position)],
+);
+
+/**
+ * Admin aplikasi — berbeda dari admin workspace, dan sengaja tabelnya sendiri.
+ *
+ * `workspace_members.role` menjawab "apa yang boleh ia lakukan di dalam tim
+ * ini"; tabel ini menjawab "apa yang boleh ia lakukan terhadap aplikasinya" —
+ * mengurasi gambar latar, dan mengurus akun orang. Menggabungnya berarti
+ * pemilik satu workspace otomatis berkuasa atas seluruh pemakai.
+ *
+ * Tidak ditaruh sebagai kolom di tabel `user` karena tabel itu milik Better
+ * Auth dan ditulis ulang tiap `npm run auth:generate`.
+ *
+ * Baris pertama tidak lahir dari sini melainkan dari env `ADMIN_EMAILS` —
+ * lihat `requireAppAdmin` di worker/guards.ts. Itulah pintu daruratnya:
+ * admin bawaan tidak bisa dicabut lewat panel, jadi panelnya tidak pernah
+ * bisa terkunci dari dalam.
+ */
+export const appAdmins = sqliteTable("app_admins", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  /** Yang mengangkat. `set null`: pengangkatan tetap sah setelah ia pergi. */
+  grantedBy: text("granted_by").references(() => user.id, { onDelete: "set null" }),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+});
+
 export type Workspace = typeof workspaces.$inferSelect;
 export type WorkspaceMember = typeof workspaceMembers.$inferSelect;
 export type Invitation = typeof invitations.$inferSelect;
@@ -541,3 +651,5 @@ export type NotificationRow = typeof notifications.$inferSelect;
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
 export type NotificationPrefs = typeof notificationPrefs.$inferSelect;
 export type UserAvatar = typeof userAvatars.$inferSelect;
+export type BackgroundImage = typeof backgroundImages.$inferSelect;
+export type AppAdmin = typeof appAdmins.$inferSelect;

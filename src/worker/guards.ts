@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import {
+  appAdmins,
   boards,
   cardComments,
   cards,
@@ -11,6 +12,7 @@ import {
   type Db,
   type Role,
 } from "../db";
+import type { SessionUser } from "./auth";
 
 const notFound = () => new HTTPException(404, { message: "Data tidak ditemukan" });
 
@@ -194,4 +196,49 @@ export function assertAuthor(authorId: string, userId: string) {
   if (authorId !== userId) {
     throw new HTTPException(403, { message: "Hanya penulisnya yang boleh mengubah ini" });
   }
+}
+
+/* ── Admin aplikasi ────────────────────────────────────────────────
+   Berbeda dari peran workspace: yang diurus di sini gambar latar dan akun
+   orang, bukan isi satu tim. Sumbernya dua, dan urutannya disengaja. */
+
+/**
+ * Email yang selalu admin, dari env. Pintu darurat aplikasinya: admin dari
+ * sini tidak bisa dicabut lewat panel, jadi panelnya tidak pernah bisa
+ * terkunci dari dalam — termasuk oleh admin yang mencabut dirinya sendiri.
+ *
+ * Dicocokkan huruf-kecil dan terpangkas, karena yang mengetiknya manusia di
+ * dalam berkas konfigurasi.
+ */
+export function envAdminEmails(env: Env): Set<string> {
+  return new Set(
+    (env.ADMIN_EMAILS ?? "")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+export const isEnvAdmin = (env: Env, email: string) =>
+  envAdminEmails(env).has(email.trim().toLowerCase());
+
+/** Apakah orang ini admin aplikasi — dan dari mana kewenangannya datang. */
+export async function appAdminAccess(db: Db, env: Env, user: SessionUser) {
+  const fromEnv = isEnvAdmin(env, user.email);
+  if (fromEnv) return { admin: true, fromEnv: true };
+
+  const row = await db.select().from(appAdmins).where(eq(appAdmins.userId, user.id)).get();
+  return { admin: Boolean(row), fromEnv: false };
+}
+
+/**
+ * Tolak siapa pun yang bukan admin aplikasi.
+ *
+ * 404, bukan 403 — sama seperti keanggotaan workspace: keberadaan panelnya
+ * pun tidak perlu dibocorkan kepada yang tidak boleh membukanya.
+ */
+export async function requireAppAdmin(db: Db, env: Env, user: SessionUser) {
+  const access = await appAdminAccess(db, env, user);
+  if (!access.admin) throw notFound();
+  return access;
 }

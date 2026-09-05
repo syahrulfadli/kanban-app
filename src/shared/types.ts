@@ -1,7 +1,10 @@
 import type {
   ActivityDetail,
   ActivityKind,
+  BackgroundImage,
   Board,
+  BoardBackgroundKind,
+  BoardGradient,
   Card,
   CardActivity,
   CardComment,
@@ -15,12 +18,15 @@ import type {
   Role,
   Workspace,
 } from "../db/schema";
-import { COLUMN_COLORS, LABEL_COLORS } from "../db/schema";
+import { BOARD_BACKGROUND_KINDS, BOARD_GRADIENTS, COLUMN_COLORS, LABEL_COLORS } from "../db/schema";
 
 export type {
   ActivityDetail,
   ActivityKind,
+  BackgroundImage,
   Board,
+  BoardBackgroundKind,
+  BoardGradient,
   Card,
   CardActivity,
   CardComment,
@@ -34,7 +40,7 @@ export type {
   Role,
   Workspace,
 };
-export { COLUMN_COLORS, LABEL_COLORS };
+export { BOARD_BACKGROUND_KINDS, BOARD_GRADIENTS, COLUMN_COLORS, LABEL_COLORS };
 
 /** Workspace beserta peran user yang sedang login di dalamnya. */
 export interface WorkspaceSummary extends Workspace {
@@ -115,11 +121,48 @@ export interface ColumnSummary extends Column {
   watching: boolean;
 }
 
+/* ── Latar papan ───────────────────────────────────────────────────
+   Sepasang kolom di database (`backgroundKind` + `backgroundValue`) sampai ke
+   klien sudah jadi satu nilai yang tidak bisa salah dirakit: kalau jenisnya
+   "image", gambarnya ikut — bukan idnya, yang masih harus dicari entah di
+   mana. Papan yang menunjuk gambar yang sudah dihapus jatuh ke "default",
+   jadi tidak ada bentuk yang menggambarkan latar yang tidak bisa digambar. */
+
+/** Gambar sebagaimana dilihat pemakai biasa — tanpa posisi dan tanpa keaktifan. */
+export interface BackgroundImageBrief {
+  id: string;
+  name: string;
+  url: string;
+  photographer: string;
+  photographerUrl: string | null;
+}
+
+export type BoardBackground =
+  | { kind: "default" }
+  | { kind: "gradient"; gradient: BoardGradient }
+  | { kind: "image"; image: BackgroundImageBrief };
+
+export const DEFAULT_BOARD_BACKGROUND: BoardBackground = { kind: "default" };
+
+/** Nama gradiasi yang dibaca orang. Bentuknya tinggal di CSS, namanya di sini. */
+export const BOARD_GRADIENT_LABELS: Record<BoardGradient, string> = {
+  fajar: "Fajar",
+  laut: "Laut",
+  kabut: "Kabut",
+  lumut: "Lumut",
+  senja: "Senja",
+  pasir: "Pasir",
+  nila: "Nila",
+  sakura: "Sakura",
+};
+
 export interface BoardDetail extends Board {
   role: Role;
   /** Label milik board — palet yang bisa dipasang ke kartu mana pun di sini. */
   labels: Label[];
   columns: ColumnSummary[];
+  /** Latar yang sudah diresolusi — lihat BoardBackground di atas. */
+  background: BoardBackground;
 }
 
 /* ── Pencarian kartu ───────────────────────────────────────────────
@@ -280,6 +323,57 @@ export interface NotificationFeed {
   /** Penanda halaman berikutnya; null berarti sudah sampai dasar. */
   nextCursor: string | null;
 }
+
+/* ── Panel admin ───────────────────────────────────────────────────
+   Bentuk yang hanya dilihat admin aplikasi. Terpisah dari MemberSummary yang
+   sudah ada: yang itu menjawab "siapa saja di tim ini", yang ini "siapa saja
+   di aplikasi ini" — dan pertanyaan kedua membawa hal-hal yang tidak boleh
+   terlihat di halaman anggota, seperti cara sebuah akun bisa masuk. */
+
+/** Apakah orang yang sedang masuk boleh membuka panel admin, dan dari mana. */
+export interface AdminAccess {
+  admin: boolean;
+  /**
+   * Admin dari env `ADMIN_EMAILS` tidak bisa dicabut lewat panel — panel
+   * memakainya untuk tidak menawarkan tombol yang pasti ditolak server.
+   */
+  fromEnv: boolean;
+}
+
+/** Cara sebuah akun bisa masuk. "credential" berarti email dan kata sandi. */
+export type LoginMethod = "credential" | "google" | "github";
+
+export interface AdminUserSummary {
+  id: string;
+  name: string;
+  email: string;
+  image: string | null;
+  createdAt: string;
+  methods: LoginMethod[];
+  /** Berapa tim yang ia ikuti — ukuran kasar seberapa terpakai akunnya. */
+  workspaces: number;
+  admin: boolean;
+  /** Admin dari env: tampil sebagai admin, tapi tidak bisa dicabut di sini. */
+  fromEnv: boolean;
+}
+
+export interface AdminUserPage {
+  items: AdminUserSummary[];
+  /** Penanda halaman berikutnya; null berarti sudah sampai dasar. */
+  nextCursor: string | null;
+  /** Seluruh akun di aplikasi, bukan hanya yang lolos penyaring. */
+  total: number;
+}
+
+/** Satu gambar latar sebagaimana dilihat panel — lengkap dengan yang nonaktif. */
+export interface AdminBackgroundImage extends BackgroundImageBrief {
+  active: boolean;
+  /** Berapa papan yang sedang memakainya — yang membuat "hapus" punya berat. */
+  usedBy: number;
+}
+
+/** Host yang boleh dipakai alamat gambar. Dijaga sama di kedua sisi. */
+export const UNSPLASH_IMAGE_HOST = "images.unsplash.com";
 
 export interface ApiError {
   error: string;

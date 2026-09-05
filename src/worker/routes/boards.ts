@@ -1,9 +1,12 @@
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import {
+  BOARD_GRADIENTS,
+  backgroundImages,
   boards,
   cards,
   columnWatches,
@@ -11,15 +14,59 @@ import {
   labels,
   workspaceMembers,
   workspaces,
+  type Db,
 } from "../../db";
 import type { AppEnv } from "../auth";
 import { assertRole, requireBoard, requireMembership } from "../guards";
 import { notifyBoard } from "../realtime";
 import { VIEWER_PARAM } from "../board-room";
 import { extrasFor, loadCardExtras } from "../card-data";
-import type { BoardDetail, MoveTargetWorkspace, UserBrief } from "../../shared/types";
+import { activeBackgrounds } from "./admin";
+import type {
+  BoardBackground,
+  BoardDetail,
+  MoveTargetWorkspace,
+  UserBrief,
+} from "../../shared/types";
 
 const DEFAULT_COLUMNS = ["To Do", "In Progress", "Done"];
+
+/**
+ * Sepasang kolom di database jadi satu nilai yang bisa digambar.
+ *
+ * Gambar yang sudah tidak ada jatuh ke "default" alih-alih membuat papannya
+ * gagal dimuat: latar adalah hiasan, dan hiasan yang hilang tidak boleh
+ * menghalangi orang membuka pekerjaannya. Itu juga jaring untuk papan yang
+ * sempat menunjuk gambar yang dihapus di luar rute penghapusan.
+ */
+async function resolveBackground(
+  db: Db,
+  kind: string,
+  value: string | null,
+): Promise<BoardBackground> {
+  if (kind === "gradient") {
+    const gradient = BOARD_GRADIENTS.find((name) => name === value);
+    return gradient ? { kind: "gradient", gradient } : { kind: "default" };
+  }
+
+  if (kind === "image" && value) {
+    const image = await db
+      .select({
+        id: backgroundImages.id,
+        name: backgroundImages.name,
+        url: backgroundImages.url,
+        photographer: backgroundImages.photographer,
+        photographerUrl: backgroundImages.photographerUrl,
+      })
+      .from(backgroundImages)
+      .where(eq(backgroundImages.id, value))
+      .get();
+
+    return image ? { kind: "image", image } : { kind: "default" };
+  }
+
+  return { kind: "default" };
+}
 
 const app = new Hono<AppEnv>()
 
@@ -140,6 +187,15 @@ const app = new Hono<AppEnv>()
   })
 
   /**
+   * Gambar latar yang boleh dipilih. Terbuka untuk siapa pun yang sudah
+   * masuk, bukan hanya admin: yang dikurasi admin adalah daftarnya, dan yang
+   * memilih dari daftar itu setiap anggota papan.
+   *
+   * Berdiri sebelum "/:id", sama seperti "destinations".
+   */
+  .get("/backgrounds", async (c) => c.json(await activeBackgrounds(c.get("db"))))
+
+  /**
    * Kanal realtime board. Upgrade WebSocket dari browser tetap membawa cookie
    * sesi, jadi pemeriksaan keanggotaan yang sama berlaku di sini.
    */
@@ -184,7 +240,7 @@ const app = new Hono<AppEnv>()
     // Label, progress checklist, jumlah followup, peserta, dan keadaan Awasi
     // ikut terangkut di payload board: kartu dan kolom harus bisa menggambar
     // semuanya tanpa dibuka dulu.
-    const [extras, boardLabels, watched] = await Promise.all([
+    const [extras, boardLabels, watched, background] = await Promise.all([
       loadCardExtras(db, { boardId: board.id }, userId),
       db
         .select()
@@ -197,6 +253,7 @@ const app = new Hono<AppEnv>()
         .innerJoin(columns, eq(columns.id, columnWatches.columnId))
         .where(and(eq(columns.boardId, board.id), eq(columnWatches.userId, userId)))
         .all(),
+      resolveBackground(db, board.backgroundKind, board.backgroundValue),
     ]);
 
     const watchedColumns = new Set(watched.map((row) => row.columnId));
@@ -204,6 +261,7 @@ const app = new Hono<AppEnv>()
     const detail: BoardDetail = {
       ...board,
       role,
+      background,
       labels: boardLabels,
       columns: cols.map((col) => ({
         ...col,
@@ -217,22 +275,86 @@ const app = new Hono<AppEnv>()
     return c.json(detail);
   })
 
+  /**
+   * Judul dan latar papan.
+   *
+   * Latar datang sebagai satu objek bertanda (`{ kind, value }`), bukan dua
+   * field lepas: itu satu-satunya bentuk yang tidak bisa mengirim "gambar"
+   * tanpa gambarnya. Zod yang menegakkannya, jadi kombinasi yang mustahil
+   * ditolak sebelum menyentuh database.
+   *
+   * Siapa pun anggota workspace boleh mengubahnya — sama seperti judul.
+   * Latar itu perabot bersama, dan menguncinya untuk admin berarti satu tim
+   * yang seluruhnya anggota tidak pernah bisa mengganti latar papannya
+   * sendiri.
+   */
   .patch(
     "/:id",
-    zValidator("json", z.object({ title: z.string().trim().min(1).max(120) })),
+    zValidator(
+      "json",
+      z.object({
+        title: z.string().trim().min(1).max(120).optional(),
+        background: z
+          .discriminatedUnion("kind", [
+            z.object({ kind: z.literal("default") }),
+            z.object({ kind: z.literal("gradient"), value: z.enum(BOARD_GRADIENTS) }),
+            z.object({ kind: z.literal("image"), value: z.string().min(1) }),
+          ])
+          .optional(),
+      }),
+    ),
     async (c) => {
       const db = c.get("db");
       const { board } = await requireBoard(db, c.req.param("id"), c.get("user").id);
+      const patch = c.req.valid("json");
+
+      /* Gambar yang dipilih harus ada DAN aktif. Yang nonaktif tetap terbaca
+         di papan yang sudah memakainya, tapi tidak boleh dipilih baru —
+         kalau tidak, "nonaktifkan" di panel admin tidak berarti apa-apa. */
+      if (patch.background?.kind === "image") {
+        const image = await db
+          .select({ id: backgroundImages.id })
+          .from(backgroundImages)
+          .where(
+            and(
+              eq(backgroundImages.id, patch.background.value),
+              eq(backgroundImages.active, true),
+            ),
+          )
+          .get();
+
+        if (!image) {
+          throw new HTTPException(400, {
+            message: "Gambar latar itu sudah tidak tersedia. Muat ulang pemilihnya.",
+          });
+        }
+      }
 
       const updated = await db
         .update(boards)
-        .set({ title: c.req.valid("json").title, updatedAt: new Date() })
+        .set({
+          ...(patch.title !== undefined && { title: patch.title }),
+          ...(patch.background !== undefined && {
+            backgroundKind: patch.background.kind,
+            backgroundValue:
+              patch.background.kind === "default" ? null : patch.background.value,
+          }),
+          updatedAt: new Date(),
+        })
         .where(eq(boards.id, board.id))
         .returning()
         .get();
 
       notifyBoard(c, board.id);
-      return c.json(updated);
+
+      return c.json({
+        ...updated,
+        background: await resolveBackground(
+          db,
+          updated.backgroundKind,
+          updated.backgroundValue,
+        ),
+      });
     },
   )
 

@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { AdminPage } from "./components/AdminPage";
 import { AuthPage } from "./components/AuthPage";
 import { BoardView } from "./components/BoardView";
 import { InvitePage } from "./components/InvitePage";
@@ -49,6 +50,8 @@ function RouteSkeleton({ route }: { route: Route }) {
     case "workspace":
     case "members":
       return <ListPageSkeleton crumb />;
+    case "admin":
+      return <ListPageSkeleton />;
     default:
       return <ListPageSkeleton />;
   }
@@ -192,6 +195,12 @@ export default function App() {
       return (
         <Shell>
           <SettingsPage />
+        </Shell>
+      );
+    case "admin":
+      return (
+        <Shell>
+          <AdminPage tab={route.tab} />
         </Shell>
       );
     default:

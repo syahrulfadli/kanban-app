@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { forgetAdminAccess, useAdminAccess } from "../hooks/useAdminAccess";
 import { useDismiss } from "../hooks/useDismiss";
 import { signOut, useSession } from "../lib/auth-client";
 import { cn } from "../lib/cn";
@@ -19,6 +20,17 @@ const GEAR = (
 );
 
 const EXIT = <path d="M15 17l5-5-5-5M20 12H9M12 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h6" />;
+
+/* Perisai — kewenangan atas aplikasinya, bukan atas satu tim. Sengaja berbeda
+   jauh dari gerigi pengaturan di sebelahnya: keduanya berdampingan di menu
+   yang sama, dan dua ikon yang harus dibandingkan dulu sama saja dengan tidak
+   ada ikon. */
+const SHIELD = (
+  <>
+    <path d="M12 3l7.5 3v5.4c0 4.3-3 8.1-7.5 9.6-4.5-1.5-7.5-5.3-7.5-9.6V6z" />
+    <path d="M9.2 11.8l2 2 3.6-3.8" />
+  </>
+);
 
 /* Tanda tanya dalam lingkaran — halaman yang menjelaskan, bukan yang mengatur. */
 const ABOUT = (
@@ -71,6 +83,10 @@ function Item({
 
 export function ProfileMenu() {
   const { data: session } = useSession();
+  /* Pintu ke panel admin hanya muncul bagi yang boleh membukanya — bukan demi
+     keamanan (server yang menjaganya), melainkan supaya menu ini tidak
+     menawarkan halaman yang berakhir dengan kalimat penolakan. */
+  const { admin } = useAdminAccess();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -170,6 +186,17 @@ export function ProfileMenu() {
               }}
             />
 
+            {admin && (
+              <Item
+                icon={SHIELD}
+                label="Panel admin"
+                onClick={() => {
+                  setOpen(false);
+                  navigate(paths.admin);
+                }}
+              />
+            )}
+
             <Item
               icon={GEAR}
               label="Pengaturan"
@@ -185,6 +212,11 @@ export function ProfileMenu() {
               danger
               onClick={() => {
                 setOpen(false);
+                /* Jawaban "apakah saya admin" milik sesi yang barusan
+                   ditutup, bukan milik peramban ini: tanpa dibuang, orang
+                   berikutnya yang masuk di perangkat yang sama akan melihat
+                   pintu panel admin sampai halamannya dimuat ulang. */
+                forgetAdminAccess();
                 void signOut().then(() => navigate(paths.workspaces));
               }}
             />

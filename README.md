@@ -6,6 +6,11 @@ Kartu bisa dibuka sebagai dialog: label berwarna, checklist dengan progress bar,
 thread followup, orang yang diundang mengurusnya, tenggat, serta jejak siapa
 membuat dan mengubahnya.
 
+Setiap papan boleh punya latarnya sendiri: bawaan, salah satu dari delapan
+gradiasi, atau foto Unsplash yang dikurasi lewat panel admin. Panel yang sama
+mengurus akun — daftar seluruh pengguna, mengangkat admin aplikasi, mengganti
+kata sandi yang lupa, dan menghapus akun.
+
 Bisa dipasang sebagai aplikasi (PWA) dan mengirim notifikasi push ke perangkat —
 peserta sebuah kartu dikabari saat ada followup baru atau kartunya berubah,
 meski aplikasinya sedang tertutup. Kabar yang sama juga menumpuk di kotak masuk
@@ -62,6 +67,11 @@ npm run db:migrate:remote
 # 4. Set secret produksi
 npx wrangler secret put BETTER_AUTH_SECRET     # openssl rand -base64 32
 npx wrangler secret put BETTER_AUTH_URL        # https://<nama>.workers.dev
+
+# Admin panel — email yang selalu admin aplikasi, dipisah koma.
+# Tanpa ini panelnya tidak bisa dibuka siapa pun, dan admin dari sini yang
+# mengangkat admin berikutnya lewat panel. Lihat "Model izin" di bawah.
+npx wrangler secret put ADMIN_EMAILS           # anda@contoh.com
 
 # Notifikasi push (opsional) — sepasang kunci dari `npm run vapid:keys`.
 # Tempel NILAINYA saja: `wrangler secret put` menyimpan apa pun yang diketik,
@@ -120,6 +130,20 @@ workspace
 | Buat & ganti nama board | `member` |
 | Hapus board, undang/keluarkan anggota | `admin` |
 | Ubah peran, hapus workspace | `owner` |
+| Ganti latar papan | `member` |
+
+**Admin aplikasi** berdiri di luar tabel itu, dan sengaja: `workspace_members.role`
+menjawab "apa yang boleh ia lakukan di dalam tim ini", sedangkan admin aplikasi
+menjawab "apa yang boleh ia lakukan terhadap aplikasinya" — mengurasi gambar latar
+dan mengurus akun orang. Sumbernya dua:
+
+1. **`ADMIN_EMAILS`** di env — daftar email yang dipisah koma. Mereka selalu admin
+   dan **tidak bisa dicabut lewat panel**. Inilah pintu daruratnya: panel admin
+   tidak pernah bisa terkunci dari dalam.
+2. **Tabel `app_admins`** — diangkat oleh admin lain lewat panel, dan bisa dicabut
+   di sana juga.
+
+Yang bukan admin aplikasi mendapat **404** dari seluruh `/api/admin/**`.
 
 Semua pemeriksaan izin ada di [src/worker/guards.ts](src/worker/guards.ts). Route tidak
 pernah menyentuh tabel keanggotaan langsung — selalu lewat `requireBoard`,
@@ -149,6 +173,7 @@ board tidak bocor ke orang luar.
 | `GET` | `/api/boards/:id/ws` | member (upgrade WebSocket) |
 | `DELETE` | `/api/boards/:id` | admin |
 | `GET` | `/api/boards/destinations` | member (papan tujuan untuk pindah kolom/kartu) |
+| `GET` | `/api/boards/backgrounds` | login (gambar latar yang aktif, untuk pemilih) |
 | `POST PATCH DELETE` | `/api/columns`, `/api/columns/:id` | member |
 | `POST` | `/api/columns/:id/move` | member |
 | `POST` | `/api/columns/:id/transfer` | member (pindah ke papan lain) |
@@ -176,6 +201,14 @@ board tidak bocor ke orang luar.
 | `PUT DELETE` | `/api/profile/avatar` | login (foto profil sendiri) |
 | `POST` | `/api/profile/password` | login (kata sandi pertama untuk akun sosial) |
 | `GET` | `/api/avatars/:userId` | login (berkas foto profil) |
+| `GET` | `/api/admin-access` | login (boleh tidaknya membuka panel admin) |
+| `GET POST` | `/api/admin/backgrounds` | admin aplikasi |
+| `PATCH DELETE` | `/api/admin/backgrounds/:id` | admin aplikasi |
+| `POST` | `/api/admin/backgrounds/:id/move` | admin aplikasi (urutan di pemilih) |
+| `GET` | `/api/admin/users?q=&cursor=` | admin aplikasi |
+| `POST` | `/api/admin/users/:id/admin` | admin aplikasi (angkat / cabut) |
+| `POST` | `/api/admin/users/:id/password` | admin aplikasi (kata sandi baru) |
+| `DELETE` | `/api/admin/users/:id` | admin aplikasi |
 
 ### Frontend
 
@@ -185,6 +218,8 @@ board tidak bocor ke orang luar.
 #/w/:workspaceId        daftar board dalam workspace
 #/w/:workspaceId/members anggota & undangan
 #/settings              pengaturan akun & notifikasi
+#/admin                 panel admin — kurasi gambar latar papan
+#/admin/pengguna        panel admin — daftar & pengelolaan akun
 #/board/:boardId        papan kanban
 #/board/:boardId/card/:cardId  papan dengan satu kartu terbuka (tujuan notifikasi)
 #/invite/:token         terima undangan

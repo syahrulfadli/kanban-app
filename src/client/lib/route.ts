@@ -1,5 +1,8 @@
 import { useSyncExternalStore } from "react";
 
+/** Dua urusan di panel admin, dan masing-masing punya alamatnya sendiri. */
+export type AdminTab = "backgrounds" | "users";
+
 /** Router hash minimal — cukup untuk jumlah halaman saat ini. */
 export type Route =
   | { name: "workspaces" }
@@ -10,6 +13,8 @@ export type Route =
   | { name: "workspace"; workspaceId: string }
   | { name: "members"; workspaceId: string }
   | { name: "settings" }
+  /** Panel admin aplikasi. `tab` menentukan urusan mana yang terbuka. */
+  | { name: "admin"; tab: AdminTab }
   /** Halaman masuk/daftar. Hanya berarti selagi belum ada sesi. */
   | { name: "auth"; mode: "login" | "register" }
   /** `cardId` ada kalau alamatnya menunjuk satu kartu — dari notifikasi, misalnya. */
@@ -25,6 +30,8 @@ function parse(hash: string): Route {
   if (board) return { name: "board", boardId: board[1], cardId: board[2] };
 
   if (path === "/settings") return { name: "settings" };
+  if (path === "/admin") return { name: "admin", tab: "backgrounds" };
+  if (path === "/admin/pengguna") return { name: "admin", tab: "users" };
   if (path === "/pengantar") return { name: "landing" };
 
   if (path === "/masuk") return { name: "auth", mode: "login" };
@@ -63,6 +70,8 @@ export const paths = {
   workspace: (id: string) => `#/w/${id}`,
   members: (id: string) => `#/w/${id}/members`,
   settings: "#/settings",
+  admin: "#/admin",
+  adminUsers: "#/admin/pengguna",
   masuk: "#/masuk",
   daftar: "#/daftar",
   board: (id: string) => `#/board/${id}`,

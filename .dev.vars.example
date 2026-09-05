@@ -18,3 +18,8 @@ VAPID_PRIVATE_KEY=""
 # Alamat kontak yang dilihat push service kalau kiriman kita bermasalah.
 # Boleh mailto: atau https:. Kosong = memakai BETTER_AUTH_URL.
 VAPID_SUBJECT=""
+
+# Admin panel. Email di sini SELALU admin aplikasi dan tidak bisa dicabut
+# lewat panel — itulah pintu daruratnya. Pisahkan dengan koma.
+# Kosong berarti belum ada seorang pun yang bisa membuka panelnya.
+ADMIN_EMAILS=""
