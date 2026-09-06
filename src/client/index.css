@@ -428,10 +428,13 @@ body {
   }
 
   /* Kaca cair — kapsul navigasi.
-     Peta refraksinya ada di index.html (#glassLiquidNav): peta yang sama
-     dengan #glassLens (bibir tegak lurus, datar di tengah), hanya
-     dibengkokkan lebih jauh, karena di sini efeknya adalah tampilan kapsul
-     itu sendiri, bukan cuma sentuhan di tepi dialog.
+     Peta refraksinya ada di index.html (#glassLiquidNav) — BUKAN peta bibir
+     #glassLens yang datar di tengah dan hanya menekuk dekat tepi. Peta itu
+     dirancang untuk dialog besar; di kapsul yang tingginya cuma ~44px, pita
+     tekukannya jadi setipis beberapa piksel dan berhenti jauh sebelum
+     benar-benar sampai ke pinggiran atas-bawahnya — persis yang terlihat
+     begitu diperbesar dekat. Peta di sini turbulensi yang menggeser SETIAP
+     piksel, jadi tidak ada zona datar yang perlu pas dengan bentuk elemen.
 
      Dua angka yang diminta punya arti berbeda dan sengaja tidak saling
      mengganti: BLUR mengaburkan apa yang tembus, REFRAKSI membengkokkannya.
@@ -446,9 +449,10 @@ body {
      kembali kelokan halus yang baru dibuat feDisplacementMap, dan
      refraksinya nyaris hilang ditelan kaburnya sendiri. Ditahan rendah
      di 2px (10% dari rentang wajar 0–20px) — sekadar melembutkan jahitan
-     piksel — sementara bengkoknya tetap besar (65% dari rentang 0–100
-     pada feDisplacementMap, jauh di atas 14–18 milik #glassLens yang
-     cuma menyentuh tepi).
+     piksel — sementara bengkoknya tetap terasa besar RELATIF terhadap
+     tinggi kapsul (skala 12–15 di feDisplacementMap — lihat komentar
+     #glassLiquidNav untuk kenapa angka ini jauh lebih kecil daripada
+     rentang 0–100 yang dipakai saat peta bibirnya masih dipakai).
 
      Isiannya juga ditipiskan di sini, bukan di token --glass-fill global:
      kolom dan dialog masih perlu isian yang cukup tebal untuk kartu di
