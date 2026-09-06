@@ -19,10 +19,10 @@ export function AppHeader({
     <header className={cn("flex shrink-0 items-center gap-2 px-5 pt-5 pb-3", className)}>
       <button
         onClick={() => navigate(paths.workspaces)}
-        className="flex shrink-0 items-center gap-2 text-sm font-semibold tracking-tight"
+        className="flex shrink-0 items-center gap-2 text-lg font-bold tracking-tight"
       >
         {/* Tiga kolom kecil — lambang papan kanban. */}
-        <svg viewBox="0 0 24 24" className="size-4 text-accent" aria-hidden>
+        <svg viewBox="0 0 24 24" className="size-6 text-accent" aria-hidden>
           <rect x="2.5" y="4" width="5" height="16" rx="1.5" fill="currentColor" opacity="0.9" />
           <rect x="9.5" y="4" width="5" height="11" rx="1.5" fill="currentColor" opacity="0.6" />
           <rect x="16.5" y="4" width="5" height="7" rx="1.5" fill="currentColor" opacity="0.35" />
