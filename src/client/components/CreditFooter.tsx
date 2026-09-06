@@ -46,7 +46,7 @@ export function CreditFooter({ open }: { open: number }) {
           terpotong separuh selagi ditarik — yang bergerak cuma kapsul di
           atasnya, dan kreditnya sendiri menjernih sambil naik sedikit. */}
       <div
-        className="absolute inset-x-0 bottom-0 flex justify-center transition-[opacity,transform] duration-300 ease-[var(--ease-spring)] motion-reduce:transition-none"
+        className="absolute inset-x-0 bottom-1.5 md:bottom-0 flex justify-center transition-[opacity,transform] duration-300 ease-[var(--ease-spring)] motion-reduce:transition-none"
         style={{ opacity: open, transform: `translateY(${(1 - open) * 12}px)` }}
       >
         {/* `on-photo-bottom-center` hanya berarti di papan yang latarnya foto —
