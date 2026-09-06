@@ -49,12 +49,14 @@ export function CreditFooter({ open }: { open: number }) {
         className="absolute inset-x-0 bottom-0 flex justify-center transition-[opacity,transform] duration-300 ease-[var(--ease-spring)] motion-reduce:transition-none"
         style={{ opacity: open, transform: `translateY(${(1 - open) * 12}px)` }}
       >
-        {/* `on-photo-bottom` hanya berarti di papan yang latarnya foto tanpa
-            kabut — di halaman lain atributnya tidak ada di <html> dan kelas ini
-            tidak menimpa apa pun. */}
+        {/* `on-photo-bottom-center` hanya berarti di papan yang latarnya foto —
+            di halaman lain atributnya tidak ada di <html> dan kelas ini tidak
+            menimpa apa pun. Kredit ini duduk di TENGAH kaki halaman, sama
+            seperti kapsul navigasi di atasnya, jadi jalur yang dibaca bukan
+            jalur kiri yang dipakai kredit foto — lihat client/lib/backdrop.ts. */}
         <p
           className={cn(
-            "credit on-photo on-photo-bottom",
+            "credit on-photo on-photo-bottom-center",
             hidden ? "pointer-events-none" : "pointer-events-auto",
           )}
         >

@@ -465,7 +465,7 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
           dari papan. `pointer-events-none` di pembungkusnya: yang boleh
           diketuk cuma tautannya sendiri, bukan pita kosong sepanjang layar. */}
       {photo && (
-        <div className="on-photo-bottom pointer-events-none fixed bottom-6 left-5 z-30 max-w-[45vw]">
+        <div className="on-photo-bottom-start pointer-events-none fixed bottom-6 left-5 z-30 max-w-[45vw]">
           <PhotoCredit image={photo} />
         </div>
       )}

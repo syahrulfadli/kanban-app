@@ -7,18 +7,22 @@ import type { BoardBackground } from "../../shared/types";
  * Menyalakan tinta adaptif untuk teks yang duduk langsung di atas foto latar.
  *
  * Jawabannya ditulis sebagai atribut di `<html>`, bukan diturunkan lewat prop.
- * Itu bukan jalan pintas: yang membutuhkannya ada di dua tempat yang tidak
- * bersaudara — kepala papan hidup di dalam BoardView, sedangkan kredit pembuat
- * hidup di kapsul navigasi milik App, yang sama sekali tidak tahu papan apa
- * yang sedang dibuka. Satu-satunya leluhur yang dimiliki keduanya adalah
- * dokumen itu sendiri, dan di sanalah `useTheme` sudah menaruh temanya.
+ * Itu bukan jalan pintas: yang membutuhkannya ada di tempat-tempat yang tidak
+ * bersaudara — kepala papan dan kepala kolom hidup di dalam BoardView,
+ * sedangkan kapsul navigasi dan kredit pembuat hidup di App, yang sama sekali
+ * tidak tahu papan apa yang sedang dibuka. Satu-satunya leluhur yang dimiliki
+ * semuanya adalah dokumen itu sendiri, dan di sanalah `useTheme` sudah
+ * menaruh temanya.
  *
  * Atributnya dilepas saat papannya ditinggalkan, jadi halaman lain tidak
  * pernah mewarisi tinta yang dihitung untuk foto yang tidak ada di sana.
  */
 const TOP = "inkTop";
 const TOP_END = "inkTopEnd";
-const BOTTOM = "inkBottom";
+const BOTTOM_START = "inkBottomStart";
+const BOTTOM_CENTER = "inkBottomCenter";
+const COLUMNS = "inkColumns";
+const KEYS = [TOP, TOP_END, BOTTOM_START, BOTTOM_CENTER, COLUMNS] as const;
 
 export function useBackdropInk(background: BoardBackground) {
   const { resolved: theme } = useTheme();
@@ -30,9 +34,7 @@ export function useBackdropInk(background: BoardBackground) {
     const root = document.documentElement;
 
     const clear = () => {
-      delete root.dataset[TOP];
-      delete root.dataset[TOP_END];
-      delete root.dataset[BOTTOM];
+      for (const key of KEYS) delete root.dataset[key];
     };
 
     if (!photo) {
@@ -56,14 +58,16 @@ export function useBackdropInk(background: BoardBackground) {
       }
 
       const paint = () => {
-        const { top, topEnd, bottom } = inkFor(profile, {
+        const { top, topEnd, bottomStart, bottomCenter, columns } = inkFor(profile, {
           viewport: window.innerWidth / window.innerHeight,
           overlay,
           theme,
         });
         root.dataset[TOP] = top;
         root.dataset[TOP_END] = topEnd;
-        root.dataset[BOTTOM] = bottom;
+        root.dataset[BOTTOM_START] = bottomStart;
+        root.dataset[BOTTOM_CENTER] = bottomCenter;
+        root.dataset[COLUMNS] = columns;
       };
 
       paint();

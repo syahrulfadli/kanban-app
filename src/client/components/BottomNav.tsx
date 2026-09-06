@@ -21,7 +21,13 @@ export function BottomNav({ locked = false }: { locked?: boolean }) {
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex flex-col items-center px-4 pb-5">
-      <nav className="glass glass-frost pointer-events-auto flex items-center gap-2 rounded-full p-1.5">
+      {/* `on-photo-bottom-center` menimpa token tinta saat papan yang sedang
+          dibuka berlatar foto — lihat client/lib/backdrop.ts. Ikonnya sendiri
+          semua `currentColor` lewat utility text-*, jadi cukup token yang
+          ditimpa di sini, tidak ada elemen lagi yang perlu disentuh.
+          `glass-liquid` menukar frost biasa dengan kaca yang jauh lebih tipis
+          isiannya dan membengkokkan latar di baliknya — lihat index.css. */}
+      <nav className="glass glass-liquid on-photo-bottom-center pointer-events-auto flex items-center gap-2 rounded-full p-1.5">
         <ProfileMenu />
         <CardSearch />
         <NotificationBell />

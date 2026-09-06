@@ -110,21 +110,40 @@ export function ProfileMenu() {
 
   /* Menunya dipasang di <body>, jadi ia kehilangan tombol yang tadinya
      menempatkannya — letaknya sekarang diukur sendiri dari persegi avatar:
-     tepi kanan bertemu tepi kanan, dan alasnya berhenti tepat di atas
-     kapsulnya. Kapsul itu tidak ikut menggulir bersama halaman, jadi yang
-     bisa memindahkannya cuma jendela yang berubah ukuran. */
-  const [anchor, setAnchor] = useState<{ right: number; bottom: number } | null>(null);
+     biasanya tepi kanan lembar bertemu tepi kanan tombol, dan alasnya
+     berhenti tepat di atas kapsulnya. Kapsul itu tidak ikut menggulir
+     bersama halaman, jadi yang bisa memindahkannya cuma jendela yang
+     berubah ukuran.
+
+     "Biasanya", karena tepi-ke-tepi itu cuma benar selama masih ada ruang
+     di sebelah kiri tombolnya. Begitu avatar berdiri dekat tepi kiri layar
+     sempit — kapsul boleh menyusun ulang urutan tombolnya — menempelkan
+     tepi kanan lembar ke sana justru mendorong tepi kirinya keluar layar,
+     dan itulah yang terpotong. Di situ lembarnya berhenti mengikuti tombol
+     dan ditengahkan terhadap LAYAR: jawaban yang selalu muat, berapa pun
+     sempitnya, dan yang tidak butuh tahu tombolnya sedang berdiri di mana. */
+  const MENU_MARGIN = 16;
+  const MENU_WIDTH = 224; // w-56
+
+  const [anchor, setAnchor] = useState<
+    { mode: "end"; right: number; bottom: number } | { mode: "center"; bottom: number } | null
+  >(null);
   useLayoutEffect(() => {
     if (!open) return;
 
     const place = () => {
       const rect = ref.current?.getBoundingClientRect();
-      if (rect) {
-        setAnchor({
-          right: window.innerWidth - rect.right,
-          bottom: window.innerHeight - rect.top + 12,
-        });
-      }
+      if (!rect) return;
+
+      const bottom = window.innerHeight - rect.top + 12;
+      const panelWidth = Math.min(MENU_WIDTH, window.innerWidth - MENU_MARGIN * 2);
+      const leftIfEndAligned = rect.right - panelWidth;
+
+      setAnchor(
+        leftIfEndAligned >= MENU_MARGIN
+          ? { mode: "end", right: window.innerWidth - rect.right, bottom }
+          : { mode: "center", bottom },
+      );
     };
 
     place();
@@ -163,7 +182,11 @@ export function ProfileMenu() {
           <div
             ref={panelRef}
             role="menu"
-            style={{ right: anchor.right, bottom: anchor.bottom }}
+            style={
+              anchor.mode === "end"
+                ? { right: anchor.right, bottom: anchor.bottom }
+                : { left: "50%", bottom: anchor.bottom, transform: "translateX(-50%)" }
+            }
             className="sheet sheet-frost fixed z-45 w-56 max-w-[calc(100vw-2rem)] rounded-2xl p-1.5"
           >
             <div className="px-2.5 py-2">

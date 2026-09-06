@@ -72,6 +72,9 @@
   --glass-fill-hi: rgb(255 255 255 / 0.62);
   --glass-blur: 16px;
   --glass-sat: 150%;
+  /* Isian kapsul navigasi — jauh lebih tipis dari --glass-fill: lihat
+     catatan .glass-liquid tentang kenapa ia tidak memakai token yang sama. */
+  --glass-liquid-fill: rgb(255 255 255 / 0.14);
 
   /* Bayangan lebar dan sangat lembut: satu lapis kontak tipis supaya pane
      tidak melayang tanpa dasar, lalu satu lapis luas beropasitas rendah.
@@ -210,6 +213,7 @@
   --glass-fill-hi: rgb(255 255 255 / 0.09);
   --glass-blur: 14px;
   --glass-sat: 130%;
+  --glass-liquid-fill: rgb(255 255 255 / 0.03);
 
   --glass-depth: 0 1px 2px rgb(0 0 0 / 0.25),
                  0 12px 32px -16px rgb(0 0 0 / 0.55);
@@ -421,6 +425,34 @@ body {
      dan cadangannya ikut hilang. */
   .glass.glass-lens {
     backdrop-filter: url(#glassLens) blur(5px) saturate(140%);
+  }
+
+  /* Kaca cair — kapsul navigasi.
+     Peta refraksinya ada di index.html (#glassLiquidNav): peta yang sama
+     dengan #glassLens (bibir tegak lurus, datar di tengah), hanya
+     dibengkokkan lebih jauh, karena di sini efeknya adalah tampilan kapsul
+     itu sendiri, bukan cuma sentuhan di tepi dialog.
+
+     Dua angka yang diminta punya arti berbeda dan sengaja tidak saling
+     mengganti: BLUR mengaburkan apa yang tembus, REFRAKSI membengkokkannya.
+     Menaikkan blur untuk membuat sesuatu "terlihat kaca" hanya menghasilkan
+     jendela buram — kaca sungguhan tetap tajam, yang melengkung adalah
+     bentuk benda di baliknya. Karena itu blur-nya sengaja ditahan sangat
+     rendah (5% dari rentang wajar 0–20px ≈ 1px, sekadar melembutkan jahitan
+     piksel) sementara bengkoknya besar (65% dari rentang 0–100 pada
+     feDisplacementMap, jauh di atas 14–18 milik #glassLens yang cuma
+     menyentuh tepi).
+
+     Isiannya juga ditipiskan di sini, bukan di token --glass-fill global:
+     kolom dan dialog masih perlu isian yang cukup tebal untuk kartu di
+     dalamnya tetap terbaca sebagai kartu; kapsul navigasi tidak menaungi
+     apa pun di dalam dirinya sendiri, jadi ia boleh nyaris tembus pandang. */
+  .glass-liquid {
+    background-color: var(--glass-liquid-fill);
+    backdrop-filter: blur(1px) saturate(160%);
+  }
+  .glass.glass-liquid {
+    backdrop-filter: url(#glassLiquidNav) blur(1px) saturate(160%);
   }
 
   /* Permukaan di dalam gelas: benda yang mengambang, bukan jendela.
@@ -1655,16 +1687,19 @@ body {
 /* ══════════════════════════════════════════════════════════════════
    Tinta di atas foto
 
-   Kepala papan dan barisan kredit di kaki halaman tidak duduk di atas
-   pelat kaca — mereka duduk di atas fotonya. Selama kabut menyala itu
-   tidak jadi soal: yang di bawah teks sudah hampir seluruhnya warna
-   tema. Begitu kabutnya dimatikan, tinta tema bertemu foto sembarang.
+   Kepala papan, kepala kolom yang tidak diberi warna, kapsul navigasi, dan
+   barisan kredit di kaki halaman tidak duduk di atas pelat kaca yang pekat —
+   mereka duduk di atas fotonya, langsung atau lewat kaca yang nyaris tembus.
+   Kabut yang digambar di atas foto membantu, tapi tidak pernah menghapus
+   fotonya — kabut tema terang di sini cuma abu-abu 23%, jadi foto gelap
+   dengan kabut menyala tetap butuh tinta terang, bukan tinta tema begitu saja.
 
    Yang menentukan bukan tema melainkan foto itu sendiri, diukur di petak
-   tempat teksnya benar-benar berdiri (client/lib/backdrop.ts) dan
-   dituliskan ke <html> sebagai data-ink-top / data-ink-bottom. Dua petak,
-   bukan satu: sebuah foto bisa terang di atas dan gelap di bawah, dan
-   satu jawaban untuk seluruh layar akan salah di salah satu ujungnya.
+   tempat teksnya benar-benar berdiri (client/lib/backdrop.ts) dan dituliskan
+   ke <html> sebagai data-ink-top / data-ink-top-end / data-ink-bottom-start /
+   data-ink-bottom-center / data-ink-columns. Lima petak, bukan satu: sebuah
+   foto bisa terang di satu sudut dan gelap di sudut lain, dan satu jawaban
+   untuk seluruh layar akan salah di sebagian besar tempatnya.
 
    Yang ditimpa hanya token tinta — bukan seluruh palet. Pelat kaca di
    dalamnya punya isian dan bayangannya sendiri yang sudah bekerja di
@@ -1702,9 +1737,29 @@ body {
     text-shadow: none;
   }
 
+  /* Kepala kolom yang tidak diberi warna: token yang sama dengan kolom
+     berwarna (lihat [data-tinted="true"] .column-chrome), tapi arahnya
+     ditentukan foto, bukan rona label. Tidak perlu kelas baru di markup —
+     `.column-chrome` dan `[data-tinted="false"]` sudah ada di sana untuk
+     alasan lain, dan pasangan atribut+kelas yang sudah ada ini sudah cukup
+     spesifik untuk ditumpangi. */
+  [data-ink-columns] [data-tinted="false"] .column-chrome {
+    /* Sama seperti .on-photo-top: judul kolom dan kolom isian nama tidak
+       menyebut warna sama sekali (bukan utility text-*), jadi mereka hanya
+       mewarisi `color` — dan warisan itu sudah jadi warna sungguhan
+       sebelum sampai sini kalau tidak ditulis ulang tepat di sini. */
+    color: var(--color-ink);
+    text-shadow: var(--photo-shadow, none);
+  }
+  [data-ink-columns] [data-tinted="false"] .column-chrome .chip {
+    text-shadow: none;
+  }
+
   [data-ink-top="light"] .on-photo-top,
   [data-ink-top-end="light"] .on-photo-top-end,
-  [data-ink-bottom="light"] .on-photo-bottom {
+  [data-ink-bottom-start="light"] .on-photo-bottom-start,
+  [data-ink-bottom-center="light"] .on-photo-bottom-center,
+  [data-ink-columns="light"] [data-tinted="false"] .column-chrome {
     --color-ink: #F7F9FC;
     --color-ink-soft: #DDE4EF;
     --color-muted: #C2CCDA;
@@ -1718,7 +1773,9 @@ body {
 
   [data-ink-top="dark"] .on-photo-top,
   [data-ink-top-end="dark"] .on-photo-top-end,
-  [data-ink-bottom="dark"] .on-photo-bottom {
+  [data-ink-bottom-start="dark"] .on-photo-bottom-start,
+  [data-ink-bottom-center="dark"] .on-photo-bottom-center,
+  [data-ink-columns="dark"] [data-tinted="false"] .column-chrome {
     --color-ink: #0B1220;
     --color-ink-soft: #2A3547;
     --color-muted: #47536A;
@@ -1733,11 +1790,11 @@ body {
   /* Kredit foto sudah punya alasnya sendiri, jadi ia tidak butuh bayangan —
      dua-duanya sekaligus membuat hurufnya terlihat kotor. Alasnya yang
      dibalik supaya tetap membaca sebagai keping di atas foto. */
-  [data-ink-bottom="light"] .photo-credit {
+  [data-ink-bottom-start="light"] .photo-credit {
     background-color: rgb(8 10 14 / 0.42);
     text-shadow: none;
   }
-  [data-ink-bottom="dark"] .photo-credit {
+  [data-ink-bottom-start="dark"] .photo-credit {
     background-color: rgb(255 255 255 / 0.55);
     text-shadow: none;
   }
