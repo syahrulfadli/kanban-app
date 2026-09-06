@@ -195,24 +195,7 @@ export function CardFollowup({
                         {edited(comment) && " · disunting"}
                       </span>
 
-                      {mine && editing !== comment.id && (
-                        <span className="ml-auto flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-                          <button
-                            type="button"
-                            onClick={() => setEditing(comment.id)}
-                            className="text-[0.6875rem] font-semibold text-faint transition-colors hover:text-ink"
-                          >
-                            Ubah
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onDelete(comment)}
-                            className="text-[0.6875rem] font-semibold text-faint transition-colors hover:text-danger"
-                          >
-                            Hapus
-                          </button>
-                        </span>
-                      )}
+                      
                     </div>
 
                     {editing === comment.id ? (
@@ -238,6 +221,25 @@ export function CardFollowup({
                         {comment.body}
                       </p>
                     )}
+
+                    {mine && editing !== comment.id && (
+                        <span className="ml-auto flex gap-1 ">
+                          <button
+                            type="button"
+                            onClick={() => setEditing(comment.id)}
+                            className="text-[0.6875rem] font-semibold text-faint transition-colors hover:text-ink"
+                          >
+                            Ubah
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onDelete(comment)}
+                            className="text-[0.6875rem] font-semibold text-faint transition-colors hover:text-danger"
+                          >
+                            Hapus
+                          </button>
+                        </span>
+                      )}
                   </div>
                 </li>
               );
