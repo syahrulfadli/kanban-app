@@ -428,31 +428,28 @@ body {
   }
 
   /* Kaca cair — kapsul navigasi.
-     Peta refraksinya ada di index.html (#glassLiquidNav) — BUKAN peta bibir
-     #glassLens yang datar di tengah dan hanya menekuk dekat tepi. Peta itu
-     dirancang untuk dialog besar; di kapsul yang tingginya cuma ~44px, pita
-     tekukannya jadi setipis beberapa piksel dan berhenti jauh sebelum
-     benar-benar sampai ke pinggiran atas-bawahnya — persis yang terlihat
-     begitu diperbesar dekat. Peta di sini turbulensi yang menggeser SETIAP
-     piksel, jadi tidak ada zona datar yang perlu pas dengan bentuk elemen.
+     Peta refraksinya ada di index.html (#glassLiquidNav): peta yang sama
+     dengan #glassLens (bibir tegak lurus, datar di tengah), hanya
+     dibengkokkan lebih jauh, karena di sini efeknya adalah tampilan kapsul
+     itu sendiri, bukan cuma sentuhan di tepi dialog.
+
+     Peta ini datar di tengah dan cuma menekuk dekat tepi — di kapsul yang
+     pendek (~48px) itu berarti tepi atas-bawahnya kurang ikut melengkung
+     kalau diperiksa sangat dekat. Sempat diganti feTurbulence (menggeser
+     seluruh permukaan) supaya sampai ke semua pinggiran, lalu dikembalikan
+     ke sini atas permintaan — rupa peta bibir inilah yang dimaksud "efek
+     liquid glass sebelumnya", dan keterbatasannya di tepi pendek diterima
+     sebagai harga rupa itu.
 
      Dua angka yang diminta punya arti berbeda dan sengaja tidak saling
      mengganti: BLUR mengaburkan apa yang tembus, REFRAKSI membengkokkannya.
      Menaikkan blur untuk membuat sesuatu "terlihat kaca" hanya menghasilkan
      jendela buram — kaca sungguhan tetap tajam, yang melengkung adalah
-     bentuk benda di baliknya.
-
-     Urutan fungsi di `backdrop-filter` bukan basa-basi: url() lebih dulu
-     membengkokkan latarnya, BARU blur() mengaburkan HASIL yang sudah
-     bengkok itu — bukan dua efek yang berdiri sendiri-sendiri. Jadi blur
-     tidak boleh naik jauh: 5px (25%) ternyata cukup untuk meratakan
-     kembali kelokan halus yang baru dibuat feDisplacementMap, dan
-     refraksinya nyaris hilang ditelan kaburnya sendiri. Ditahan rendah
-     di 2px (10% dari rentang wajar 0–20px) — sekadar melembutkan jahitan
-     piksel — sementara bengkoknya tetap terasa besar RELATIF terhadap
-     tinggi kapsul (skala 12–15 di feDisplacementMap — lihat komentar
-     #glassLiquidNav untuk kenapa angka ini jauh lebih kecil daripada
-     rentang 0–100 yang dipakai saat peta bibirnya masih dipakai).
+     bentuk benda di baliknya. Karena itu blur-nya sengaja ditahan sangat
+     rendah (5% dari rentang wajar 0–20px ≈ 1px, sekadar melembutkan jahitan
+     piksel) sementara bengkoknya besar (65% dari rentang 0–100 pada
+     feDisplacementMap, jauh di atas 14–18 milik #glassLens yang cuma
+     menyentuh tepi).
 
      Isiannya juga ditipiskan di sini, bukan di token --glass-fill global:
      kolom dan dialog masih perlu isian yang cukup tebal untuk kartu di
@@ -460,10 +457,10 @@ body {
      apa pun di dalam dirinya sendiri, jadi ia boleh nyaris tembus pandang. */
   .glass-liquid {
     background-color: var(--glass-liquid-fill);
-    backdrop-filter: blur(2px) saturate(160%);
+    backdrop-filter: blur(1px) saturate(160%);
   }
   .glass.glass-liquid {
-    backdrop-filter: url(#glassLiquidNav) blur(2px) saturate(160%);
+    backdrop-filter: url(#glassLiquidNav) blur(1px) saturate(160%);
   }
 
   /* Permukaan di dalam gelas: benda yang mengambang, bukan jendela.

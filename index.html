@@ -75,40 +75,34 @@
       </defs>
     </svg>
 
-    <!-- Peta bibir #glassLens (edge-only, datar di tengah) cocok untuk
-         dialog besar tapi salah untuk kapsul navigasi: kapsul ini pendek
-         (~44px) jauh sebelum lebar, dan pita 11%-dari-tepi yang dipakai
-         glassLens jadi setipis beberapa piksel di sumbu pendeknya — begitu
-         diperbesar dekat ke pinggiran atas/bawah, hampir seluruh tinggi
-         kapsul jatuh di zona "datar" itu dan refraksinya terlihat berhenti
-         sebelum benar-benar sampai ke tepi.
+    <!-- Peta yang sama dengan #glassLens, disalin (primitif SVG tidak bisa
+         dibagi lintas <filter>) tapi dibengkokkan jauh lebih dalam: di kapsul
+         navigasi refraksi INILAH tampilan "kaca cair"-nya, bukan cuma sentuhan
+         di tepi. "Blur amount 0.05" dan "refraction 0.65" yang diminta
+         dipetakan ke rentang wajar kedua parameter — lihat catatan
+         .glass-liquid di index.css untuk kenapa keduanya dijaga tidak saling
+         meniadakan.
 
-         Jadi peta di sini bukan gradien tepi, melainkan turbulensi yang
-         menggeser SETIAP piksel secara merata — tidak ada lagi "zona datar
-         di tengah" yang perlu pas dengan bentuk elemen, jadi bengkoknya
-         sampai ke seluruh pinggiran tanpa peduli rasio panjang-lebarnya.
-         Filter region-nya juga dilebihkan (-30% di tiap sisi, bukan pas
-         0–100%): tanpa itu piksel di tepi yang seharusnya menggeser masuk
-         dari LUAR kotak elemen tidak punya apa-apa untuk digeser, dan
-         berakhir pudar tepat di tempat yang paling sering diperiksa dekat.
-
-         Skalanya jauh lebih kecil daripada #glassLens (12–15, bukan 14–18
-         milik dialog yang berukuran beberapa kali lipat): "refraction 0.65"
-         yang diminta di sini berarti bengkok yang terasa besar RELATIF
-         terhadap tinggi kapsul, bukan angka piksel yang sama dengan dialog
-         yang jauh lebih besar. -->
+         Peta bibir ini datar di tengah dan hanya menekuk dekat tepi — di
+         kapsul yang pendek (~48px) pita tekukannya tipis, dan tepi atas-bawah
+         nyaris tidak ikut melengkung kalau diperbesar dekat. Sempat diganti
+         ke feTurbulence (menggeser seluruh permukaan, sampai ke semua
+         pinggiran) lalu dikembalikan ke sini atas permintaan — rupa peta
+         bibir inilah yang dimaksud "efek liquid glass sebelumnya". -->
     <svg width="0" height="0" aria-hidden="true" focusable="false"
          style="position:absolute;pointer-events:none">
       <defs>
-        <filter id="glassLiquidNav" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
-          <feTurbulence type="fractalNoise" baseFrequency="0.05 0.09" numOctaves="2" seed="8" result="noise2"/>
-          <feDisplacementMap in="SourceGraphic" in2="noise2" scale="12.61"
+        <filter id="glassLiquidNav" x="0%" y="0%" width="100%" height="100%" color-interpolation-filters="sRGB">
+          <feImage href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220.0000%22%20stop-color%3D%22rgb%280%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.0165%22%20stop-color%3D%22rgb%280%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.0322%22%20stop-color%3D%22rgb%280%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.0495%22%20stop-color%3D%22rgb%288%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.0660%22%20stop-color%3D%22rgb%2848%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.0825%22%20stop-color%3D%22rgb%2881%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.0990%22%20stop-color%3D%22rgb%28110%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.1100%22%20stop-color%3D%22rgb%28128%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.8900%22%20stop-color%3D%22rgb%28128%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.9010%22%20stop-color%3D%22rgb%28146%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.9175%22%20stop-color%3D%22rgb%28175%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.9340%22%20stop-color%3D%22rgb%28207%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.9505%22%20stop-color%3D%22rgb%28247%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.9678%22%20stop-color%3D%22rgb%28255%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.9835%22%20stop-color%3D%22rgb%28255%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%221.0000%22%20stop-color%3D%22rgb%28255%2C0%2C0%29%22%2F%3E%3C%2FlinearGradient%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20fill%3D%22url%28%23g%29%22%2F%3E%3C%2Fsvg%3E" preserveAspectRatio="none" result="mx2"/>
+          <feImage href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220.0000%22%20stop-color%3D%22rgb%280%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.0165%22%20stop-color%3D%22rgb%280%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.0322%22%20stop-color%3D%22rgb%280%2C0%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.0495%22%20stop-color%3D%22rgb%280%2C8%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.0660%22%20stop-color%3D%22rgb%280%2C48%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.0825%22%20stop-color%3D%22rgb%280%2C81%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.0990%22%20stop-color%3D%22rgb%280%2C110%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.1100%22%20stop-color%3D%22rgb%280%2C128%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.8900%22%20stop-color%3D%22rgb%280%2C128%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.9010%22%20stop-color%3D%22rgb%280%2C146%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.9175%22%20stop-color%3D%22rgb%280%2C175%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.9340%22%20stop-color%3D%22rgb%280%2C207%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.9505%22%20stop-color%3D%22rgb%280%2C247%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.9678%22%20stop-color%3D%22rgb%280%2C255%2C0%29%22%2F%3E%3Cstop%20offset%3D%220.9835%22%20stop-color%3D%22rgb%280%2C255%2C0%29%22%2F%3E%3Cstop%20offset%3D%221.0000%22%20stop-color%3D%22rgb%280%2C255%2C0%29%22%2F%3E%3C%2FlinearGradient%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20fill%3D%22url%28%23g%29%22%2F%3E%3C%2Fsvg%3E" preserveAspectRatio="none" result="my2"/>
+          <feBlend in="mx2" in2="my2" mode="screen" result="map2"/>
+          <feDisplacementMap in="SourceGraphic" in2="map2" scale="58.51"
           xChannelSelector="R" yChannelSelector="G" result="dr2"/>
           <feColorMatrix in="dr2" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cr2"/>
-          <feDisplacementMap in="SourceGraphic" in2="noise2" scale="14"
+          <feDisplacementMap in="SourceGraphic" in2="map2" scale="65"
           xChannelSelector="R" yChannelSelector="G" result="dg2"/>
           <feColorMatrix in="dg2" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cg2"/>
-          <feDisplacementMap in="SourceGraphic" in2="noise2" scale="15.39"
+          <feDisplacementMap in="SourceGraphic" in2="map2" scale="71.49"
           xChannelSelector="R" yChannelSelector="G" result="db2"/>
           <feColorMatrix in="db2" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="cb2"/>
           <feBlend in="cr2" in2="cg2" mode="screen" result="crg2"/>
