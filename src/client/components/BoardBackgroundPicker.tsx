@@ -108,7 +108,7 @@ function ImageOptions({
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <p id={overlayId} className="text-xs font-medium">
-            Kabut di atas gambar
+            <i>Overlay</i>
           </p>
           <p className="mt-0.5 text-[11px] leading-relaxed text-muted">
             Menjaga tulisan tetap terbaca. Dimatikan, fotonya tampil utuh dan warna
@@ -118,7 +118,9 @@ function ImageOptions({
         <Toggle checked={overlay} onChange={onOverlay} labelledBy={overlayId} size="sm" />
       </div>
 
-      <p className="mt-3 text-xs font-medium">Kekaburan</p>
+      <p className="mt-3 text-xs font-medium">
+        Efek <i>blur</i>
+      </p>
       <div className="mt-1.5 flex items-center gap-1">
         {BOARD_BLUR_LEVELS.map((level) => (
           <button

@@ -158,7 +158,7 @@ export const DEFAULT_BOARD_BACKGROUND: BoardBackground = { kind: "default" };
 
 /** Nama tingkat kekaburan yang dibaca orang. Angkanya piksel; ini namanya. */
 export const BOARD_BLUR_LABELS: Record<BoardBlur, string> = {
-  0: "Tajam",
+  0: "Nonaktif",
   6: "Tipis",
   14: "Sedang",
   28: "Tebal",
