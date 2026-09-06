@@ -437,10 +437,17 @@ body {
      mengganti: BLUR mengaburkan apa yang tembus, REFRAKSI membengkokkannya.
      Menaikkan blur untuk membuat sesuatu "terlihat kaca" hanya menghasilkan
      jendela buram — kaca sungguhan tetap tajam, yang melengkung adalah
-     bentuk benda di baliknya. Karena itu blur-nya dijaga tetap rendah (25%
-     dari rentang wajar 0–20px = 5px — cukup untuk melunakkan apa yang tembus
-     tanpa menelan bengkoknya) sementara bengkoknya besar (65% dari rentang
-     0–100 pada feDisplacementMap, jauh di atas 14–18 milik #glassLens yang
+     bentuk benda di baliknya.
+
+     Urutan fungsi di `backdrop-filter` bukan basa-basi: url() lebih dulu
+     membengkokkan latarnya, BARU blur() mengaburkan HASIL yang sudah
+     bengkok itu — bukan dua efek yang berdiri sendiri-sendiri. Jadi blur
+     tidak boleh naik jauh: 5px (25%) ternyata cukup untuk meratakan
+     kembali kelokan halus yang baru dibuat feDisplacementMap, dan
+     refraksinya nyaris hilang ditelan kaburnya sendiri. Ditahan rendah
+     di 2px (10% dari rentang wajar 0–20px) — sekadar melembutkan jahitan
+     piksel — sementara bengkoknya tetap besar (65% dari rentang 0–100
+     pada feDisplacementMap, jauh di atas 14–18 milik #glassLens yang
      cuma menyentuh tepi).
 
      Isiannya juga ditipiskan di sini, bukan di token --glass-fill global:
@@ -449,10 +456,10 @@ body {
      apa pun di dalam dirinya sendiri, jadi ia boleh nyaris tembus pandang. */
   .glass-liquid {
     background-color: var(--glass-liquid-fill);
-    backdrop-filter: blur(5px) saturate(160%);
+    backdrop-filter: blur(2px) saturate(160%);
   }
   .glass.glass-liquid {
-    backdrop-filter: url(#glassLiquidNav) blur(5px) saturate(160%);
+    backdrop-filter: url(#glassLiquidNav) blur(2px) saturate(160%);
   }
 
   /* Permukaan di dalam gelas: benda yang mengambang, bukan jendela.
