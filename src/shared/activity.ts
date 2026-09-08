@@ -65,6 +65,10 @@ export function describeActivity(kind: ActivityKind, detail: ActivityDetail | nu
       };
     case "due_cleared":
       return { verb: "menghapus tenggat" };
+    case "attachment_added":
+      return { verb: "menambahkan lampiran", subject: d.text };
+    case "attachment_removed":
+      return { verb: "menghapus lampiran", subject: d.text };
   }
 }
 
@@ -140,6 +144,10 @@ export function describeNotification(
         : `mengubah tenggat ${card}`;
     case "due_cleared":
       return `menghapus tenggat ${card}`;
+    case "attachment_added":
+      return `menambahkan lampiran ${quoted(d.text, "baru")} di ${card}`;
+    case "attachment_removed":
+      return `menghapus lampiran ${quoted(d.text, "lama")} dari ${card}`;
   }
 }
 

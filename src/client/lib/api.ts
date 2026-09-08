@@ -2,6 +2,7 @@ import type {
   AdminAccess,
   AdminBackgroundImage,
   AdminUserPage,
+  AttachmentMime,
   AvatarMime,
   BackgroundImageBrief,
   Board,
@@ -10,6 +11,7 @@ import type {
   BoardDetail,
   BoardGradient,
   Card,
+  CardAttachmentDetail,
   CardCommentDetail,
   CardDetail,
   CardSearchHit,
@@ -268,4 +270,9 @@ export const api = {
   updateChecklistItem: (id: string, patch: { text?: string; done?: boolean }) =>
     send<ChecklistItem>(`/cards/checklist/${id}`, "PATCH", patch),
   deleteChecklistItem: (id: string) => send<void>(`/cards/checklist/${id}`, "DELETE"),
+
+  /* lampiran */
+  uploadAttachment: (cardId: string, upload: { filename: string; mime: AttachmentMime; data: string }) =>
+    send<CardAttachmentDetail>(`/cards/${cardId}/attachments`, "POST", upload),
+  deleteAttachment: (id: string) => send<void>(`/cards/attachments/${id}`, "DELETE"),
 };

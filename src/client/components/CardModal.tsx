@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { CardAttachments } from "./CardAttachments";
 import { CardChecklist } from "./CardChecklist";
 import { CardDue } from "./CardDue";
 import { CardFollowup } from "./CardFollowup";
@@ -12,9 +13,11 @@ import { CardDetailSkeleton, SkeletonLine } from "./Skeleton";
 import { useStoredFlag } from "../hooks/useStoredFlag";
 import { api } from "../lib/api";
 import { optimisticActivity, type ActivityNote } from "../lib/activity";
+import { prepareAttachment } from "../lib/attachment";
 import { formatDateTime, formatRelative } from "../lib/format";
 import type { ChannelStatus } from "../lib/realtime";
 import type {
+  CardAttachmentDetail,
   CardCommentDetail,
   CardDetail,
   ChecklistItem,
@@ -212,13 +215,16 @@ export function CardModal({
         });
         setError(null);
       } catch (e) {
+        // Beda dengan `run`: belum ada apa pun yang diterapkan secara
+        // optimistik di atas, jadi tidak ada yang perlu dipulihkan lewat
+        // `load()` — memanggilnya di sini hanya akan langsung menghapus
+        // pesan error ini lewat `setError(null)`-nya sendiri begitu berhasil.
         setError(e instanceof Error ? e.message : "Perubahan gagal disimpan");
-        await load();
       } finally {
         onBoardChange();
       }
     },
-    [cardId, currentUser, load, onBoardChange],
+    [cardId, currentUser, onBoardChange],
   );
 
   const commitTitle = (value: string) => {
@@ -320,6 +326,30 @@ export function CardModal({
       () => api.addChecklistItem(cardId, text),
       (card, item) => ({ ...card, checklistItems: [...card.checklistItems, item] }),
       (item) => ({ kind: "checklist_added", detail: { text: item.text } }),
+    );
+
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+
+  const addAttachment = (file: File) => {
+    setUploadingAttachment(true);
+    void insert(
+      async () => {
+        const upload = await prepareAttachment(file);
+        return api.uploadAttachment(cardId, upload);
+      },
+      (card, attachment) => ({ ...card, attachments: [...card.attachments, attachment] }),
+      (attachment) => ({ kind: "attachment_added", detail: { text: attachment.filename } }),
+    ).finally(() => setUploadingAttachment(false));
+  };
+
+  const deleteAttachment = (attachment: CardAttachmentDetail) =>
+    void run(
+      (card) => ({
+        ...card,
+        attachments: card.attachments.filter((a) => a.id !== attachment.id),
+      }),
+      () => api.deleteAttachment(attachment.id),
+      { kind: "attachment_removed", detail: { text: attachment.filename } },
     );
 
   /* Mengundang seseorang bukan menyunting kartu, tapi tetap lewat `run`:
@@ -602,6 +632,13 @@ export function CardModal({
                   onRename={renameItem}
                   onDelete={deleteItem}
                   onAdd={addItem}
+                />
+
+                <CardAttachments
+                  attachments={detail.attachments}
+                  uploading={uploadingAttachment}
+                  onAdd={addAttachment}
+                  onDelete={deleteAttachment}
                 />
               </div>
 

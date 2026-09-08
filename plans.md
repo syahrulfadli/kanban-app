@@ -79,7 +79,54 @@ Trello.
 - Entry point ke panel arsip kecil saja (ikon di menu board), badge jumlah
   hanya kalau tidak kosong — jangan selalu terlihat kalau memang kosong.
 
-## 3. Lampiran kecil di kartu
+## 3. Lampiran kecil di kartu — **selesai**
+
+Diimplementasikan: tabel `cardAttachments` (`src/db/schema.ts`, migrasi
+`0011_married_ronan.sql`) — base64 di D1, tanpa R2, persis pola
+`userAvatars`. Endpoint `POST/DELETE /api/cards/.../attachments` dan
+`GET /api/attachments/:id` (`src/worker/routes/cards.ts`,
+`src/worker/guards.ts`) — yang terakhir tetap diperiksa sampai keanggotaan
+workspace (beda dari avatar yang publik ke sesama user login), dan
+`CardDetail` hanya membawa metadata lampiran, bukan `data`-nya — isi
+berkas ditarik terpisah lewat URL itu, sama seperti `user.image`.
+Di klien: `src/client/lib/attachment.ts` (resize gambar di browser,
+mempertahankan rasio aspek — beda dari avatar yang dipotong persegi;
+berkas non-gambar dikirim apa adanya), `CardAttachments.tsx` (daftar
+lampiran + lightbox ringan), dipasang di `CardModal` setelah checklist.
+Helper canvas→base64 avatar diekstrak ke `imageCodec.ts` supaya dipakai
+ulang oleh keduanya.
+
+**Keputusan atas pertanyaan terbuka:** tipe berkas gambar (webp/jpeg/png)
+**+ berkas umum kecil** (`application/pdf`, `text/plain`,
+`application/zip`) — bukan gambar saja; klik non-gambar mengunduh
+(`Content-Disposition: attachment`), bukan dibuka inline. Batas: 500 KB
+per berkas (base64) setelah diproses, maksimal 10 lampiran per kartu.
+Base64/D1 dikonfirmasi (bukan R2). Pratinjau gambar: lightbox ringan
+meniru `ConfirmDialog` (backdrop gelap, klik luar/Esc menutup), tanpa
+zoom/pan.
+
+Diuji langsung di browser (Playwright headless, akun baru, workspace→
+board→kartu baru): unggah gambar kecil menampilkan thumbnail, klik
+membuka lightbox, Esc dan klik backdrop sama-sama menutup lightbox
+**tanpa ikut menutup dialog kartu**; unggah berkas non-gambar tampil
+sebagai ikon+nama+ukuran dengan tautan unduh yang benar; unggah berkas
+melebihi 500 KB ditolak di klien (tanpa panggilan jaringan) dengan pesan
+galat yang jelas; hapus lampiran menghilangkannya dari daftar dan
+tercatat di lini masa ("menambahkan lampiran …" / "menghapus lampiran
+…"). Sanity check keamanan: `GET /api/attachments/:id` dikonfirmasi 401
+tanpa sesi dan 404 untuk pengguna yang bukan anggota workspace pemilik
+board (lintas dua akun uji). Tidak ada error konsol React di sepanjang
+pengujian.
+
+Bug yang ditemukan dan diperbaiki selagi menguji ini (bukan mengenai
+lampiran secara khusus): `insert()` di `CardModal.tsx` memanggil `load()`
+di blok catch-nya, yang begitu berhasil langsung memanggil
+`setError(null)` — menghapus pesan galat yang baru saja diset oleh
+catch-nya sendiri. Ini membuat pesan galat pada **semua** alur "tambah"
+(checklist, followup baru, label baru, lampiran) nyaris tidak pernah
+terlihat penggunanya. `load()` di situ juga tidak berguna: `insert()`
+tidak pernah menerapkan apa pun secara optimistik sebelum `commit()`
+selesai, jadi tidak ada yang perlu dipulihkan. Baris itu dihapus.
 
 **Masalah:** kartu belum bisa punya lampiran berkas.
 

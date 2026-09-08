@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { and, asc, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
@@ -7,6 +8,7 @@ import { nanoid } from "nanoid";
 import {
   boards,
   cardActivities,
+  cardAttachments,
   cardComments,
   cardLabels,
   cardMembers,
@@ -25,6 +27,7 @@ import type { AppEnv } from "../auth";
 import {
   assertAuthor,
   assertRole,
+  requireAttachment,
   requireCard,
   requireChecklistItem,
   requireColumn,
@@ -50,6 +53,12 @@ import {
 } from "../card-data";
 import { evenPositions, needsRebalance, positionBetween } from "../../shared/position";
 import { MIN_QUERY_LENGTH, matchesQuery, snippetAround } from "../../shared/search";
+import {
+  ATTACHMENT_MIMES,
+  isAttachmentImage,
+  MAX_ATTACHMENT_BASE64,
+  MAX_ATTACHMENTS_PER_CARD,
+} from "../../shared/types";
 import type { CardDetail, CardSearchHit, CardSummary, UserBrief } from "../../shared/types";
 
 /**
@@ -74,7 +83,7 @@ async function buildCardDetail(
   workspaceId: string,
   viewerId: string,
 ): Promise<CardDetail> {
-  const [card, extrasMap, items, comments, activities] = await Promise.all([
+  const [card, extrasMap, items, comments, attachmentRows, activities] = await Promise.all([
     db.select().from(cards).where(eq(cards.id, cardId)).get(),
 
     loadCardExtras(db, { cardId }, viewerId),
@@ -100,6 +109,31 @@ async function buildCardDetail(
       .innerJoin(user, eq(cardComments.userId, user.id))
       .where(eq(cardComments.cardId, cardId))
       .orderBy(asc(cardComments.createdAt))
+      .all(),
+
+    /* Left join, bukan inner: pengunggah yang sudah keluar dari tim
+       menyisakan `user_id` null, dan lampirannya tetap harus tampil. Kolom
+       `data` (base64) sengaja tidak ikut ditarik — isi berkas ditarik
+       terpisah lewat /api/attachments/:id saat benar-benar dibutuhkan. */
+    db
+      .select({
+        id: cardAttachments.id,
+        cardId: cardAttachments.cardId,
+        filename: cardAttachments.filename,
+        mime: cardAttachments.mime,
+        size: cardAttachments.size,
+        createdAt: cardAttachments.createdAt,
+        uploader: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          image: user.image,
+        },
+      })
+      .from(cardAttachments)
+      .leftJoin(user, eq(cardAttachments.userId, user.id))
+      .where(eq(cardAttachments.cardId, cardId))
+      .orderBy(asc(cardAttachments.createdAt))
       .all(),
 
     /* Left join, bukan inner: pelaku yang sudah keluar dari tim menyisakan
@@ -136,6 +170,10 @@ async function buildCardDetail(
     workspaceId,
     checklistItems: items,
     comments: comments.map(({ comment, author }) => ({ ...comment, author })),
+    attachments: attachmentRows.map(({ uploader, ...rest }) => ({
+      ...rest,
+      uploader: uploader?.id ? uploader : null,
+    })),
     activities: activities.map(({ activity, actor }) => ({
       ...activity,
       actor: actor?.id ? actor : null,
@@ -330,6 +368,25 @@ const app = new Hono<AppEnv>()
     const note = { kind: "checklist_removed", detail: { text: item.text } } as const;
 
     await db.delete(checklistItems).where(eq(checklistItems.id, item.id));
+    await markCardActivity(db, cardId, userId, { note });
+    await touchBoard(c, boardId);
+    notifyCardActivity(c, { cardId, boardId, cardTitle, notes: note });
+
+    return c.body(null, 204);
+  })
+
+  .delete("/attachments/:attachmentId", async (c) => {
+    const db = c.get("db");
+    const userId = c.get("user").id;
+    const { attachment, cardId, cardTitle, boardId } = await requireAttachment(
+      db,
+      c.req.param("attachmentId"),
+      userId,
+    );
+
+    const note = { kind: "attachment_removed", detail: { text: attachment.filename } } as const;
+
+    await db.delete(cardAttachments).where(eq(cardAttachments.id, attachment.id));
     await markCardActivity(db, cardId, userId, { note });
     await touchBoard(c, boardId);
     notifyCardActivity(c, { cardId, boardId, cardTitle, notes: note });
@@ -995,6 +1052,93 @@ const app = new Hono<AppEnv>()
 
       return c.json(item, 201);
     },
+  )
+
+  .post(
+    "/:id/attachments",
+    zValidator(
+      "json",
+      z.object({
+        filename: z.string().trim().min(1).max(255),
+        mime: z.enum(ATTACHMENT_MIMES),
+        /** base64 tanpa awalan data URL — klien sudah meresize/mengencode. */
+        data: z.string().min(1).max(MAX_ATTACHMENT_BASE64),
+      }),
+    ),
+    async (c) => {
+      const db = c.get("db");
+      const userId = c.get("user").id;
+      const { card, boardId } = await requireCard(db, c.req.param("id"), userId);
+      const body = c.req.valid("json");
+
+      const countRow = await db
+        .select({ total: sql<number>`count(*)` })
+        .from(cardAttachments)
+        .where(eq(cardAttachments.cardId, card.id))
+        .get();
+
+      if ((countRow?.total ?? 0) >= MAX_ATTACHMENTS_PER_CARD) {
+        throw new HTTPException(400, {
+          message: `Maksimal ${MAX_ATTACHMENTS_PER_CARD} lampiran per kartu`,
+        });
+      }
+
+      const attachment = {
+        id: nanoid(),
+        cardId: card.id,
+        userId,
+        filename: body.filename,
+        mime: body.mime,
+        // Dihitung dari base64-nya sendiri, bukan dipercaya dari klien.
+        size: Math.floor((body.data.length * 3) / 4),
+        data: body.data,
+        createdAt: new Date(),
+      };
+
+      const note = { kind: "attachment_added", detail: { text: attachment.filename } } as const;
+
+      await db.insert(cardAttachments).values(attachment);
+      await markCardActivity(db, card.id, userId, { note });
+      await touchBoard(c, boardId);
+      notifyCardActivity(c, { cardId: card.id, boardId, cardTitle: card.title, notes: note });
+
+      const { data: _data, ...metadata } = attachment;
+      return c.json(
+        { ...metadata, uploader: toBrief(c.get("user")) },
+        201,
+      );
+    },
   );
+
+/**
+ * Isi lampiran itu sendiri, terpisah dari rute kartu karena alamatnya
+ * menyebut lampirannya langsung — dipakai sebagai `src` gambar atau tautan
+ * unduh, bukan lewat payload kartu yang sudah cukup berat.
+ *
+ * Tetap diperiksa sampai keanggotaan workspace: beda dengan foto profil,
+ * lampiran ikut kerahasiaan board yang menyimpannya.
+ */
+export const attachments = new Hono<AppEnv>().get("/:id", async (c) => {
+  const db = c.get("db");
+  const userId = c.get("user").id;
+  const { attachment } = await requireAttachment(db, c.req.param("id"), userId);
+
+  const binary = atob(attachment.data);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+  const headers: Record<string, string> = {
+    "Content-Type": attachment.mime,
+    "Cache-Control": "private, max-age=31536000, immutable",
+  };
+  // Berkas non-gambar diunduh, bukan dirender inline — tidak ada pratinjau
+  // untuk tipe ini, dan ini menutup risiko peramban menafsirkan isinya.
+  if (!isAttachmentImage(attachment.mime)) {
+    headers["Content-Disposition"] =
+      `attachment; filename="${encodeURIComponent(attachment.filename)}"`;
+  }
+
+  return c.body(bytes, 200, headers);
+});
 
 export default app;

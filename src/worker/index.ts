@@ -5,7 +5,7 @@ import { createAuth, requireAuth, type AppEnv } from "./auth";
 import admin, { adminAccess } from "./routes/admin";
 import boards from "./routes/boards";
 import columns from "./routes/columns";
-import cards from "./routes/cards";
+import cards, { attachments } from "./routes/cards";
 import labels from "./routes/labels";
 import notifications from "./routes/notifications";
 import profile, { avatars } from "./routes/profile";
@@ -53,6 +53,7 @@ const api = new Hono<AppEnv>()
   .route("/boards", boards)
   .route("/columns", columns)
   .route("/cards", cards)
+  .route("/attachments", attachments)
   .route("/labels", labels)
   .route("/push", push)
   .route("/profile", profile)

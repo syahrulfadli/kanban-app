@@ -8,6 +8,7 @@ import type {
   BoardGradient,
   Card,
   CardActivity,
+  CardAttachment,
   CardComment,
   ChecklistItem,
   Column,
@@ -37,6 +38,7 @@ export type {
   BoardGradient,
   Card,
   CardActivity,
+  CardAttachment,
   CardComment,
   ChecklistItem,
   Column,
@@ -106,6 +108,22 @@ export interface CardActivityDetail extends CardActivity {
   actor: UserBrief | null;
 }
 
+/**
+ * Lampiran sebagaimana dikirim ke klien — metadata saja, tanpa isi
+ * berkasnya (`data`). Isi sebenarnya ditarik terpisah lewat
+ * `/api/attachments/:id`, persis seperti `user.image` menunjuk ke
+ * `/api/avatars/:userId` alih-alih membenam base64 di payload user.
+ */
+export interface CardAttachmentDetail {
+  id: string;
+  cardId: string;
+  filename: string;
+  mime: string;
+  size: number;
+  createdAt: Date;
+  uploader: UserBrief | null;
+}
+
 /** Isi lengkap satu kartu — hanya ditarik saat dialognya dibuka. */
 export interface CardDetail extends CardSummary {
   boardId: string;
@@ -115,6 +133,7 @@ export interface CardDetail extends CardSummary {
   workspaceId: string;
   checklistItems: ChecklistItem[];
   comments: CardCommentDetail[];
+  attachments: CardAttachmentDetail[];
   /** Jejak perubahan, terurut dari yang paling lama. */
   activities: CardActivityDetail[];
   createdByUser: UserBrief | null;
@@ -298,6 +317,34 @@ export const AVATAR_SIZE = 256;
    150 KB sudah sangat longgar — angka ini penjaga terhadap kiriman yang
    tidak wajar, bukan target. */
 export const MAX_AVATAR_BASE64 = 200_000;
+
+/* ── Lampiran kartu ───────────────────────────────────────────────
+   Aturan yang sama seperti foto profil: klien memangkas dan mengencode,
+   server hanya memeriksa hasilnya. Bedanya, gambar tidak dipotong persegi
+   (rasio aslinya penting untuk dokumen/screenshot) dan berkas non-gambar
+   diterima apa adanya tanpa diproses. */
+
+/** Gambar yang bisa dipratinjau langsung sebagai thumbnail. */
+export const ATTACHMENT_IMAGE_MIMES = ["image/webp", "image/jpeg", "image/png"] as const;
+
+/** Berkas umum lain — ditampilkan sebagai ikon+nama+ukuran, klik untuk unduh. */
+export const ATTACHMENT_FILE_MIMES = ["application/pdf", "text/plain", "application/zip"] as const;
+
+export const ATTACHMENT_MIMES = [...ATTACHMENT_IMAGE_MIMES, ...ATTACHMENT_FILE_MIMES] as const;
+export type AttachmentMime = (typeof ATTACHMENT_MIMES)[number];
+
+export const isAttachmentImage = (mime: string): boolean =>
+  (ATTACHMENT_IMAGE_MIMES as readonly string[]).includes(mime);
+
+/** Sisi terpanjang gambar setelah diresize, dalam piksel. */
+export const ATTACHMENT_MAX_DIMENSION = 1600;
+
+/* Batas panjang base64 per lampiran — cukup untuk screenshot atau dokumen
+   kecil tanpa membengkakkan kuota D1 free tier. */
+export const MAX_ATTACHMENT_BASE64 = 500_000;
+
+/** Berapa banyak lampiran yang boleh menempel di satu kartu. */
+export const MAX_ATTACHMENTS_PER_CARD = 10;
 
 /* ── Kotak masuk notifikasi ───────────────────────────────────────── */
 

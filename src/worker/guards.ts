@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import {
   appAdmins,
   boards,
+  cardAttachments,
   cardComments,
   cards,
   checklistItems,
@@ -153,6 +154,34 @@ export async function requireChecklistItem(db: Db, itemId: string, userId: strin
       ),
     )
     .where(eq(checklistItems.id, itemId))
+    .get();
+
+  if (!row) throw notFound();
+  return row;
+}
+
+/** Lampiran + kartu + board induk + peran user. */
+export async function requireAttachment(db: Db, attachmentId: string, userId: string) {
+  const row = await db
+    .select({
+      attachment: cardAttachments,
+      cardId: cards.id,
+      cardTitle: cards.title,
+      boardId: boards.id,
+      role: workspaceMembers.role,
+    })
+    .from(cardAttachments)
+    .innerJoin(cards, eq(cardAttachments.cardId, cards.id))
+    .innerJoin(columns, eq(cards.columnId, columns.id))
+    .innerJoin(boards, eq(columns.boardId, boards.id))
+    .innerJoin(
+      workspaceMembers,
+      and(
+        eq(workspaceMembers.workspaceId, boards.workspaceId),
+        eq(workspaceMembers.userId, userId),
+      ),
+    )
+    .where(eq(cardAttachments.id, attachmentId))
     .get();
 
   if (!row) throw notFound();

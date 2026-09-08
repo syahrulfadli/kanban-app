@@ -241,6 +241,8 @@ export const ACTIVITY_KINDS = [
   "member_removed",
   "due_changed",
   "due_cleared",
+  "attachment_added",
+  "attachment_removed",
 ] as const;
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
 
@@ -318,6 +320,25 @@ export const checklistItems = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   },
   (t) => [index("checklist_card_idx").on(t.cardId, t.position)],
+);
+
+export const cardAttachments = sqliteTable(
+  "card_attachments",
+  {
+    id: text("id").primaryKey(),
+    cardId: text("card_id")
+      .notNull()
+      .references(() => cards.id, { onDelete: "cascade" }),
+    // set null, bukan cascade — sama seperti cards.createdBy: lampiran tidak
+    // ikut hilang hanya karena pengunggahnya keluar dari tim.
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    filename: text("filename").notNull(),
+    mime: text("mime").notNull(),
+    size: integer("size").notNull(),
+    data: text("data").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [index("card_attachments_card_idx").on(t.cardId, t.createdAt)],
 );
 
 /**
@@ -669,6 +690,7 @@ export type Card = typeof cards.$inferSelect;
 export type Label = typeof labels.$inferSelect;
 export type CardComment = typeof cardComments.$inferSelect;
 export type ChecklistItem = typeof checklistItems.$inferSelect;
+export type CardAttachment = typeof cardAttachments.$inferSelect;
 export type CardParticipant = typeof cardParticipants.$inferSelect;
 export type CardMember = typeof cardMembers.$inferSelect;
 export type CardWatch = typeof cardWatches.$inferSelect;
