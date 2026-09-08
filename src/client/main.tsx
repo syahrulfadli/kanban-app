@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import { ProfilePopoverProvider } from "./components/ProfilePopover";
 import { UndoProvider } from "./components/UndoToasts";
 import { startGlassTracker } from "./lib/glass";
 import "./index.css";
@@ -10,7 +11,12 @@ createRoot(document.getElementById("root")!).render(
     {/* Toast urung dipasang di akar: penghapusan boleh terjadi di halaman
         mana pun, dan jendela urungnya harus selamat melewati pindah rute. */}
     <UndoProvider>
-      <App />
+      {/* Panel profil dipicu dari banyak tempat tersebar (footer kartu,
+          followup, daftar anggota) — global di akar supaya tidak perlu
+          dioper lewat props berlapis-lapis. */}
+      <ProfilePopoverProvider>
+        <App />
+      </ProfilePopoverProvider>
     </UndoProvider>
   </StrictMode>,
 );

@@ -24,6 +24,7 @@ import type {
   InvitePreview,
   Label,
   LabelColor,
+  MemberStats,
   MemberSummary,
   MoveTargetWorkspace,
   NotificationFeed,
@@ -116,6 +117,8 @@ export const api = {
   /* anggota */
   listMembers: (workspaceId: string) =>
     request<MemberSummary[]>(`/workspaces/${workspaceId}/members`),
+  getMemberStats: (workspaceId: string, userId: string) =>
+    request<MemberStats>(`/workspaces/${workspaceId}/members/${userId}/stats`),
   changeRole: (workspaceId: string, userId: string, role: Role) =>
     send<void>(`/workspaces/${workspaceId}/members/${userId}`, "PATCH", { role }),
   removeMember: (workspaceId: string, userId: string) =>
@@ -242,6 +245,8 @@ export const api = {
   deleteAvatar: () => send<void>("/profile/avatar", "DELETE"),
   createPassword: (newPassword: string) =>
     send<void>("/profile/password", "POST", { newPassword }),
+  /** Statistik kontribusi sendiri, total lintas semua workspace. */
+  getMyStats: () => request<MemberStats>("/profile/stats"),
 
   /* panel admin — semuanya 404 bagi yang bukan admin aplikasi */
   getAdminAccess: () => request<AdminAccess>("/admin-access"),

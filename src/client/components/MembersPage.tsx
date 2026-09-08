@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { AppHeader } from "./AppHeader";
+import { Avatar } from "./Avatar";
+import { useOpenProfile } from "./ProfilePopover";
 import { navigate, paths } from "../lib/route";
 import { useSession } from "../lib/auth-client";
 import { MembersSkeleton, SkeletonLine } from "./Skeleton";
@@ -14,6 +16,7 @@ const ROLE_LABEL: Record<Role, string> = {
 
 export function MembersPage({ workspaceId }: { workspaceId: string }) {
   const { data: session } = useSession();
+  const openProfile = useOpenProfile();
   const [workspace, setWorkspace] = useState<WorkspaceSummary | null>(null);
   /* `null` selama daftarnya belum datang. Dengan senarai kosong sebagai nilai
      awal, halaman yang sedang memuat tidak bisa dibedakan dari workspace yang
@@ -108,12 +111,25 @@ export function MembersPage({ workspaceId }: { workspaceId: string }) {
                 key={member.userId}
                 className="glass glass-plate flex items-center gap-3 rounded-2xl px-4 py-3.5"
               >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">
-                    {member.name} {isSelf && <span className="text-faint">(Anda)</span>}
-                  </p>
-                  <p className="truncate text-xs text-muted">{member.email}</p>
-                </div>
+                <button
+                  type="button"
+                  onClick={(e) =>
+                    openProfile(
+                      { id: member.userId, name: member.name, email: member.email, image: member.image },
+                      workspaceId,
+                      e.currentTarget,
+                    )
+                  }
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                >
+                  <Avatar person={{ id: member.userId, name: member.name, email: member.email, image: member.image }} />
+                  <span className="min-w-0">
+                    <p className="truncate text-sm font-medium">
+                      {member.name} {isSelf && <span className="text-faint">(Anda)</span>}
+                    </p>
+                    <p className="truncate text-xs text-muted">{member.email}</p>
+                  </span>
+                </button>
 
                 {workspace?.role === "owner" && !isSelf ? (
                   <select

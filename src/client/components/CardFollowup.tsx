@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Avatar } from "./Avatar";
 import { Markdown } from "./Markdown";
 import { MarkdownField } from "./MarkdownField";
+import { useOpenProfile } from "./ProfilePopover";
 import { useStoredFlag } from "../hooks/useStoredFlag";
 import { describeActivity } from "../lib/activity";
 import { cn } from "../lib/cn";
@@ -16,6 +17,8 @@ interface Props {
   activities: CardActivityDetail[];
   /** Id user yang sedang login — hanya tulisannya sendiri yang boleh diubah. */
   currentUserId: string;
+  /** Workspace pemilik kartu — dibutuhkan untuk membuka profil publik pelaku. */
+  workspaceId: string;
   /** Status koneksi realtime board — memadamkan Kirim/Simpan selagi offline. */
   networkStatus: ChannelStatus;
   onAdd: (body: string) => void;
@@ -64,19 +67,37 @@ function When({ at, className }: { at: Date | string; className?: string }) {
  * Satu catatan perubahan. Sengaja lebih kecil dan lebih redup daripada
  * followup yang ditulis orang: ia latar, bukan percakapan.
  */
-function ActivityRow({ activity }: { activity: CardActivityDetail }) {
+function ActivityRow({ activity, workspaceId }: { activity: CardActivityDetail; workspaceId: string }) {
   const { verb, subject, color } = describeActivity(activity.kind, activity.detail);
+  const openProfile = useOpenProfile();
+  const actor = activity.actor;
 
   return (
     <li className="timeline-item timeline-item-note">
-      {activity.actor ? (
-        <Avatar person={activity.actor} size="sm" className="justify-self-center" />
+      {actor ? (
+        <button
+          type="button"
+          onClick={(e) => openProfile(actor, workspaceId, e.currentTarget)}
+          className="justify-self-center rounded-full transition-opacity hover:opacity-80"
+        >
+          <Avatar person={actor} size="sm" />
+        </button>
       ) : (
         <span className="timeline-dot" aria-hidden />
       )}
 
       <p className="text-[0.6875rem] leading-relaxed text-faint">
-        <span className="font-semibold text-muted">{activity.actor?.name ?? "Seseorang"}</span>{" "}
+        {actor ? (
+          <button
+            type="button"
+            onClick={(e) => openProfile(actor, workspaceId, e.currentTarget)}
+            className="font-semibold text-muted hover:text-ink hover:underline"
+          >
+            {actor.name}
+          </button>
+        ) : (
+          <span className="font-semibold text-muted">Seseorang</span>
+        )}{" "}
         {verb}
         {subject &&
           (color ? (
@@ -100,6 +121,7 @@ export function CardFollowup({
   comments,
   activities,
   currentUserId,
+  workspaceId,
   networkStatus,
   onAdd,
   onEdit,
@@ -107,6 +129,7 @@ export function CardFollowup({
 }: Props) {
   const [editing, setEditing] = useState<string | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
+  const openProfile = useOpenProfile();
 
   /**
    * Lini masa lengkap, atau percakapannya saja.
@@ -186,19 +209,37 @@ export function CardFollowup({
           <ol className="timeline">
             {entries.map((entry) => {
               if (entry.note) {
-                return <ActivityRow key={entry.activity.id} activity={entry.activity} />;
+                return (
+                  <ActivityRow
+                    key={entry.activity.id}
+                    activity={entry.activity}
+                    workspaceId={workspaceId}
+                  />
+                );
               }
 
               const comment = entry.comment;
               const mine = comment.userId === currentUserId;
 
               return (
-                <li key={comment.id} className="timeline-item group">
-                  <Avatar person={comment.author} />
+                <li key={comment.id} className="timeline-item group items-start">
+                  <button
+                    type="button"
+                    onClick={(e) => openProfile(comment.author, workspaceId, e.currentTarget)}
+                    className="rounded-full transition-opacity hover:opacity-80"
+                  >
+                    <Avatar person={comment.author} />
+                  </button>
 
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-baseline gap-x-2">
-                      <span className="text-sm font-semibold">{comment.author.name}</span>
+                      <button
+                        type="button"
+                        onClick={(e) => openProfile(comment.author, workspaceId, e.currentTarget)}
+                        className="text-sm font-semibold hover:underline"
+                      >
+                        {comment.author.name}
+                      </button>
                       <span className="text-[0.6875rem] text-faint">
                         <When at={comment.createdAt} />
                         {edited(comment) && " · disunting"}

@@ -3,11 +3,12 @@ import { HTTPException } from "hono/http-exception";
 import { APIError } from "better-auth/api";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { userAvatars } from "../../db";
+import { cardComments, cards, userAvatars } from "../../db";
 import type { AppEnv } from "../auth";
 import { AVATAR_MIMES, MAX_AVATAR_BASE64 } from "../../shared/types";
+import type { MemberStats } from "../../shared/types";
 
 /**
  * Bagian akun yang tidak ditangani Better Auth sendiri.
@@ -18,6 +19,30 @@ import { AVATAR_MIMES, MAX_AVATAR_BASE64 } from "../../shared/types";
  * dibuat server-only oleh Better Auth.
  */
 const app = new Hono<AppEnv>()
+
+  /**
+   * Statistik kontribusi milik sendiri — total lintas SEMUA workspace,
+   * bukan dibatasi satu workspace seperti statistik profil publik orang
+   * lain (`/workspaces/:id/members/:userId/stats`). Kapsul profil di navbar
+   * tampil sama di semua halaman tanpa tahu workspace mana yang sedang
+   * dibuka, jadi tidak ada satu workspace untuk dibatasi — dan karena ini
+   * data milik yang memintanya sendiri, tidak ada alasan menyembunyikan
+   * kontribusi dari workspace lain yang juga dia ikuti.
+   */
+  .get("/stats", async (c) => {
+    const userId = c.get("user").id;
+
+    const [comments, cardsRow] = await Promise.all([
+      c.get("db").select({ total: count() }).from(cardComments).where(eq(cardComments.userId, userId)).get(),
+      c.get("db").select({ total: count() }).from(cards).where(eq(cards.createdBy, userId)).get(),
+    ]);
+
+    const stats: MemberStats = {
+      commentCount: comments?.total ?? 0,
+      cardsCreated: cardsRow?.total ?? 0,
+    };
+    return c.json(stats);
+  })
 
   /**
    * Simpan foto profil perangkat ini. Klien sudah memangkas dan mengecilkan

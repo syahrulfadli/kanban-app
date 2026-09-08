@@ -244,7 +244,64 @@ kompleksitas baru. Disimpan sebagai opsi lanjutan, bukan rencana awal.
   terlihat rusak. Begitu status kembali `"live"`, tombol otomatis menyala
   lagi tanpa perlu aksi ulang dari user.
 
-## 5. Profil publik: lihat kontribusi orang lain
+## 5. Profil publik: lihat kontribusi orang lain — **selesai**
+
+Diimplementasikan: endpoint `GET /api/workspaces/:id/members/:userId/stats`
+(`src/worker/routes/workspaces.ts`) — hanya mengembalikan statistik
+(`commentCount`, `cardsCreated`) dibatasi ke board-board workspace itu,
+bukan identitas (`UserBrief` sudah ada di tangan tiap titik pemicu, jadi
+tidak perlu ditarik ulang). Panel di klien: `ProfilePopover.tsx` — context/
+provider global (pola sama seperti `UndoProvider`), popover `fixed`
+diposisikan dari `getBoundingClientRect()` elemen yang diklik lewat
+`createPortal`, dipasang di `main.tsx`. Titik pemicu yang dipasangi klik:
+`AvatarStack` (lewat prop baru `onSelect`) di footer `CardModal`, avatar &
+nama penulis followup dan pelaku aktivitas di `CardFollowup.tsx`, chip
+orang terundang di `CardPeople.tsx`, dan baris anggota (avatar baru
+ditambahkan) di `MembersPage.tsx`. Sengaja **tidak** disentuh: avatar stack
+di muka kartu papan (`CardItem.tsx`, sudah satu target klik besar untuk
+membuka dialog) dan baris picker "Orang" di `CardPeople` (satu tombol besar
+yang sudah dipakai penuh untuk toggle assign/unassign).
+
+Bug yang ditemukan dan diperbaiki selagi menguji: fokus tetap berada di
+tombol avatar yang diklik (di dalam `CardModal`) setelah popover terbuka,
+sehingga Escape menembus lewat bubbling native ke handler dialog kartu di
+baliknya dan ikut menutup seluruh kartu — persis pola bug lightbox lampiran
+sebelumnya, tapi lewat jalur berbeda (fokus, bukan React event bubbling,
+karena popover ini di-portal ke `document.body`). Diperbaiki dengan
+memindah fokus ke panel popover saat terbuka, meniru `ConfirmDialog`.
+
+Diuji langsung di browser (Playwright headless, akun baru, workspace→
+board→kartu baru, tulis 2 followup, assign diri sendiri): kelima titik
+pemicu semuanya membuka popover dengan nama dan statistik yang benar
+(`[2 followup, 1 kartu dibuat]`), Escape dan klik-di-luar masing-masing
+menutup popover **tanpa** ikut menutup dialog kartu, dan tombol silang
+hapus chip di `CardPeople` tetap berfungsi (tidak ada regresi dari
+menumpangi klik profil di baris yang sama). Sanity check keamanan:
+endpoint statistik dikonfirmasi 401 tanpa sesi dan 404 untuk pengguna yang
+bukan anggota workspace (lintas dua akun uji). Tidak ada error konsol.
+
+**Susulan:** kapsul profil sendiri di navbar (`ProfileMenu.tsx`) dipasangi
+statistik yang sama, dengan sumber angka yang beda alasannya — kapsul itu
+dirender sekali untuk semua rute (tidak tahu workspace mana yang sedang
+dibuka), jadi ditambah endpoint baru `GET /api/profile/stats`
+(`src/worker/routes/profile.ts`) yang menghitung kontribusi **lintas
+semua workspace** yang diikuti, bukan dibatasi satu workspace seperti
+endpoint profil publik orang lain. Ditampilkan menyatu di panel menu yang
+sudah ada (di bawah nama & email, sebelum daftar aksi), bukan lewat
+`ProfilePopover` yang sama — kapsulnya sudah punya panelnya sendiri.
+
+**Susulan lagi:** klik foto profil di dalam `ProfilePopover` membuka
+lightbox berisi foto ukuran asli (256×256 — persis `AVATAR_SIZE`, karena
+foto memang sudah dipangkas ke ukuran itu saat diunggah). Lightbox-nya
+diekstrak jadi komponen bersama `Lightbox.tsx` dari yang sebelumnya
+tertanam di `CardAttachments.tsx` (dulu `AttachmentLightbox`) — logic
+fokus+`stopPropagation` Escape-nya identik, jadi dipakai ulang alih-alih
+ditulis dua kali. Satu penyesuaian tambahan diperlukan: `useDismiss` milik
+`ProfilePopover` (klik-di-luar & Escape untuk menutup popovernya sendiri)
+dinonaktifkan sementara selagi lightbox foto terbuka — lightbox itu
+di-portal terpisah ke `document.body`, jadi tanpa ini klik apa pun di
+dalamnya (termasuk fotonya) salah terbaca sebagai "klik di luar popover"
+dan ikut menutupnya.
 
 **Masalah:** belum ada cara melihat profil ringkas orang lain di
 workspace — hanya nama/avatar yang muncul di avatar stack, komentar, dan

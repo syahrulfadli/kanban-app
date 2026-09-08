@@ -11,6 +11,7 @@ import { WatchToggle } from "./WatchToggle";
 import { AvatarStack } from "./Avatar";
 import { CardDetailSkeleton, SkeletonLine } from "./Skeleton";
 import { useStoredFlag } from "../hooks/useStoredFlag";
+import { useOpenProfile } from "./ProfilePopover";
 import { api } from "../lib/api";
 import { optimisticActivity, type ActivityNote } from "../lib/activity";
 import { prepareAttachment } from "../lib/attachment";
@@ -74,6 +75,7 @@ export function CardModal({
   const [editingDescription, setEditingDescription] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const openProfile = useOpenProfile();
 
   /* Panel followup boleh disembunyikan, dan pilihannya diingat peramban —
      bukan server. Yang diatur di sini cara satu orang membaca kartu, dan
@@ -648,6 +650,7 @@ export function CardModal({
                   comments={detail.comments}
                   activities={detail.activities}
                   currentUserId={currentUser.id}
+                  workspaceId={detail.workspaceId}
                   networkStatus={networkStatus}
                   onAdd={addComment}
                   onEdit={editComment}
@@ -661,7 +664,12 @@ export function CardModal({
                 dibuat dan terakhir diubah. Keduanya hanya muncul di sini,
                 tidak di muka kartu. */}
             <footer className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line-soft px-5 py-3">
-              <AvatarStack people={detail.participants} max={6} size="md" />
+              <AvatarStack
+                people={detail.participants}
+                max={6}
+                size="md"
+                onSelect={(person, anchor) => openProfile(person, detail.workspaceId, anchor)}
+              />
 
               <div className="ml-auto text-right">
                 <Trace verb="Dibuat" who={detail.createdByUser} at={detail.createdAt} />

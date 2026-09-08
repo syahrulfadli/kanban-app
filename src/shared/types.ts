@@ -65,6 +65,12 @@ export interface UserBrief {
   image: string | null;
 }
 
+/** Kontribusi seseorang dalam satu workspace — isi panel profil publik. */
+export interface MemberStats {
+  commentCount: number;
+  cardsCreated: number;
+}
+
 /** Berapa butir checklist yang sudah dicentang — sumber angka progress bar. */
 export interface ChecklistProgress {
   total: number;

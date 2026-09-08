@@ -1,12 +1,15 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Skeleton } from "./Skeleton";
 import { forgetAdminAccess, useAdminAccess } from "../hooks/useAdminAccess";
 import { useDismiss } from "../hooks/useDismiss";
+import { api } from "../lib/api";
 import { signOut, useSession } from "../lib/auth-client";
 import { cn } from "../lib/cn";
 import { avatarTint, initials } from "../lib/people";
 import { currentSubscription, syncSubscription } from "../lib/push";
 import { navigate, paths } from "../lib/route";
+import type { MemberStats } from "../../shared/types";
 
 /* Ikon roda gigi dan pintu keluar. Digambar sebaris supaya tidak ada
    permintaan jaringan tambahan; warnanya mengikuti `currentColor`. */
@@ -88,8 +91,27 @@ export function ProfileMenu() {
      menawarkan halaman yang berakhir dengan kalimat penolakan. */
   const { admin } = useAdminAccess();
   const [open, setOpen] = useState(false);
+  const [stats, setStats] = useState<MemberStats | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  /* Ditarik saat menunya dibuka, bukan saat komponennya lahir — kapsul ini
+     ada di setiap halaman, dan kebanyakan kunjungan tidak pernah membuka
+     menunya. Sekali tertarik ia menetap, sama seperti daftar anggota di
+     `CardPeople`. */
+  useEffect(() => {
+    if (!open || stats) return;
+
+    let alive = true;
+    void api
+      .getMyStats()
+      .then((rows) => alive && setStats(rows))
+      .catch(() => {});
+
+    return () => {
+      alive = false;
+    };
+  }, [open, stats]);
 
   /* Perangkat yang sudah berlangganan notifikasi mendaftar ulang diam-diam
      tiap aplikasi dibuka: baris di server bisa saja hilang — database
@@ -192,6 +214,25 @@ export function ProfileMenu() {
             <div className="px-2.5 py-2">
               <p className="truncate text-sm font-medium">{name}</p>
               <p className="truncate text-xs text-muted">{email}</p>
+
+              <div className="mt-3 grid grid-cols-2 gap-3 text-center">
+                <div>
+                  {stats ? (
+                    <p className="text-2xl font-semibold tabular-nums">{stats.commentCount}</p>
+                  ) : (
+                    <Skeleton className="mx-auto h-7 w-10" />
+                  )}
+                  <p className="mt-0.5 text-xs text-muted">followup</p>
+                </div>
+                <div>
+                  {stats ? (
+                    <p className="text-2xl font-semibold tabular-nums">{stats.cardsCreated}</p>
+                  ) : (
+                    <Skeleton className="mx-auto h-7 w-10" />
+                  )}
+                  <p className="mt-0.5 text-xs text-muted">kartu dibuat</p>
+                </div>
+              </div>
             </div>
 
             <span className="my-1 block h-px bg-line-soft" />

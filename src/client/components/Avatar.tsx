@@ -26,7 +26,7 @@ export function Avatar({ person, size = "md", className, title }: AvatarProps) {
 
   return (
     <span
-      className={cn("avatar shrink-0 overflow-hidden", !photo && "avatar-tinted", SIZE[size], className)}
+      className={cn("avatar shrink-0 items-center overflow-hidden", !photo && "avatar-tinted", SIZE[size], className)}
       style={photo ? undefined : avatarTint(person.name, person.email)}
       title={title ?? `${person.name} · ${person.email}`}
     >
@@ -45,13 +45,15 @@ interface StackProps {
   max?: number;
   size?: Size;
   className?: string;
+  /** Kalau diisi, tiap avatar (bukan keping "+n") jadi tombol pembuka profil. */
+  onSelect?: (person: UserBrief, anchor: HTMLElement) => void;
 }
 
 /**
  * Deretan orang yang menyentuh sebuah kartu — pembuatnya di depan, lalu
  * siapa pun yang menyunting atau menulis followup, urut waktu.
  */
-export function AvatarStack({ people, max = 4, size = "sm", className }: StackProps) {
+export function AvatarStack({ people, max = 4, size = "sm", className, onSelect }: StackProps) {
   if (people.length === 0) return null;
 
   const shown = people.length > max ? people.slice(0, max - 1) : people;
@@ -59,9 +61,20 @@ export function AvatarStack({ people, max = 4, size = "sm", className }: StackPr
 
   return (
     <span className={cn("avatar-stack flex items-center", className)}>
-      {shown.map((person) => (
-        <Avatar key={person.id} person={person} size={size} />
-      ))}
+      {shown.map((person) =>
+        onSelect ? (
+          <button
+            key={person.id}
+            type="button"
+            onClick={(e) => onSelect(person, e.currentTarget)}
+            className="rounded-full transition-opacity hover:opacity-80"
+          >
+            <Avatar person={person} size={size} />
+          </button>
+        ) : (
+          <Avatar key={person.id} person={person} size={size} />
+        ),
+      )}
 
       {rest > 0 && (
         <span

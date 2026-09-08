@@ -1,12 +1,23 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { and, desc, eq, ne } from "drizzle-orm";
+import { and, count, desc, eq, ne } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { HTTPException } from "hono/http-exception";
-import { invitations, ROLES, user, workspaceMembers, workspaces } from "../../db";
+import {
+  boards,
+  cardComments,
+  cards,
+  columns,
+  invitations,
+  ROLES,
+  user,
+  workspaceMembers,
+  workspaces,
+} from "../../db";
 import type { AppEnv } from "../auth";
 import { assertRole, requireMembership } from "../guards";
+import type { MemberStats } from "../../shared/types";
 
 /** Undangan berlaku 7 hari. */
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -109,6 +120,44 @@ const app = new Hono<AppEnv>()
       .where(eq(workspaceMembers.workspaceId, id));
 
     return c.json(rows);
+  })
+
+  /**
+   * Statistik kontribusi seseorang, dibatasi ke board-board workspace ini —
+   * isi panel profil publik. Siapa pun anggota boleh melihat statistik
+   * sesama anggota; `userId` tidak perlu diperiksa masih anggota atau tidak,
+   * karena kontribusi historis tetap dihitung walau orangnya sudah keluar
+   * (konsisten dengan lini masa kartu yang tetap menyebut nama pelaku yang
+   * sudah pergi).
+   */
+  .get("/:id/members/:userId/stats", async (c) => {
+    const db = c.get("db");
+    const { id, userId } = c.req.param();
+    await requireMembership(db, id, c.get("user").id);
+
+    const [comments, cardsRow] = await Promise.all([
+      db
+        .select({ total: count() })
+        .from(cardComments)
+        .innerJoin(cards, eq(cardComments.cardId, cards.id))
+        .innerJoin(columns, eq(cards.columnId, columns.id))
+        .innerJoin(boards, eq(columns.boardId, boards.id))
+        .where(and(eq(boards.workspaceId, id), eq(cardComments.userId, userId)))
+        .get(),
+      db
+        .select({ total: count() })
+        .from(cards)
+        .innerJoin(columns, eq(cards.columnId, columns.id))
+        .innerJoin(boards, eq(columns.boardId, boards.id))
+        .where(and(eq(boards.workspaceId, id), eq(cards.createdBy, userId)))
+        .get(),
+    ]);
+
+    const stats: MemberStats = {
+      commentCount: comments?.total ?? 0,
+      cardsCreated: cardsRow?.total ?? 0,
+    };
+    return c.json(stats);
   })
 
   .patch(

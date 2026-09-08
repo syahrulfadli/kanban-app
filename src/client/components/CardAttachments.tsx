@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { isAttachmentImage, MAX_ATTACHMENT_BASE64 } from "../../shared/types";
 import type { CardAttachmentDetail } from "../../shared/types";
 import { ATTACHMENT_ACCEPT } from "../lib/attachment";
 import { cn } from "../lib/cn";
+import { Lightbox } from "./Lightbox";
 
 interface Props {
   attachments: CardAttachmentDetail[];
@@ -27,46 +28,6 @@ function AttachmentIcon() {
     <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M21.44 11.05 12.25 20.24a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95l-9.2 9.19a1.5 1.5 0 0 1-2.12-2.12l8.49-8.48" />
     </svg>
-  );
-}
-
-/**
- * Lightbox ringan: gambar penuh di atas backdrop gelap, tanpa zoom/pan.
- *
- * Fokus dipindah ke wadahnya sendiri saat terbuka, dan Escape di sini
- * dihentikan propagasinya — persis pola `ConfirmDialog`. Tanpa itu, Escape
- * menembus ke dialog kartu di baliknya dan menutup seluruh kartu, bukan
- * cuma lightbox-nya.
- */
-function AttachmentLightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    rootRef.current?.focus();
-  }, []);
-
-  return (
-    <div
-      ref={rootRef}
-      tabIndex={-1}
-      role="dialog"
-      aria-modal="true"
-      aria-label={alt || "Pratinjau lampiran"}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") {
-          e.stopPropagation();
-          onClose();
-        }
-      }}
-      className="fixed inset-0 z-[55] flex items-center justify-center overflow-hidden p-4 outline-none"
-    >
-      <div className="scrim" onClick={onClose} aria-hidden />
-      <img
-        src={src}
-        alt={alt}
-        className="glass relative max-h-full max-w-full rounded-xl object-contain shadow-2xl"
-      />
-    </div>
   );
 }
 
@@ -184,11 +145,13 @@ export function CardAttachments({ attachments, uploading, onAdd, onDelete }: Pro
       />
 
       {preview && (
-        <AttachmentLightbox
-          src={attachmentUrl(preview.id)}
-          alt={preview.filename}
-          onClose={() => setPreview(null)}
-        />
+        <Lightbox label={preview.filename} onClose={() => setPreview(null)}>
+          <img
+            src={attachmentUrl(preview.id)}
+            alt={preview.filename}
+            className="glass relative max-h-full max-w-full rounded-xl object-contain shadow-2xl"
+          />
+        </Lightbox>
       )}
     </section>
   );

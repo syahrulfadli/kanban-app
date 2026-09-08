@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "./Avatar";
+import { useOpenProfile } from "./ProfilePopover";
 import { api } from "../lib/api";
 import type { MemberSummary, UserBrief } from "../../shared/types";
 
@@ -25,6 +26,7 @@ export function CardPeople({ members, workspaceId, onAdd, onRemove }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const ref = useRef<HTMLDivElement>(null);
+  const openProfile = useOpenProfile();
 
   const invited = new Set(members.map((m) => m.id));
 
@@ -97,8 +99,14 @@ export function CardPeople({ members, workspaceId, onAdd, onRemove }: Props) {
             className="chip gap-1.5 py-0.5 pr-1 pl-1"
             title={`${person.name} · ${person.email}`}
           >
-            <Avatar person={person} size="sm" title={person.name} />
-            <span className="max-w-32 truncate">{person.name}</span>
+            <button
+              type="button"
+              onClick={(e) => openProfile(person, workspaceId, e.currentTarget)}
+              className="flex items-center gap-1.5 rounded-full hover:opacity-80"
+            >
+              <Avatar person={person} size="sm" title={person.name} />
+              <span className="max-w-32 truncate">{person.name}</span>
+            </button>
             <button
               type="button"
               aria-label={`Keluarkan ${person.name} dari kartu`}
