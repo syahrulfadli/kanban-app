@@ -9,7 +9,79 @@ lalu arsip, baru lampiran (paling banyak keputusan desain).
 Batch kedua (#4–6): rich text/markdown untuk deskripsi & followup, profil
 publik dengan kontribusi, dan edit judul/warna workspace & board.
 
-## 1. Filter board
+## 1. Filter board — **selesai**
+
+Diimplementasikan: `src/client/lib/boardFilter.ts` (state filter, fungsi murni
+`matchesBoardFilter` — AND antar kategori label/orang/dibuat oleh/jatuh
+tempo, OR di dalam kategori yang sama — dan `dueCategory` yang membagi
+tenggat jadi `"overdue" | "week" | "none"`, beda ambang dari `dueState` yang
+sudah ada di `format.ts` karena "minggu ini" butuh jendela 7 hari, bukan
+24 jam seperti `"soon"`). Kategori "Orang" mencocokkan lewat `cardFaces`
+(gabungan `card.members` dan `card.participants`), bukan `card.members`
+saja — supaya sama persis dengan sumber checklist-nya, karena mencocokkan
+cuma ke `members` berarti orang yang di checklist tapi cuma berstatus
+peserta (bukan diundang) tidak akan pernah cocok dengan kartu apa pun.
+
+State filter disimpan lewat `useBoardFilter.ts` (hook baru) — satu kunci
+`localStorage` per board (`kanban:filter:<boardId>`), pola yang sama persis
+dengan `useCollapsedColumns`: lokal per perangkat (tidak disinkronkan ke
+kolaborator lain), tapi bertahan lewat reload. Kosong berarti kunci dihapus
+dari `localStorage`, bukan disimpan sebagai array kosong.
+
+Komponen `BoardFilter.tsx` — tombol chip + panel `.sheet` di kepala papan
+(`AppHeader`, sejajar `BoardBackgroundPicker`/`LiveIndicator`, pola yang
+sama: tanpa portal karena kepala papan bukan pane ber-frost). Ukuran teks
+di panelnya disamakan dengan panel `BoardBackgroundPicker` ("Latar papan")
+supaya kedua panel yang bertetangga di kepala papan terbaca sebagai satu
+keluarga: judul bagian `text-xs font-semibold tracking-tight` (bukan
+`.section-label` yang dipakai di tempat lain seperti `CardPeople`, yang
+lebih kecil dan lebih tebal), baris isi `text-[11px]`. Isinya empat bagian:
+checklist label (chip `labelTint` yang sama seperti di kartu, cincin aksen
+saat aktif — pola yang sama dengan highlight `CardSearch`), checklist orang
+(avatar + nama, diturunkan dari `cardFaces(members, participants)` tiap
+kartu di board, digabung unik — bukan `api.listMembers`, supaya tidak ada
+panggilan jaringan tambahan dan hanya orang yang benar-benar tampil di kartu
+board ini yang muncul), checklist **dibuat oleh** (daftar lebih pendek —
+cuma orang yang `card.createdBy`-nya cocok, diturunkan dari kamus
+id→`UserBrief` yang sama dengan checklist Orang, karena pembuat kartu selalu
+ikut jadi peserta — lihat `routes/cards.ts`), dan tiga sakelar jatuh tempo
+(Terlambat / Minggu ini / Tanpa tanggal). Badge angka di tombol Filter saat
+ada filter aktif, tombol "Bersihkan filter" muncul di kaki panel.
+
+`ColumnView` menerima prop `filter`, menyaring `column.cards` sebelum
+di-`map`-kan (bukan menyembunyikan `CardItem` yang sudah dirender) — supaya
+kartu yang tersaring tidak ikut mendaftarkan drop target drag-and-drop.
+`prevCardId`/`nextCardId` tetap dihitung dari `column.cards` asli (bukan
+daftar yang sudah tersaring), supaya urutan drag-and-drop tidak rusak saat
+filter aktif. Pesan kosong dibedakan dua kondisi: kolom yang sungguh kosong
+tetap "Belum ada kartu", kolom berisi kartu tapi semuanya tersaring dapat
+pesan baru "Tidak ada kartu yang cocok filter" — konsisten dengan pola yang
+sama di `NotificationBell` dan `CardSearch`.
+
+**Keputusan atas pertanyaan terbuka:** state filter disimpan ke
+`localStorage` per board (bukan lokal-saja) — awalnya diimplementasikan
+lokal-saja lalu diralat ke `localStorage` begitu diminta. Kategori "dibuat
+oleh" (`card.createdBy`) ditambah di luar cakupan awal, atas permintaan
+susulan.
+
+Diuji langsung di browser (Playwright headless, akun baru, workspace→
+board→satu kolom berisi 3 kartu: Kartu A tanpa label/tenggat, Kartu B
+berlabel "Bug" dan tenggat lewat, Kartu C berlabel "Feature" dan tenggat
+8 hari lagi): filter label=Bug menampilkan hanya B; menambah label Feature
+(OR di kategori sama) menampilkan B dan C; filter label=Bug **DAN**
+jatuh tempo=Terlambat tetap hanya B (AND antar kategori, keduanya cocok
+di B); filter label=Feature **DAN** jatuh tempo=Terlambat tidak
+menampilkan satu pun kartu — kolom masih berisi 3 kartu tapi menampilkan
+pesan "Tidak ada kartu yang cocok filter"; filter dibuat-oleh=diri sendiri
+menampilkan ketiga kartu (ketiganya memang dibuat sendiri), dikombinasikan
+DENGAN label=Bug menyempit ke hanya B; "Bersihkan filter" mengembalikan
+ketiga kartu; filter yang dipasang lalu halaman di-reload tetap bertahan
+(badge angka di tombol Filter juga tetap benar) — mengonfirmasi
+`localStorage` bekerja. Tidak ada error konsol React di sepanjang
+pengujian. Filter "Orang" tidak sempat diuji hingga menyembunyikan kartu
+(perlu akun kedua yang diundang ke sebagian kartu saja — di luar cakupan
+pengujian solo ini), tapi checklist-nya sudah diverifikasi tampil benar
+dengan avatar dan nama diri sendiri.
 
 **Masalah:** pencarian kartu (`CardSearch`) sudah ada tapi itu pencarian teks
 bebas (judul, label, orang disebut namanya). Belum ada cara untuk menyaring

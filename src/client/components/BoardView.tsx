@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { monitorForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { extractClosestEdge } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
 import { BoardBackgroundPicker, PhotoCredit } from "./BoardBackgroundPicker";
+import { BoardFilter } from "./BoardFilter";
 import { CardModal } from "./CardModal";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { MoveDialog, type MoveSubject } from "./MoveDialog";
@@ -9,12 +10,14 @@ import { ColumnView } from "./ColumnView";
 import { AddItemForm } from "./AddItemForm";
 import { useBackdropInk } from "../hooks/useBackdropInk";
 import { useBoard } from "../hooks/useBoard";
+import { useBoardFilter } from "../hooks/useBoardFilter";
 import { useCollapsedColumns } from "../hooks/useCollapsedColumns";
 import { playDropSound } from "../hooks/useSound";
 import { useSession } from "../lib/auth-client";
 import { navigate, paths } from "../lib/route";
 import { backgroundPhoto, backgroundProps } from "../lib/background";
 import { cn } from "../lib/cn";
+import { cardFaces } from "../lib/people";
 import type { ChannelStatus } from "../lib/realtime";
 import type { UserBrief } from "../../shared/types";
 import { Avatar } from "./Avatar";
@@ -230,6 +233,47 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
      ulang tiap ganti board. */
   const [labelsOpen, setLabelsOpen] = useState(false);
 
+  /* Filter board: disimpan di peramban per papan (lihat useBoardFilter) —
+     bertahan lewat reload, tapi lokal per perangkat, bukan disinkronkan ke
+     kolaborator lain. */
+  const { filter, setFilter } = useBoardFilter(boardId);
+
+  /* Orang yang bisa disaring: siapa saja yang sudah tampil di wajah kartu
+     manapun di board ini (diundang atau meninggalkan jejak), bukan seluruh
+     anggota workspace — filter hanya berguna untuk orang yang benar-benar
+     ada urusannya di sini, dan ini tidak butuh panggilan jaringan tambahan
+     karena kartunya sudah termuat. Sekaligus jadi kamus nama untuk "dibuat
+     oleh" di bawah — pembuat kartu selalu ikut jadi peserta (lihat
+     routes/cards.ts), jadi tidak perlu ditarik dari tempat lain. */
+  const peopleById = useMemo(() => {
+    const map = new Map<string, UserBrief>();
+    for (const column of board?.columns ?? []) {
+      for (const card of column.cards) {
+        for (const person of cardFaces(card.members, card.participants)) {
+          if (!map.has(person.id)) map.set(person.id, person);
+        }
+      }
+    }
+    return map;
+  }, [board]);
+
+  const people = useMemo(() => [...peopleById.values()], [peopleById]);
+
+  /* Siapa saja yang pernah membuat kartu di board ini — daftar lebih pendek
+     dari `people`, dan itu memang yang diinginkan: "dibuat oleh" cuma
+     berguna untuk orang yang benar-benar membuat sesuatu, bukan semua orang
+     yang wajahnya pernah tampil di kartu. */
+  const creators = useMemo(() => {
+    const seen = new Map<string, UserBrief>();
+    for (const column of board?.columns ?? []) {
+      for (const card of column.cards) {
+        const person = card.createdBy ? peopleById.get(card.createdBy) : undefined;
+        if (person && !seen.has(person.id)) seen.set(person.id, person);
+      }
+    }
+    return [...seen.values()];
+  }, [board, peopleById]);
+
   const askDeleteCard = (cardId: string) => {
     const card = board?.columns.flatMap((col) => col.cards).find((c) => c.id === cardId);
     if (card) setPending({ kind: "card", id: card.id, title: card.title });
@@ -400,6 +444,13 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
             satu foto boleh gelap di satu sisi dan terang di sisi lain. */}
         <span className="on-photo-top-end ml-auto flex min-w-0 items-center gap-2">
           {error && <span className="min-w-0 truncate text-xs text-danger">{error}</span>}
+          <BoardFilter
+            labels={board.labels}
+            people={people}
+            creators={creators}
+            filter={filter}
+            onChange={setFilter}
+          />
           <BoardBackgroundPicker
             boardId={boardId}
             background={board.background}
@@ -450,6 +501,7 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
             onDeleteCard={askDeleteCard}
             labelsOpen={labelsOpen}
             onToggleLabels={() => setLabelsOpen((v) => !v)}
+            filter={filter}
           />
         ))}
 

@@ -17,6 +17,7 @@ import { EyeIcon } from "./WatchToggle";
 import { useDismiss } from "../hooks/useDismiss";
 import { cn } from "../lib/cn";
 import { columnTint, labelTint } from "../lib/people";
+import { isBoardFilterActive, matchesBoardFilter, type BoardFilterState } from "../lib/boardFilter";
 import type { BoardDetail, ColumnColor } from "../../shared/types";
 
 type ColumnWithCards = BoardDetail["columns"][number];
@@ -153,6 +154,8 @@ interface Props {
   /** Diteruskan apa adanya ke kartu — papan yang memilikinya, bukan kolom. */
   labelsOpen: boolean;
   onToggleLabels: () => void;
+  /** Filter board — papan yang memilikinya, sama seperti labelsOpen. */
+  filter: BoardFilterState;
 }
 
 export function ColumnView({
@@ -171,6 +174,7 @@ export function ColumnView({
   onDeleteCard,
   labelsOpen,
   onToggleLabels,
+  filter,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const plateRef = useRef<HTMLElement>(null);
@@ -421,6 +425,11 @@ export function ColumnView({
     );
   }
 
+  const filterActive = isBoardFilterActive(filter);
+  const visibleCount = filterActive
+    ? column.cards.filter((card) => matchesBoardFilter(card, filter)).length
+    : column.cards.length;
+
   return (
     <div
       ref={ref}
@@ -621,18 +630,20 @@ export function ColumnView({
         </div>
 
         <ul ref={cardListRef} className="flex min-h-14 flex-1 flex-col gap-2 overflow-y-auto p-2">
-          {column.cards.map((card, i) => (
-            <CardItem
-              key={card.id}
-              card={card}
-              prevCardId={column.cards[i - 1]?.id ?? null}
-              nextCardId={column.cards[i + 1]?.id ?? null}
-              labelsOpen={labelsOpen}
-              onToggleLabels={onToggleLabels}
-              onOpen={() => onOpenCard(card.id)}
-              onDelete={() => onDeleteCard(card.id)}
-            />
-          ))}
+          {column.cards.map((card, i) =>
+            filterActive && !matchesBoardFilter(card, filter) ? null : (
+              <CardItem
+                key={card.id}
+                card={card}
+                prevCardId={column.cards[i - 1]?.id ?? null}
+                nextCardId={column.cards[i + 1]?.id ?? null}
+                labelsOpen={labelsOpen}
+                onToggleLabels={onToggleLabels}
+                onOpen={() => onOpenCard(card.id)}
+                onDelete={() => onDeleteCard(card.id)}
+              />
+            ),
+          )}
 
           {/* Kartu yang dijatuhkan di ruang kosong kolom mendarat di kaki
               daftar, jadi lubangnya juga berdiri di kaki daftar. Ia elemen
@@ -650,6 +661,15 @@ export function ColumnView({
           {column.cards.length === 0 && cardSlot === null && (
             <li className="column-chrome rounded-xl border-2 border-dashed border-line px-3 py-6 text-center text-xs text-faint">
               Belum ada kartu
+            </li>
+          )}
+
+          {/* Kolom punya kartu, tapi filter menyembunyikan semuanya —
+              beda pesan dari "Belum ada kartu" supaya tidak terbaca sebagai
+              bug: isinya bukan kosong, cuma sedang tersaring. */}
+          {column.cards.length > 0 && visibleCount === 0 && cardSlot === null && (
+            <li className="column-chrome rounded-xl border-2 border-dashed border-line px-3 py-6 text-center text-xs text-faint">
+              Tidak ada kartu yang cocok filter
             </li>
           )}
         </ul>
