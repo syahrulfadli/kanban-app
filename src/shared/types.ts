@@ -134,6 +134,9 @@ export interface CardAttachmentDetail {
 /** Isi lengkap satu kartu — hanya ditarik saat dialognya dibuka. */
 export interface CardDetail extends CardSummary {
   boardId: string;
+  /** Nama kolom tempat kartu ini — dikirim server, bukan diturunkan dari
+      `board.columns` di klien: kartu terarsip sudah tidak ada di sana. */
+  columnTitle: string;
   /* Ikut dikirim demi pemilih orang: yang boleh diundang ke kartu adalah
      anggota workspace pemilik papannya, dan daftar itu ditarik dari alamat
      workspace — bukan dari kartunya. */
@@ -246,6 +249,8 @@ export interface CardSearchHit {
    */
   matchedLabelIds: string[];
   matchedUserIds: string[];
+  /** Kartu terarsip tetap muncul di hasil pencarian — cuma ditandai. */
+  archived: boolean;
 }
 
 /* ── Pindah papan ──────────────────────────────────────────────────

@@ -36,6 +36,17 @@ function Highlight({ text, query }: { text: string; query: string }) {
   );
 }
 
+/** Kotak arsip kecil — sama bentuknya dengan yang di `CardModal`/`ArchivePanel`. */
+function ArchiveIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="3" y="4" width="18" height="4" rx="1" />
+      <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8" />
+      <path d="M10 12h4" />
+    </svg>
+  );
+}
+
 /**
  * Satu kartu di hasil pencarian.
  *
@@ -76,8 +87,23 @@ function Hit({
         active ? "bg-accent-soft/70" : "hover:bg-line-soft",
       )}
     >
-      <span className="line-clamp-2 text-sm leading-snug text-ink">
-        <Highlight text={hit.title} query={query} />
+      <span className="flex items-start gap-1.5">
+        <span className="line-clamp-2 min-w-0 flex-1 text-sm leading-snug text-ink">
+          <Highlight text={hit.title} query={query} />
+        </span>
+
+        {/* Kartu terarsip tetap ikut hasil pencarian — cuma ditandai, supaya
+            orang tidak bingung kenapa kartunya tidak ada di papan begitu
+            dibuka. Pakai `.chip` biasa (bukan pil kecil custom): itu skala
+            huruf dan kontras yang sudah terbukti terbaca di tempat lain —
+            "Diarsipkan" di sini harus sama jelasnya dengan di kepala
+            `CardModal`, bukan keterangan samar yang gampang terlewat. */}
+        {hit.archived && (
+          <span className="chip mt-0.5 shrink-0">
+            <ArchiveIcon className="size-3" />
+            Diarsipkan
+          </span>
+        )}
       </span>
 
       {hit.snippet && (

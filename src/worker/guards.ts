@@ -88,6 +88,10 @@ export async function requireCard(db: Db, cardId: string, userId: string) {
     .select({
       card: cards,
       columnId: columns.id,
+      /* Ikut terbawa juga — GET /:id butuh ini untuk header dialog, dan
+         kartu terarsip tidak lagi bisa mengambilnya dari `board.columns`
+         di klien seperti kartu aktif. */
+      columnTitle: columns.title,
       boardId: boards.id,
       /* Ikut terbawa join yang sudah ada di sini: undangan ke kartu dibatasi
          anggota workspace pemilik papannya, dan tanpa ini setiap pemeriksaan

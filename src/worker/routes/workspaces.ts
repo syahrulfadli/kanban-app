@@ -10,6 +10,7 @@ import {
   cards,
   columns,
   invitations,
+  LABEL_COLORS,
   ROLES,
   user,
   workspaceMembers,
@@ -30,6 +31,7 @@ const app = new Hono<AppEnv>()
       .select({
         id: workspaces.id,
         name: workspaces.name,
+        color: workspaces.color,
         createdAt: workspaces.createdAt,
         updatedAt: workspaces.updatedAt,
         role: workspaceMembers.role,
@@ -71,16 +73,29 @@ const app = new Hono<AppEnv>()
 
   .patch(
     "/:id",
-    zValidator("json", z.object({ name: z.string().trim().min(1).max(120) })),
+    zValidator(
+      "json",
+      z.object({
+        name: z.string().trim().min(1).max(120).optional(),
+        /* Null menghapus warnanya, jadi ia harus benar-benar terkirim — pola
+           yang sama dengan warna kolom (lihat PATCH /columns/:id). */
+        color: z.enum(LABEL_COLORS).nullish(),
+      }),
+    ),
     async (c) => {
       const db = c.get("db");
       const id = c.req.param("id");
       const member = await requireMembership(db, id, c.get("user").id);
       assertRole(member.role, "admin");
+      const patch = c.req.valid("json");
 
       const updated = await db
         .update(workspaces)
-        .set({ name: c.req.valid("json").name, updatedAt: new Date() })
+        .set({
+          ...(patch.name !== undefined && { name: patch.name }),
+          ...(patch.color !== undefined && { color: patch.color ?? null }),
+          updatedAt: new Date(),
+        })
         .where(eq(workspaces.id, id))
         .returning()
         .get();

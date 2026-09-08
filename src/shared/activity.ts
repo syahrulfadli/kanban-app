@@ -65,6 +65,12 @@ export function describeActivity(kind: ActivityKind, detail: ActivityDetail | nu
       };
     case "due_cleared":
       return { verb: "menghapus tenggat" };
+    /* Tanggalnya tidak ikut disebut: ia masih terpasang di kartu yang sama,
+       terbaca beberapa sentimeter dari baris ini. */
+    case "due_done":
+      return { verb: "menandai tenggat selesai" };
+    case "due_undone":
+      return { verb: "membuka lagi tenggat" };
     case "attachment_added":
       return { verb: "menambahkan lampiran", subject: d.text };
     case "attachment_removed":
@@ -148,6 +154,10 @@ export function describeNotification(
         : `mengubah tenggat ${card}`;
     case "due_cleared":
       return `menghapus tenggat ${card}`;
+    case "due_done":
+      return `menandai tenggat ${card} selesai`;
+    case "due_undone":
+      return `membuka lagi tenggat ${card}`;
     case "attachment_added":
       return `menambahkan lampiran ${quoted(d.text, "baru")} di ${card}`;
     case "attachment_removed":

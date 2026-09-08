@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "../lib/cn";
-import { dueState, formatDateTime } from "../lib/format";
+import { dueState, formatDateTime, formatRelative } from "../lib/format";
 
 interface Props {
   /** ISO dari server, atau Date dari state optimistik; null berarti tanpa tenggat. */
   dueAt: Date | string | null;
+  /** Kapan tenggatnya dinyatakan selesai; null berarti masih menagih. */
+  dueDoneAt: Date | string | null;
   onChange: (dueAt: string | null) => void;
+  onDoneChange: (done: boolean) => void;
 }
 
 /** Jam bawaan sebuah tenggat: sore, saat orang menutup pekerjaan harinya. */
@@ -38,7 +41,7 @@ function preset(days: number): string {
    bukan tawaran yang masuk akal. */
 const firstGuess = () => (new Date().getHours() < DEFAULT_HOUR ? preset(0) : preset(1));
 
-export function CardDue({ dueAt, onChange }: Props) {
+export function CardDue({ dueAt, dueDoneAt, onChange, onDoneChange }: Props) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const ref = useRef<HTMLDivElement>(null);
@@ -74,7 +77,8 @@ export function CardDue({ dueAt, onChange }: Props) {
     onChange(null);
   };
 
-  const state = dueAt ? dueState(dueAt) : null;
+  const state = dueAt ? dueState(dueAt, dueDoneAt) : null;
+  const done = state === "done";
 
   return (
     <div className="flex flex-col gap-2">
@@ -91,7 +95,13 @@ export function CardDue({ dueAt, onChange }: Props) {
             "chip transition-colors hover:text-ink",
             /* Rona hanya dipakai saat waktunya benar-benar menuntut sesuatu.
                Tenggat yang masih jauh tetap berhuruf biasa: kalau setiap
-               tanggal berwarna, yang lewat tenggat berhenti menonjol. */
+               tanggal berwarna, yang lewat tenggat berhenti menonjol.
+
+               Hijau adalah pengecualiannya, dan sengaja: ia satu-satunya rona
+               yang menjawab, bukan menuntut. Tanpa itu tenggat yang sudah
+               diselesaikan tidak bisa dibedakan dari yang belum disentuh
+               siapa-siapa. */
+            state === "done" && "text-ok",
             state === "overdue" && "text-danger",
             state === "soon" && "text-warn",
           )}
@@ -103,6 +113,10 @@ export function CardDue({ dueAt, onChange }: Props) {
           {dueAt ? formatDateTime(dueAt) : "Tenggat"}
         </button>
 
+        {/* Silangnya menempel pada chip tanggal karena ia milik tanggal itu —
+            menghapusnya, bukan menyelesaikannya. Sakelar Selesai tinggal di
+            sesudahnya supaya keduanya tidak pernah terbaca sebagai sepasang
+            aksi atas hal yang sama. */}
         {dueAt && (
           <button
             type="button"
@@ -113,6 +127,46 @@ export function CardDue({ dueAt, onChange }: Props) {
             <svg viewBox="0 0 24 24" className="size-3" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden>
               <path d="M6 6 18 18M18 6 6 18" />
             </svg>
+          </button>
+        )}
+
+        {/* Selesai berdiri sebagai sakelar sendiri di sebelah tanggalnya, bukan
+            di dalam popover pengatur waktu: menyelesaikan tenggat itu kabar
+            harian yang diketuk sambil lalu, sedangkan popover itu tempat
+            memilih tanggal — dua hal yang jarang dikerjakan bersamaan.
+            Bunyinya meniru chip "Diarsipkan · <waktu>" di kepala dialog: satu
+            butir yang sekaligus mengatakan keadaannya dan sejak kapan. */}
+        {dueAt && (
+          <button
+            type="button"
+            aria-pressed={done}
+            onClick={() => onDoneChange(!done)}
+            title={
+              done && dueDoneAt
+                ? `Ditandai selesai ${formatDateTime(dueDoneAt)} — klik untuk membukanya lagi`
+                : "Tandai tenggat ini selesai — waktunya berhenti menagih"
+            }
+            className={cn(
+              "chip cursor-pointer transition-colors",
+              done ? "text-ok" : "hover:text-ink",
+            )}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="size-3.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              {/* Lingkarannya utuh cuma saat sudah selesai; selagi belum, ia
+                  garis putus — bentuk yang sama, tapi belum tertutup. */}
+              <circle cx="12" cy="12" r="9" strokeDasharray={done ? undefined : "3 3"} />
+              <path d="m8.5 12.2 2.4 2.4 4.6-4.9" />
+            </svg>
+            {done && dueDoneAt ? `Selesai · ${formatRelative(dueDoneAt)}` : "Tandai selesai"}
           </button>
         )}
 

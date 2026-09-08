@@ -82,6 +82,7 @@ async function buildCardDetail(
   boardId: string,
   workspaceId: string,
   viewerId: string,
+  columnTitle: string,
 ): Promise<CardDetail> {
   const [card, extrasMap, items, comments, attachmentRows, activities] = await Promise.all([
     db.select().from(cards).where(eq(cards.id, cardId)).get(),
@@ -167,6 +168,7 @@ async function buildCardDetail(
     ...card,
     ...extras,
     boardId,
+    columnTitle,
     workspaceId,
     checklistItems: items,
     comments: comments.map(({ comment, author }) => ({ ...comment, author })),
@@ -220,6 +222,7 @@ const app = new Hono<AppEnv>()
         // Kartu baru selalu lahir tanpa tenggat; ia dipasang belakangan, di
         // dialognya, oleh orang yang sudah tahu kapan kartu ini harus selesai.
         dueAt: null,
+        dueDoneAt: null,
         archivedAt: null,
         createdAt: now,
         updatedAt: now,
@@ -452,6 +455,9 @@ const app = new Hono<AppEnv>()
           boardId: boards.id,
           boardTitle: boards.title,
           workspaceName: workspaces.name,
+          /* Kartu terarsip sengaja tidak disaring dari pencarian — ia masih
+             harus bisa ditemukan, cuma ditandai di hasilnya. */
+          archivedAt: cards.archivedAt,
         })
         .from(cards)
         .innerJoin(columns, eq(cards.columnId, columns.id))
@@ -506,6 +512,7 @@ const app = new Hono<AppEnv>()
           matchedUserIds: participants
             .filter((person) => matchesQuery(person.name, q) || matchesQuery(person.email, q))
             .map((person) => person.id),
+          archived: row.archivedAt !== null,
         };
       });
 
@@ -516,9 +523,13 @@ const app = new Hono<AppEnv>()
   .get("/:id", async (c) => {
     const db = c.get("db");
     const userId = c.get("user").id;
-    const { card, boardId, workspaceId } = await requireCard(db, c.req.param("id"), userId);
+    const { card, boardId, workspaceId, columnTitle } = await requireCard(
+      db,
+      c.req.param("id"),
+      userId,
+    );
 
-    return c.json(await buildCardDetail(db, card.id, boardId, workspaceId, userId));
+    return c.json(await buildCardDetail(db, card.id, boardId, workspaceId, userId, columnTitle));
   })
 
   /**
@@ -563,6 +574,10 @@ const app = new Hono<AppEnv>()
            karena itu ia harus benar-benar terkirim, bukan dihilangkan dari
            payload seperti nilai kosong lainnya. */
         dueAt: z.iso.datetime().nullish(),
+        /* Selesai-tidaknya tenggat dikirim sebagai keadaan, bukan waktu:
+           kapannya ditentukan server (jam klien bisa meleset), yang berhak
+           dinyatakan klien cuma "sudah" atau "belum". */
+        dueDone: z.boolean().optional(),
       }),
     ),
     async (c) => {
@@ -575,12 +590,40 @@ const app = new Hono<AppEnv>()
       const dueChanged =
         body.dueAt !== undefined && (card.dueAt?.getTime() ?? null) !== (dueAt?.getTime() ?? null);
 
+      /* Tenggat sesudah permintaan ini — tanda selesai bergantung padanya, dan
+         `dueAt` di badan permintaan boleh saja mengubahnya di gerakan yang
+         sama. */
+      const nextDueAt = body.dueAt !== undefined ? dueAt : card.dueAt;
+
+      /* Tiga hal bisa menggerakkan tanda selesai, dan urutannya penting:
+
+         1. Klien menyatakannya langsung (`dueDone`) — itu yang paling
+            berhak, dan ia menang atas dua aturan di bawah.
+         2. Tenggatnya dipindahkan ke tanggal lain. Tanggal baru berarti
+            tagihan baru, jadi tanda selesai yang lama gugur; kalau tidak,
+            kartu yang tenggatnya digeser ke pekan depan akan lahir sudah
+            "selesai" tanpa ada yang mengerjakannya.
+         3. Tenggatnya dihapus sama sekali — tidak ada lagi yang bisa
+            diselesaikan (lihat catatan `dueDoneAt` di skema). */
+      const dueDoneAt = !nextDueAt
+        ? null
+        : body.dueDone !== undefined
+          ? body.dueDone
+            ? (card.dueDoneAt ?? new Date())
+            : null
+          : dueChanged
+            ? null
+            : card.dueDoneAt;
+
+      const doneChanged = (card.dueDoneAt?.getTime() ?? null) !== (dueDoneAt?.getTime() ?? null);
+
       const updated = await db
         .update(cards)
         .set({
           ...(body.title !== undefined && { title: body.title }),
           ...(body.description !== undefined && { description: body.description }),
           ...(body.dueAt !== undefined && { dueAt }),
+          ...(doneChanged && { dueDoneAt }),
           updatedBy: userId,
           updatedAt: new Date(),
         })
@@ -607,6 +650,14 @@ const app = new Hono<AppEnv>()
               }
             : { kind: "due_cleared" },
         );
+      }
+
+      /* Cuma yang dinyatakan langsung. Tanda selesai yang gugur karena
+         tanggalnya dihapus atau dipindahkan bukan peristiwa tersendiri — ia
+         akibat dari baris di atas, dan mencatat keduanya membuat lini masa
+         mengabarkan satu gerakan dua kali. */
+      if (doneChanged && body.dueDone !== undefined && nextDueAt) {
+        notes.push({ kind: dueDoneAt ? "due_done" : "due_undone" });
       }
 
       await markCardActivity(db, card.id, userId, { touchCard: false, note: notes });

@@ -37,6 +37,20 @@ import type {
 } from "../../shared/types";
 import { CLIENT_ID, CLIENT_ID_HEADER } from "./realtime";
 
+/**
+ * Error yang membawa status HTTP-nya — `Error` biasa membuang angka itu di
+ * jalan, dan sebagian pemanggil (mis. `CardModal` membedakan "kartu tak
+ * ditemukan lagi" dari kegagalan lain) perlu tahu kodenya, bukan cuma
+ * kalimatnya.
+ */
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
     ...init,
@@ -51,7 +65,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       .json()
       .then((body) => (body as { error?: string }).error)
       .catch(() => null);
-    throw new Error(message ?? `Permintaan gagal (${res.status})`);
+    throw new ApiError(message ?? `Permintaan gagal (${res.status})`, res.status);
   }
 
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
@@ -111,7 +125,11 @@ export const api = {
   /* workspace */
   listWorkspaces: () => request<WorkspaceSummary[]>("/workspaces"),
   createWorkspace: (name: string) => send<WorkspaceSummary>("/workspaces", "POST", { name }),
-  renameWorkspace: (id: string, name: string) => send<void>(`/workspaces/${id}`, "PATCH", { name }),
+  /* Nama dan warna lewat satu pintu: keduanya disunting di popover yang sama,
+     dan `null` pada `color` menghapus warnanya — jadi ia harus benar-benar
+     ada di payload, bukan dihilangkan seperti nilai kosong lainnya. */
+  updateWorkspace: (id: string, patch: { name?: string; color?: LabelColor | null }) =>
+    send<WorkspaceSummary>(`/workspaces/${id}`, "PATCH", patch),
   deleteWorkspace: (id: string, options?: SendOptions) =>
     send<void>(`/workspaces/${id}`, "DELETE", undefined, options),
 
@@ -141,7 +159,9 @@ export const api = {
   createBoard: (workspaceId: string, title: string) =>
     send<Board>("/boards", "POST", { workspaceId, title }),
   getBoard: (id: string) => request<BoardDetail>(`/boards/${id}`),
-  renameBoard: (id: string, title: string) => send<Board>(`/boards/${id}`, "PATCH", { title }),
+  /** Judul dan warna penanda — pasangan `updateWorkspace`, aturan yang sama. */
+  updateBoard: (id: string, patch: { title?: string; color?: LabelColor | null }) =>
+    send<Board>(`/boards/${id}`, "PATCH", patch),
 
   /* Latar papan. Dikirim sebagai objek bertanda, sama seperti yang diterima
      server: bentuk inilah yang tidak bisa mengatakan "gambar" tanpa gambar. */
@@ -187,10 +207,16 @@ export const api = {
     send<CardSummary>("/cards", "POST", { columnId, title }),
   getCard: (id: string) => request<CardDetail>(`/cards/${id}`),
   /* `dueAt` dikirim sebagai ISO, dan null menghapusnya — jadi ia harus
-     benar-benar ada di payload, sama seperti warna kolom. */
+     benar-benar ada di payload, sama seperti warna kolom. `dueDone` cuma
+     keadaan: waktunya dicatat server, bukan dikirim dari sini. */
   updateCard: (
     id: string,
-    patch: { title?: string; description?: string | null; dueAt?: string | null },
+    patch: {
+      title?: string;
+      description?: string | null;
+      dueAt?: string | null;
+      dueDone?: boolean;
+    },
   ) => send<Card>(`/cards/${id}`, "PATCH", patch),
   moveCard: (id: string, columnId: string, index: number) =>
     send<Card>(`/cards/${id}/move`, "POST", { columnId, index }),

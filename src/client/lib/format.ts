@@ -69,15 +69,23 @@ export function formatRelative(value: Stamp): string {
    Tanggal yang dibaca berbeda dari jejak waktu: yang ditanyakan orang bukan
    "kapan ini terjadi" melainkan "masih ada waktu atau tidak". */
 
-/** Seberapa mendesak sebuah tenggat — inilah yang menentukan ronanya. */
-export type DueState = "overdue" | "soon" | "later";
+/**
+ * Seberapa mendesak sebuah tenggat — inilah yang menentukan ronanya.
+ *
+ * `"done"` berdiri di luar ketiga lainnya: ia tidak diukur dari jam, tapi
+ * dinyatakan orang, dan begitu dinyatakan tanggalnya berhenti menuntut apa
+ * pun. Karena itu ia menang atas "sudah lewat".
+ */
+export type DueState = "done" | "overdue" | "soon" | "later";
 
 /* Sehari. Bukan angka yang dihitung dari apa pun — ia sekadar batas antara
    "besok-besok" dan "hari ini juga", dan di situlah orang mulai memindahkan
    kartunya ke atas tumpukan. */
 const SOON_MS = 24 * 3600_000;
 
-export function dueState(value: Stamp): DueState {
+export function dueState(value: Stamp, doneAt?: Stamp | null): DueState {
+  if (doneAt) return "done";
+
   const diff = toDate(value).getTime() - Date.now();
   if (diff < 0) return "overdue";
   return diff < SOON_MS ? "soon" : "later";

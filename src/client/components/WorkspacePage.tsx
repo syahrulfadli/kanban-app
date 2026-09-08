@@ -1,19 +1,27 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { AddItemForm } from "./AddItemForm";
 import { AppHeader } from "./AppHeader";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { NameColorPopover } from "./NameColorPopover";
 import { useUndo } from "./UndoToasts";
+import { cn } from "../lib/cn";
+import { labelTint } from "../lib/people";
 import { insertAt } from "../lib/reorder";
 import { navigate, paths } from "../lib/route";
 import { ListSkeleton, SkeletonLine } from "./Skeleton";
-import type { Board, WorkspaceSummary } from "../../shared/types";
+import type { Board, LabelColor, WorkspaceSummary } from "../../shared/types";
 
 export function WorkspacePage({ workspaceId }: { workspaceId: string }) {
   const [workspace, setWorkspace] = useState<WorkspaceSummary | null>(null);
   const [boards, setBoards] = useState<Board[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<Board | null>(null);
+  /* Id, bukan objeknya — alasan yang sama seperti di daftar workspace. */
+  const [editingId, setEditingId] = useState<string | null>(null);
+  /* Satu ref untuk seluruh daftar — alasan yang sama seperti di daftar
+     workspace: hanya satu popover yang pernah terbuka sekaligus. */
+  const editAnchorRef = useRef<HTMLButtonElement>(null);
   const undo = useUndo();
 
   useEffect(() => {
@@ -28,6 +36,21 @@ export function WorkspacePage({ workspaceId }: { workspaceId: string }) {
   const create = async (title: string) => {
     const board = await api.createBoard(workspaceId, title);
     navigate(paths.board(board.id));
+  };
+
+  /** Judul dan warna penanda sekaligus — optimistik, pola sama dengan daftar
+      workspace: keadaan lama disimpan sebagai jalan pulang, tanpa toast urung
+      karena tidak ada yang hilang untuk diurungkan. */
+  const save = async (board: Board, patch: { name: string; color: LabelColor | null }) => {
+    const next = { title: patch.name, color: patch.color };
+    setBoards((prev) => prev?.map((b) => (b.id === board.id ? { ...b, ...next } : b)) ?? null);
+
+    try {
+      await api.updateBoard(board.id, next);
+    } catch (e: unknown) {
+      setBoards((prev) => prev?.map((b) => (b.id === board.id ? board : b)) ?? null);
+      setError(e instanceof Error ? e.message : "Gagal menyimpan board");
+    }
   };
 
   /* Board hilang dari daftar sekarang; perintah ke server baru berangkat
@@ -81,14 +104,56 @@ export function WorkspacePage({ workspaceId }: { workspaceId: string }) {
           {boards?.map((board) => (
             <li
               key={board.id}
-              className="glass glass-plate glass-plate-hover flex items-center gap-2 rounded-2xl px-4 py-3.5 transition-colors"
+              className="glass glass-plate glass-plate-hover relative flex items-center gap-2 rounded-2xl px-4 py-3.5 transition-colors"
             >
+              {/* Sama seperti baris workspace: tanpa warna berarti tanpa titik,
+                  bukan titik kosong. */}
+              {board.color && (
+                <span
+                  aria-hidden
+                  style={labelTint(board.color)}
+                  className="label-dot size-2.5 shrink-0"
+                />
+              )}
+
               <button
                 onClick={() => navigate(paths.board(board.id))}
                 className="min-w-0 flex-1 truncate text-left text-sm font-medium hover:text-accent-ink"
               >
                 {board.title}
               </button>
+
+              {/* Beda dari tombol hapus di sebelahnya: mengubah judul & warna
+                  papan terbuka untuk semua anggota, persis seperti mengganti
+                  latarnya dari dalam papan — server pun tidak menuntut admin
+                  untuk itu. */}
+              <button
+                ref={editingId === board.id ? editAnchorRef : null}
+                onClick={() => setEditingId((id) => (id === board.id ? null : board.id))}
+                aria-haspopup="dialog"
+                aria-expanded={editingId === board.id}
+                aria-label={`Ubah board ${board.title}`}
+                title="Ubah nama & warna"
+                className={cn(
+                  "grid size-6 shrink-0 place-items-center rounded-full transition-colors hover:bg-accent-soft hover:text-accent-ink",
+                  editingId === board.id ? "text-accent-ink" : "text-faint",
+                )}
+              >
+                <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M4 20h4l10-10a2.4 2.4 0 0 0-4-4L4 16v4Z" />
+                </svg>
+              </button>
+
+              {editingId === board.id && (
+                <NameColorPopover
+                  subject="board"
+                  name={board.title}
+                  color={board.color}
+                  anchorRef={editAnchorRef}
+                  onSubmit={(patch) => void save(board, patch)}
+                  onClose={() => setEditingId(null)}
+                />
+              )}
 
               {/* Hapus board butuh admin — server tetap yang memutuskan. */}
               {workspace && workspace.role !== "member" && (

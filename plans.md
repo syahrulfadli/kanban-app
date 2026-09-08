@@ -190,15 +190,219 @@ kasus.
 
 Diuji langsung di browser (Playwright headless, akun baru, workspace→
 board→kolom→2 kartu): badge Arsip tidak tampil angka saat kosong; buka
-Kartu 1 → klik Arsipkan → kartu hilang dari papan **dan** dialognya
-menutup sendiri, badge Arsip berubah jadi "1"; buka panel Arsip →
-menampilkan "Kartu 1" dengan nama kolom asal ("To Do") dan waktu relatif
-("baru saja"); klik Pulihkan → Kartu 1 kembali muncul di papan, badge
-kembali kosong; arsipkan Kartu 2, lalu "Hapus permanen" dari panel →
-dikonfirmasi lewat dialog yang menyebut nama kartu dan menegaskan "beda
-dari arsip, tidak bisa dipulihkan lagi" → kartu hilang dari panel arsip
-untuk selamanya, badge tetap kosong. Tidak ada error konsol React di
-sepanjang pengujian.
+Kartu 1 → klik Arsipkan → kartu hilang dari papan, badge Arsip berubah
+jadi "1"; buka panel Arsip → menampilkan "Kartu 1" dengan nama kolom asal
+("To Do") dan waktu relatif ("baru saja"); klik Pulihkan → Kartu 1 kembali
+muncul di papan, badge kembali kosong; arsipkan Kartu 2, lalu "Hapus
+permanen" dari panel → dikonfirmasi lewat dialog yang menyebut nama kartu
+dan menegaskan "beda dari arsip, tidak bisa dipulihkan lagi" → kartu
+hilang dari panel arsip untuk selamanya, badge tetap kosong. Tidak ada
+error konsol React di sepanjang pengujian.
+
+**Susulan: kartu terarsip tetap bisa dibuka lewat pencarian, dengan opsi
+pulihkan dan timestamp di dalam dialognya.**
+
+Awalnya dialog kartu **menutup sendiri** begitu diarsipkan (lihat catatan
+lama di atas) — itu efek samping dari cara `BoardView` menentukan kartu
+mana yang sah dibuka: dicari dari `board.columns`, dan kartu terarsip
+memang sengaja disaring dari situ (lihat di atas), jadi ia selalu "tidak
+ketemu" dan dialognya otomatis tertutup. Ternyata itu juga membuat kartu
+terarsip **tidak bisa dibuka sama sekali** lewat jalur lain (pencarian,
+alamat langsung) — cuma diketahui setelah diminta susulan ini secara
+eksplisit.
+
+Diperbaiki dengan memindahkan keabsahan "kartu ini boleh dibuka" dari
+`BoardView` (yang cuma tahu kartu aktif) ke `CardModal` sendiri (yang
+menariknya lewat `GET /cards/:id`, dan endpoint itu memang tidak pernah
+menyaring kartu terarsip). `src/client/lib/api.ts` dapat `ApiError`
+(membawa status HTTP — `Error` biasa membuangnya), dan `CardModal`
+menerima prop `onNotFound` yang dipanggil hanya saat fetch-nya 404
+sungguhan (kartu dihapus, atau bukan miliknya) — `BoardView` mengoperkan
+`leaveCard` yang sudah ada ke situ. `open`/efek pengalih-alamat lama di
+`BoardView` (yang mencari `openCardId` di `board.columns`) dihapus
+seluruhnya; `CardModal` sekarang selalu dirender begitu ada `openCardId`,
+tak peduli aktif atau terarsip. `CardDetail` juga dapat field
+`columnTitle` baru (dikirim server, lewat `requireCard` yang sudah
+menjoin `columns`) — chip nama kolom di kepala dialog dulu datang dari
+`board.columns` lewat `BoardView`, yang sekarang tidak selalu punya kartu
+itu.
+
+**Konsekuensi yang disadari, bukan bug:** dialog yang sedang terbuka
+tidak lagi otomatis tertutup kalau kolaborator lain menghapus kartu itu
+secara bersamaan (perilaku lama, bergantung pada `board.columns` yang
+sudah dihapus). Sekarang penutupannya baru terjadi reaktif — begitu ada
+aksi berikutnya di dialog itu (mis. coba menyunting) yang gagal karena
+kartunya sungguh sudah tidak ada, `run()` menarik ulang lewat `load()`,
+dan itulah yang memicu `onNotFound`. Kasusnya jarang (dua orang
+menghapus/melihat kartu yang sama nyaris bersamaan) dan akibatnya kecil
+(dialog basi sampai disentuh, bukan galat atau kehilangan data) —
+dipertimbangkan sepadan demi kartu terarsip yang sekarang bisa dibuka
+dengan benar.
+
+Perubahan lain: `CardModal` — chip "Diarsipkan · &lt;waktu relatif&gt;" di
+kepala dialog (cuma muncul kalau `detail.archivedAt`, `title` chip-nya
+membawa waktu persis lewat `formatDateTime`); tombol arsip yang sudah ada
+sekarang **gantian** jadi "Pulihkan" (ikon beda, `RestoreBoxIcon`) saat
+kartunya sudah terarsip — satu slot tombol, bukan tombol baru, karena
+cuma satu dari dua aksi itu yang pernah masuk akal sekaligus.
+`CardSearchHit` (dan endpoint `/cards/search`, yang sejak awal memang
+tidak pernah menyaring kartu terarsip dari hasilnya) dapat field
+`archived: boolean`; `CardSearch.tsx` menandainya dengan chip kecil "🗄
+Diarsipkan" di sebelah judul hasil. Chip itu awalnya pil kecil custom
+(10px, `text-faint`) yang diminta diperjelas — diganti pakai `.chip`
+biasa (11px, `ink-soft`, garis tepi tipis), skala dan kontras yang sama
+dengan "Diarsipkan" di kepala `CardModal`, supaya keduanya terbaca
+sebagai penanda yang sama, bukan dua tingkat kepentingan berbeda.
+
+Diuji langsung di browser (Playwright headless): arsipkan kartu dari
+dalam dialognya → dialog **tetap terbuka**, menampilkan chip "Diarsipkan
+· baru saja" dan tombol berganti jadi "Pulihkan"; kartu hilang dari
+papan; tutup dialog, cari lewat pencarian global → hasilnya menampilkan
+chip "Diarsipkan"; klik hasil → dialog kartu terarsip terbuka dengan
+timestamp arsip yang sama terlihat; klik "Pulihkan" dari dalam dialog →
+chip hilang, tombol kembali jadi "Arsipkan", dan begitu dialog ditutup
+kartunya kembali terlihat di papan. Tidak ada error konsol React.
+
+**Susulan: panel arsip jadi dialog modal, barisnya bisa diklik untuk
+membuka kartunya.**
+
+`ArchivePanel` awalnya popover kecil berlabuh di tombolnya (`sheet
+sheet-frost absolute top-full right-0`, pola sama dengan `BoardFilter`) —
+diminta diganti jadi dialog modal terpusat: `fixed inset-0` + `scrim` +
+panel di tengah layar, Escape dan klik scrim untuk menutup. `useDismiss`
+(pointerdown-di-luar) tidak lagi dipakai — begitu jadi modal sungguhan,
+mekanismenya sama seperti `ConfirmDialog`: scrim yang menutup, bukan
+mendeteksi klik di luar elemen tertentu.
+
+Pelatnya sempat memakai `glass glass-lens card-dialog` (kaca tembus
+pandang, gaya `ConfirmDialog`) — lalu diminta ganti jadi `card-plain`
+(pekat, gaya `CardModal`), karena refraksi kaca di atas latar papan yang
+warna-warni membuat teksnya kalah kontras, terutama di tema gelap
+(`--dialog-fill` cuma `rgb(20 23 29 / 0.62)` — tembus 38%, sedangkan
+`--card-fill` gelap pekat `#171A21`, terlepas dari apa pun di baliknya).
+Scrim-nya ikut disamakan jadi `scrim-dim` (dipakai `CardModal`) alih-alih
+`scrim` polos (dipakai `ConfirmDialog`) — pelat pekat butuh latar yang
+lebih gelap untuk tetap terpisah dari papan, karena tidak ada lagi kaca
+yang mengaburkan papan di belakangnya untuk melakukan pemisahan itu.
+Diuji ulang di tema gelap: teks di panel arsip dan `CardModal` yang
+dibuka darinya sama-sama terbaca jelas, tanpa kontras yang hilang.
+
+Judul tiap baris sekarang tombol tersendiri yang membuka kartunya lewat
+`CardModal` biasa (`navigate(paths.card(boardId, item.id))`, pola sama
+dengan `openHit` di `CardSearch`) — dialog arsip menutup diri dulu sebelum
+pindah alamat, supaya tidak ada dua dialog modal bertumpuk. Tombol
+"Pulihkan"/"Hapus permanen" tetap ada di baris yang sama sebagai aksi
+cepat tanpa perlu membuka kartunya dulu; keduanya `stopPropagation()`
+supaya tidak ikut memicu klik pembuka kartu di belakangnya.
+
+Diuji langsung di browser (Playwright headless, 2 kartu diarsipkan):
+dialog arsip terbuka di tengah layar dengan scrim; klik judul salah satu
+baris membuka `CardModal` kartu itu (dengan chip "Diarsipkan" di
+headernya) **dan** dialog arsip ikut tertutup otomatis; buka lagi panel
+arsip, klik "Pulihkan" pada baris yang lain → kartu langsung hilang dari
+daftar arsip **tanpa** ikut menutup dialog arsip atau membuka
+`CardModal`-nya (aksi cepatnya berdiri sendiri dari aksi buka-kartu);
+tombol X menutup dialog; kartu yang belum dipulihkan tetap hilang dari
+papan, yang sudah dipulihkan-cepat sudah kembali terlihat. Tidak ada
+error konsol React.
+
+**Susulan: "Pindahkan ke papan lain…" dipadamkan untuk kartu terarsip.**
+
+Butir itu bukan cuma tidak berlaku — ia **gagal diam-diam**: `askMoveCard`
+di `BoardView` mencari kartunya di `board.columns`, dan kartu terarsip
+sengaja disaring dari situ (lihat `isNull(archivedAt)` di atas), jadi
+mengkliknya menutup menu tanpa membuka dialog apa pun dan tanpa pesan.
+`MenuItem` di `CardModal` karenanya dapat dua prop baru — `disabled` dan
+`hint` (sebaris alasan di bawah label, hanya tampil selagi padam) — dan
+butir Pindahkan memakai keduanya dengan bunyi "Pulihkan dulu dari arsip".
+
+Dipilih **dipadamkan**, bukan disembunyikan (menu yang butirnya
+berganti-ganti jumlah membuat orang mengira fiturnya hilang) dan bukan
+dibuat benar-benar bekerja — yang terakhir sebenarnya mungkin, karena
+`POST /cards/:id/transfer` tidak menyentuh `archivedAt` sama sekali dan
+kartunya akan mendarat di arsip papan tujuan; itu disimpan sebagai opsi
+lanjutan, bukan yang dikerjakan sekarang.
+
+Diuji di browser (Playwright headless): kartu terarsip → butir padam
+(`isDisabled()` true) dengan keterangannya terbaca; kartu yang sama
+setelah dipulihkan → butir hidup lagi (`isDisabled()` false).
+
+**Susulan: kontras teks panel arsip di tema gelap.**
+
+Diukur, bukan dikira-kira — di atas `--card-fill` tema gelap (#171A21):
+`--color-ink` 16,1:1, `ink-soft` 11,3:1, `muted` 6,6:1, `faint` 3,8:1
+(satu-satunya yang gagal AA untuk teks kecil, dan memang sudah tidak
+dipakai di panel ini sejak putaran sebelumnya). Yang diubah: judul kartu
+`text-ink-soft` → `text-ink` (ia teks utama daftar, harus sekuat judul di
+dialog kartu), dan tombol "Pulihkan"/"Hapus permanen" `text-muted` →
+`text-ink-soft` — keduanya aksi, dan pada `text-muted` mereka terbaca
+sederajat dengan baris nama kolom di sebelahnya. Baris meta (kolom asal +
+waktu) sengaja tetap `text-muted`, supaya hierarki dua baris itu tidak
+ikut mendatar. Sekalian: keterangan butir menu yang dipadamkan (susulan di
+atas) ikut naik dari `text-faint` ke `text-muted`, dengan alasan yang sama.
+
+**Susulan: penyebab sesungguhnya "masih susah dilihat" — bukan kontras,
+tapi tinta yang diracuni foto latar.**
+
+Perbaikan kontras di atas benar tapi tidak menyentuh akar masalahnya, dan
+pengguna melaporkan panel masih sulit dibaca. Penyebabnya baru ketahuan
+setelah pengguna sendiri menunjuk arahnya: "ketika menggunakan mode
+background, ia otomatis menyesuaikan dengan kecerahan dari background".
+
+`ArchivePanel` dipasang di `BoardView` di dalam
+`<span className="on-photo-top-end">` ([BoardView.tsx:444](src/client/components/BoardView.tsx#L444)) — petak yang tintanya (`--color-ink`,
+`--color-ink-soft`, `--color-muted`, `--color-faint`, `--color-line`,
+`--color-line-soft`, dst.) ditimpa `useBackdropInk`/`backdrop.ts` mengikuti
+kecerahan FOTO LATAR papan di petak itu, bukan mengikuti temanya (lihat
+blok "Tinta di atas foto" di `index.css`). Itu mekanisme yang disengaja —
+breadcrumb dan chip di kepala papan memang duduk langsung di atas foto dan
+butuh tintanya menyesuaikan. Masalahnya: `ArchivePanel`, walau lahir di
+petak yang sama, isinya sendiri (dialog modal `.card-plain`, pelat pekat)
+sama sekali tidak duduk di atas foto — ia duduk di atas `--card-fill`
+pekat. Tapi karena CSS custom property mewarisi ke bawah, dan tiap kelas
+`text-ink`/`text-muted`/dst. di dalam dialog itu menulis `color:
+var(--color-ink)` yang meng-resolve ulang di titik itu, mereka ikut
+membaca tinta yang ditimpa untuk fotonya — bukan tinta tema yang benar
+untuk pelat pekatnya sendiri. Kombinasi tema gelap + foto terang di sudut
+kanan-atas memilih tinta GELAP (untuk kontras dengan foto terang itu), dan
+tinta gelap itu lantas terbaca di atas `--card-fill` yang SUDAH gelap
+sendiri — nyaris tak terlihat. Arah sebaliknya (tema terang + foto gelap)
+sama rusaknya: tinta TERANG terbaca di atas `--card-fill` yang sudah putih.
+
+**Diperbaiki di root cause**, mengikuti pola yang sudah ada untuk masalah
+sejenis (`.sheet` sudah memulihkan tangga tintanya sendiri dari racun rona
+kolom berwarna, lewat token `--color-ink-base` dkk. yang dibekukan di
+`:root` — lihat komentarnya di `index.css`). Ditambah dua token beku baru,
+`--color-line-base`/`--color-line-soft-base` (belum ada sebelumnya, dan
+`.card-plain`/`.card-dialog` butuh keduanya untuk cincin tepinya sendiri).
+`.card-plain` dan `.card-dialog` (dua kelas pelat "berdiri sendiri,
+terlepas dari apa pun di baliknya" — dipakai `ArchivePanel`, dan
+`ConfirmDialog`/`MoveDialog` yang memakai `card-dialog`) masing-masing
+memulihkan `--color-ink`, `--color-ink-soft`, `--color-muted`,
+`--color-faint`, `--color-line`, `--color-line-soft` ke token `-base`-nya
+begitu masuk, plus `color: var(--color-ink)` eksplisit di root-nya sendiri
+— memutus warisan racun dari leluhur mana pun, foto atau kolom berwarna.
+`ConfirmDialog` ikut diperbaiki karena "Hapus permanen" dari dalam
+`ArchivePanel` memanggilnya sebagai anak dari petak yang sama — bug yang
+identik, ditemukan sambil menguji.
+
+Ini juga membatalkan patch sebelumnya (`dark:text-white` ditempel manual
+di tiap baris teks `ArchivePanel`) yang sempat dicoba sesaat sebelum
+penyebab sesungguhnya ketahuan — dibalikkan lagi, karena (1) tidak
+lengkap: cuma menutup satu arah (tema gelap), sedangkan arah sebaliknya
+(tema terang + foto gelap) tetap rusak, dan (2) meratakan hierarki
+judul/meta yang sengaja dibedakan lewat rona.
+
+Diuji dengan menyuntik `document.documentElement.dataset.inkTopEnd`
+langsung (meniru apa yang `useBackdropInk` tulis, tanpa perlu foto
+sungguhan) di kedua arah: tema gelap + `inkTopEnd="dark"` (kasus yang
+dilaporkan) dan tema terang + `inkTopEnd="light"` (arah sebaliknya).
+Warna komputasi diperiksa lewat `getComputedStyle` sebelum dan sesudah:
+keduanya sekarang membaca token `-base` yang benar (dark: `#F3F6FC` di
+atas `#171A21`; light: `#0B1220` di atas `#FFFFFF`), bukan lagi nilai yang
+diracuni (`#0B1220`/`#F7F9FC`). Diuji juga dialog "Hapus permanen" yang
+dipanggil dari dalam panel arsip — sama-sama pulih. Tidak ada error
+konsol React.
 
 **Susulan yang belum dikerjakan:** arsip kolom (di luar cakupan yang
 disepakati untuk iterasi ini).
@@ -490,7 +694,91 @@ daftar anggota.
 - Statistik ditampilkan sebagai dua angka besar berlabel ("X followup",
   "Y kartu dibuat"), bukan tabel — cukup untuk sekilas lihat kontribusi.
 
-## 6. Edit judul dan warna untuk workspace & board
+## 6. Edit judul dan warna untuk workspace & board — **selesai**
+
+Skema: `workspaces.color` dan `boards.color`, keduanya nullable dengan enum
+`LABEL_COLORS` (migrasi `0014_nifty_fantastic_four.sql`). Deklarasi
+`LABEL_COLORS`/`COLUMN_COLORS` **dipindah ke pucuk `schema.ts`**, di atas
+tabel pertama: `enum` dibaca saat tabelnya dirakit, bukan nanti saat
+barisnya ditulis, jadi `workspaces` yang memakainya tidak bisa berdiri di
+atas konstanta yang dideklarasikan seratus baris di bawahnya
+(`drizzle-kit generate` langsung gagal dengan "Cannot access 'LABEL_COLORS'
+before initialization" — bukan kesalahan yang menunggu sampai runtime).
+
+Endpoint: bukan endpoint baru, dua yang sudah ada tinggal diperluas seperti
+dugaan di "Pertimbangan" di bawah. `PATCH /workspaces/:id` — `name` jadi
+opsional dan `color` ditambahkan (`z.enum(LABEL_COLORS).nullish()`, null
+menghapus warnanya, jadi ia harus benar-benar terkirim — pola yang sama
+dengan warna kolom); izinnya tetap admin, tidak diubah. `PATCH /boards/:id`
+dapat `color` di sebelah `title` dan cabang `background` yang sudah ada;
+izinnya juga tidak diubah — papan memang boleh disunting anggota biasa,
+sama seperti mengganti latarnya dari dalam papan. Di klien
+`renameWorkspace`/`renameBoard` diganti `updateWorkspace`/`updateBoard`
+yang menerima `{ name?, color? }` — satu pintu, karena keduanya memang
+disunting bersama di satu popover.
+
+Komponen baru `NameColorPopover.tsx`, dipakai baris workspace **dan** baris
+board (`subject` cuma mengganti katanya): input nama + `ColorSwatches`
+(`clearable`, komponen yang sudah ada, dipakai ulang tanpa perubahan) +
+Simpan/Batal, ditutup lewat `useDismiss` (klik luar & Escape), Enter
+menyimpan. Popover berlabuh `right-0` ke barisnya, bukan dialog terpusat —
+menutup seluruh layar untuk dua isian kecil akan membuat mengubah nama
+terasa lebih berat daripada menghapusnya.
+
+**Keputusan yang diambil saat implementasi:** warnanya **ikut tombol
+Simpan**, tidak tersimpan seketika seperti warna kolom di menu `ColumnView`.
+Di sana pemilih warna berdiri sendiri; di sini ia bertetangga dengan kolom
+isian yang memang harus ditutup dengan Simpan, dan satu panel yang setengah
+isinya menyimpan sendiri sementara setengah lagi menunggu tombol tidak bisa
+ditebak dari melihatnya. Penyimpanannya optimistik dengan salinan keadaan
+lama sebagai jalan pulang — **tanpa** `useUndo` seperti hapus, karena
+mengubah nama sudah bisa dibatalkan dengan mengubahnya kembali, dan toast
+urung untuk sesuatu yang tidak hilang cuma menambah bunyi.
+
+Penanda di baris: titik `label-dot` (`labelTint`, sama persis dengan titik
+label dan titik warna kolom) di kiri nama, dan **cuma digambar kalau ada
+warnanya** — baris tanpa warna tidak menyisakan titik kosong, supaya daftar
+tetap tenang saat tidak ada satu pun yang ditandai. Tombol pensil muncul di
+antara chip peran dan tombol hapus; di daftar workspace ia hanya untuk
+`role !== "member"` (mengikuti `assertRole(admin)` di server), di daftar
+board untuk semua anggota (mengikuti izin server yang memang lebih longgar
+di sana).
+
+Diuji langsung di browser (Playwright headless, tema gelap, akun baru, 2
+workspace + 2 board): popover terbuka dari baris "Tim Produk", ganti nama
+jadi "Tim Produk Inti" + warna teal → baris langsung berubah dan titik teal
+muncul; **reload** → keduanya bertahan (tersimpan di server, bukan cuma di
+state); popover baris board "Rilis Q4" + warna violet → titik violet muncul
+di barisnya. Tidak ada error konsol React.
+
+**Dua bug pada popover ini, ditemukan dan diperbaiki di putaran berikutnya
+(keduanya soal `useDismiss`, dan keduanya baru terlihat saat diuji, bukan
+saat dibaca):**
+
+1. **Escape di dalam kolom isian tidak menutup apa-apa.** `stopPropagation`
+   pada peristiwa sintetis React ikut menghentikan peristiwa aslinya di
+   wadah akar, jadi pendengar `keydown` milik `useDismiss` — yang duduk di
+   `document` — tidak pernah kebagian. Menahannya tetap perlu (Escape tidak
+   boleh menembus ke apa pun di belakang popover), jadi penutupannya
+   dikerjakan di tempat yang sama, persis seperti popover tenggat di
+   `CardDue` yang sejak awal memang begitu.
+2. **Menekan tombol pensil untuk kedua kalinya tidak menutup popovernya.**
+   `pointerdown` di tombol itu terbaca sebagai ketukan di luar → popover
+   ditutup, lalu `click`-nya menyalakan lagi seketika; hasilnya terlihat
+   seperti tombolnya tidak berfungsi. Diperbaiki dengan meneruskan ref
+   tombol pemicunya ke `useDismiss` lewat prop `anchorRef` — memang itu
+   alasan hook itu menerima BEBERAPA ref sejak awal (lihat catatannya di
+   `useDismiss.ts`), dan pemakaian pertama ini justru melewatkannya. Satu
+   ref untuk seluruh daftar, dipasang hanya di baris yang sedang disunting:
+   cuma ada satu popover terbuka pada satu waktu.
+
+Diuji ulang sesudahnya: Escape di dalam input menutup (tadinya tidak),
+tombol pensil kedua kali menutup (tadinya tidak), klik di luar tetap
+menutup, dan simpan nama+warna masih bertahan setelah reload.
+
+**Belum dikerjakan (di luar cakupan yang disepakati):** warna board belum
+dipakai di tempat lain selain baris daftarnya — kepala papan, breadcrumb,
+dan daftar workspace di navbar masih tak berwarna.
 
 **Masalah:** nama workspace dan board (`workspaces.name`, `boards.title`)
 sepertinya hanya diisi sekali saat dibuat — di `WorkspacesPage` dan
@@ -521,3 +809,79 @@ atau label (`LABEL_COLORS`) sudah punya.
 - Warna aksen tampil sebagai titik/garis kecil di baris daftar (mis. tepi
   kiri kartu baris, atau titik di samping nama) — tetap tenang, bukan
   mewarnai seluruh baris.
+
+## 7. Tenggat bisa ditandai "Selesai" — **selesai**
+
+Diminta di luar batch yang direncanakan: tenggat yang pekerjaannya sudah
+beres harus berhenti terhitung terlambat, dan tanggalnya berubah hijau.
+
+Skema: `cards.dueDoneAt` timestamp nullable (migrasi
+`0013_clammy_molecule_man.sql`) — timestamp, bukan boolean, dengan alasan
+yang sama seperti `archivedAt`: "sudah selesai" hampir selalu disusul
+"sejak kapan", dan chip di dialog kartu memang menampilkan keduanya
+("Selesai · baru saja"). Dua `ACTIVITY_KINDS` baru, `due_done` dan
+`due_undone`, dengan kalimatnya di `shared/activity.ts` — terpisah dari
+`due_changed` karena tanggalnya tidak berubah sama sekali; yang berubah
+cuma apakah ia masih menagih.
+
+Server: bukan endpoint baru — `PATCH /cards/:id` menerima `dueDone:
+boolean` (keadaan, bukan waktu; kapannya dicatat server, karena jam klien
+bisa meleset). Tiga hal bisa menggerakkan tandanya, dan urutannya
+disengaja: (1) klien menyatakannya langsung — paling berhak; (2) tenggatnya
+**dipindahkan** ke tanggal lain → tanda selesai gugur, karena tanggal baru
+adalah tagihan baru (tanpa aturan ini, kartu yang tenggatnya digeser ke
+pekan depan lahir sudah "selesai" tanpa ada yang mengerjakannya); (3)
+tenggatnya **dihapus** → tidak ada lagi yang bisa diselesaikan. Catatan
+lini masa hanya ditulis untuk yang dinyatakan langsung: yang gugur karena
+(2) atau (3) itu akibat, dan mencatat keduanya membuat satu gerakan
+dikabarkan dua kali. Aturan yang sama ditiru di state optimistik klien
+(`setDue` di `CardModal`), supaya kartunya tidak sempat tampil hijau
+dengan tenggat yang sudah berpindah sebelum jawaban server datang.
+
+Klien: `dueState(value, doneAt?)` di `format.ts` dapat keadaan keempat
+`"done"` yang **menang atas `"overdue"`** — ia tidak diukur dari jam tapi
+dinyatakan orang. Dari situ ronanya mengalir ke dua tempat: chip tanggal di
+`CardDue` dan angka tenggat di muka kartu (`CardItem`) sama-sama jadi
+`text-ok`. Sakelarnya sendiri chip di sebelah tanggal ("Tandai selesai" →
+"Selesai · <waktu relatif>"), bukan butir di dalam popover pengatur
+tanggal: menyelesaikan tenggat itu ketukan sambil lalu, sedangkan popover
+itu tempat memilih tanggal. Silang "hapus tenggat" duduk di antara
+keduanya, menempel pada chip tanggal yang memang jadi miliknya.
+
+Filter board (`boardFilter.ts`): kartu yang tenggatnya selesai keluar dari
+**ketiga** kategori — bukan pindah ke "Tanpa tanggal", yang berarti hal
+lain (belum dijadwalkan sama sekali). Ketiga saringan itu menanyakan
+pekerjaan mana yang masih menagih waktu, dan yang ini sudah tidak.
+
+**Catatan atas "tidak lagi memicu notifikasi":** aplikasi ini **belum
+punya** notifikasi tenggat terlewat — tidak ada cron/`scheduled` di
+`wrangler.jsonc` maupun alarm Durable Object, dan satu-satunya kabar
+bertema tenggat yang ada (`due_changed`/`due_cleared`) dipicu saat
+seseorang mengubah tanggalnya, bukan saat waktunya lewat. Jadi yang
+sungguh dipadamkan sekarang adalah penanda terlambatnya: rona merah di
+kartu & dialog, kalimat "Lewat tenggat", dan kategori "Terlambat" di
+filter. `dueDoneAt` sudah jadi tempat bertanya yang benar kalau pengingat
+terjadwal ditambahkan nanti.
+
+Diuji langsung di browser (Playwright headless, tema gelap, akun baru, dua
+kartu bertenggat 36 jam lalu): kartu yang belum ditandai tampil merah
+dengan "Lewat tenggat"; kartu yang ditandai selesai lewat API tampil hijau
+di papan maupun di dialognya; menandai kartu kedua lewat tombolnya
+mengubah chip jadi "Selesai · baru saja" (hijau) seketika dan angka
+tenggatnya di papan ikut hijau; filter "Terlambat" yang tadinya memuat
+keduanya berubah jadi "Tidak ada kartu yang cocok filter". Tidak ada error
+konsol React.
+
+Ketiga aturan server yang saling berkaitan itu diuji terpisah lewat API
+(delapan skenario, semuanya lulus), karena yang lewat UI cuma menyentuh
+jalur bahagianya: (1) ditandai selesai → `dueDoneAt` terisi, lini masa
+`due_done` sekali; (2) tenggat **dipindah** ke tanggal lain → tanda selesai
+gugur dan lini masanya cuma mencatat `due_changed` — **tidak** ada
+`due_undone` palsu; (3) tenggat **dihapus** → tanda selesai ikut kosong,
+cuma `due_cleared`; (4) tanggal yang sama dikirim ulang → tanda selesai
+bertahan (bukti `dueChanged` membandingkan nilai, bukan kehadiran field);
+(5) `dueDone: false` → null, dan `due_undone` tercatat; (6) kartu tanpa
+tenggat ditandai selesai → diabaikan diam-diam, tanpa catatan palsu di
+lini masa; (7) `dueAt` + `dueDone` dalam satu permintaan → langsung
+selesai, `due_done` tercatat; (8) payload `GET /boards/:id` membawa
+`dueDoneAt` (yang dibaca muka kartu untuk ronanya).

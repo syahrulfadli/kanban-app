@@ -299,30 +299,28 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
 
   const confirmDelete = () => {
     if (!pending) return;
-    if (pending.kind === "card") actions.deleteCard(pending.id);
-    else actions.deleteColumn(pending.id);
+    if (pending.kind === "card") {
+      actions.deleteCard(pending.id);
+      // Beda dari kartu yang sungguh 404 (lihat catatan `onNotFound` di
+      // bawah): `deleteCard` optimistik dengan jendela urung (lihat
+      // useBoard.ts), jadi GET /cards/:id masih menjawab 200 selama jendela
+      // itu terbuka — dialognya tidak akan pernah tahu lewat 404-nya sendiri
+      // kalau tidak ditutup di sini juga. Dua jalan berbeda untuk pertanyaan
+      // yang sama, "kartunya masih ada?" — kalau salah satunya berubah,
+      // periksa yang satunya lagi.
+      if (pending.id === openCardId) leaveCard();
+    } else {
+      actions.deleteColumn(pending.id);
+    }
     setPending(null);
   };
 
-  // Kartu yang sedang dibuka dicari ulang dari board setiap render: kalau
-  // kolaborator lain menghapusnya, dialognya ikut tertutup dengan sendirinya.
-  const open = useMemo(() => {
-    if (!openCardId || !board) return null;
-
-    for (const column of board.columns) {
-      if (column.cards.some((card) => card.id === openCardId)) {
-        return { cardId: openCardId, columnTitle: column.title };
-      }
-    }
-    return null;
-  }, [board, openCardId]);
-
-  useEffect(() => {
-    if (openCardId && board && !open) {
-      pushedCardId.current = null;
-      navigate(paths.board(boardId), { replace: true });
-    }
-  }, [board, boardId, open, openCardId]);
+  /* Dulu dicari dari `board.columns` di sini, dan ditutup begitu tak
+     ketemu — tapi kartu terarsip juga tak ada di sana padahal masih sah
+     dibuka (lewat pencarian, lewat alamatnya). Keabsahannya sekarang
+     ditentukan `CardModal` sendiri lewat `GET /cards/:id`: 404 sungguhan
+     (dihapus, atau bukan miliknya) memanggil `onNotFound` di bawah, yang
+     menutup dialog persis seperti dulu. */
 
   // Monitor DnD didaftarkan sekali; state terbaru dibaca lewat ref agar
   // listener tidak perlu dipasang ulang setiap render.
@@ -562,18 +560,19 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
         />
       )}
 
-      {open && session && (
+      {openCardId && session && (
         <CardModal
-          key={open.cardId}
-          cardId={open.cardId}
+          key={openCardId}
+          cardId={openCardId}
           boardLabels={board.labels}
-          columnTitle={open.columnTitle}
-          shareUrl={`${location.origin}${location.pathname}${paths.card(boardId, open.cardId)}`}
+          shareUrl={`${location.origin}${location.pathname}${paths.card(boardId, openCardId)}`}
           currentUser={{ ...session.user, image: session.user.image ?? null }}
           networkStatus={live.status}
           onClose={leaveCard}
-          onMove={() => askMoveCard(open.cardId)}
+          onMove={() => askMoveCard(openCardId)}
           onBoardChange={() => void refresh()}
+          onDelete={() => askDeleteCard(openCardId)}
+          onNotFound={leaveCard}
         />
       )}
 

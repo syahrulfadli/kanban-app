@@ -7,6 +7,7 @@ import { nanoid } from "nanoid";
 import {
   BOARD_BLUR_LEVELS,
   BOARD_GRADIENTS,
+  LABEL_COLORS,
   backgroundImages,
   boards,
   cards,
@@ -354,6 +355,10 @@ const app = new Hono<AppEnv>()
       "json",
       z.object({
         title: z.string().trim().min(1).max(120).optional(),
+        /* Rona penanda papan di daftar board — bukan latar papan, yang punya
+           cabangnya sendiri di bawah. Null menghapusnya, jadi ia harus
+           benar-benar terkirim. */
+        color: z.enum(LABEL_COLORS).nullish(),
         background: z
           .discriminatedUnion("kind", [
             /* Ketat, bukan longgar: tanpa ini Zod membuang field yang tidak
@@ -411,6 +416,7 @@ const app = new Hono<AppEnv>()
         .update(boards)
         .set({
           ...(patch.title !== undefined && { title: patch.title }),
+          ...(patch.color !== undefined && { color: patch.color ?? null }),
           ...(patch.background !== undefined && {
             backgroundKind: patch.background.kind,
             backgroundValue:

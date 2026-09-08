@@ -175,7 +175,7 @@ export function CardItem({
   const { checklist, labels, participants, members, commentCount, attachmentCount, watching } =
     card;
   const faces = cardFaces(members, participants);
-  const due = card.dueAt ? dueState(card.dueAt) : null;
+  const due = card.dueAt ? dueState(card.dueAt, card.dueDoneAt) : null;
   const percent = checklist.total ? Math.round((checklist.done / checklist.total) * 100) : 0;
   const complete = checklist.total > 0 && checklist.done === checklist.total;
   const shownLabels = labels.slice(0, VISIBLE_LABELS);
@@ -303,10 +303,17 @@ export function CardItem({
                 <span
                   className={cn(
                     "flex items-center gap-1 text-[0.6875rem] font-semibold tabular-nums",
+                    /* Hijau berarti tanggalnya sudah dijawab — dan karena itu
+                       ia menang atas merah, walau tanggalnya sendiri lewat. */
+                    due === "done" && "text-ok",
                     due === "overdue" && "text-danger",
                     due === "soon" && "text-warn",
                   )}
-                  title={`Tenggat ${formatDateTime(card.dueAt)}`}
+                  title={
+                    card.dueDoneAt
+                      ? `Tenggat ${formatDateTime(card.dueAt)} — selesai`
+                      : `Tenggat ${formatDateTime(card.dueAt)}`
+                  }
                 >
                   <svg
                     viewBox="0 0 24 24"

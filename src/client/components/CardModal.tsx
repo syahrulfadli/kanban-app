@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { CardAttachments } from "./CardAttachments";
 import { CardChecklist } from "./CardChecklist";
 import { CardDue } from "./CardDue";
@@ -7,14 +8,16 @@ import { CardLabels } from "./CardLabels";
 import { CardPeople } from "./CardPeople";
 import { Markdown } from "./Markdown";
 import { MarkdownField } from "./MarkdownField";
-import { WatchToggle } from "./WatchToggle";
+import { EyeIcon } from "./WatchToggle";
 import { AvatarStack } from "./Avatar";
 import { CardDetailSkeleton, SkeletonLine } from "./Skeleton";
+import { useDismiss } from "../hooks/useDismiss";
 import { useStoredFlag } from "../hooks/useStoredFlag";
 import { useOpenProfile } from "./ProfilePopover";
-import { api } from "../lib/api";
+import { api, ApiError } from "../lib/api";
 import { optimisticActivity, type ActivityNote } from "../lib/activity";
 import { prepareAttachment } from "../lib/attachment";
+import { cn } from "../lib/cn";
 import { formatDateTime, formatRelative } from "../lib/format";
 import type { ChannelStatus } from "../lib/realtime";
 import type {
@@ -27,11 +30,147 @@ import type {
   UserBrief,
 } from "../../shared/types";
 
+/* Ukuran menu kartu — tidak bergantung pada props/state, jadi tinggal di luar
+   komponen alih-alih dibuat ulang di setiap render. */
+const MENU_MARGIN = 16;
+const MENU_WIDTH = 208; // w-52
+
+/** Kotak arsip — dipakai baik untuk tombol maupun chip keterangan di header. */
+function ArchiveBoxIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="3" y="4" width="18" height="4" rx="1" />
+      <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8" />
+      <path d="M10 12h4" />
+    </svg>
+  );
+}
+
+/** Kotak terbuka dengan anak panah keluar — kebalikan arsip, bukan kotak baru. */
+function RestoreBoxIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M4 13v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6" />
+      <path d="M12 15V3m0 0-3.5 3.5M12 3l3.5 3.5" />
+    </svg>
+  );
+}
+
+/** Dua mata rantai — menyalin tautan. */
+function LinkIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M10 13.5a4 4 0 0 0 5.7.4l3-3a4 4 0 0 0-5.7-5.7l-1.6 1.6" />
+      <path d="M14 10.5a4 4 0 0 0-5.7-.4l-3 3a4 4 0 0 0 5.7 5.7l1.6-1.6" />
+    </svg>
+  );
+}
+
+/** Tanda centang — konfirmasi tautan sudah tersalin. */
+function CheckIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="m5 12.5 4.5 4.5L19 7.5" />
+    </svg>
+  );
+}
+
+/** Anak panah yang keluar dari sebuah bidang — pindah ke papan lain. */
+function MoveOutIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M13 4H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6" />
+      <path d="m16 8 4 4-4 4M20 12H10" />
+    </svg>
+  );
+}
+
+/** Tong sampah — hapus kartu, tidak seperti arsip: tidak bisa dipulihkan. */
+function TrashIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M4 7h16M10 11v6M14 11v6" />
+      <path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12" />
+      <path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+    </svg>
+  );
+}
+
+/** Tiga titik mendatar — menu kartu, bentuknya sama persis dengan menu kolom. */
+function MoreIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-5" fill="currentColor" aria-hidden>
+      <circle cx="5" cy="12" r="1.6" />
+      <circle cx="12" cy="12" r="1.6" />
+      <circle cx="19" cy="12" r="1.6" />
+    </svg>
+  );
+}
+
+/**
+ * Satu butir di menu kartu. Bentuknya sengaja sama persis dengan butir menu
+ * kolom dan menu profil — ikonnya diterima utuh, bukan sebagai isi sebuah
+ * `<svg>` yang sudah ditentukan di sini, karena EyeIcon punya dua rupa dan
+ * ketebalan garisnya sendiri.
+ */
+function MenuItem({
+  icon,
+  label,
+  onClick,
+  danger = false,
+  disabled = false,
+  hint,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+  /** Butir yang tetap digambar tapi belum bisa dipakai sekarang. Dipadamkan,
+      bukan disembunyikan: menu yang butirnya berganti-ganti jumlah membuat
+      orang mengira fiturnya hilang, padahal cuma sedang tidak berlaku. */
+  disabled?: boolean;
+  /** Sebaris alasan di bawah label — cuma terbaca selagi butirnya padam.
+      Butir mati tanpa keterangan hanya memberi tahu bahwa sesuatu tidak
+      bisa ditekan, tidak memberi tahu apa yang harus dilakukan dulu. */
+  hint?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-sm transition-colors",
+        disabled
+          ? "cursor-not-allowed text-muted"
+          : cn(
+              "cursor-pointer text-ink-soft",
+              danger
+                ? "hover:bg-danger/10 hover:text-danger"
+                : "hover:bg-accent-soft hover:text-accent-ink",
+            ),
+      )}
+    >
+      {icon}
+      <span className="min-w-0">
+        {label}
+        {/* `text-muted`, bukan `text-faint`: sebelas piksel dengan kontras
+            3,8:1 di tema gelap terbaca sebagai noda, bukan kalimat — dan
+            alasan sebuah butir dipadamkan justru yang paling perlu terbaca
+            di menu ini. */}
+        {disabled && hint && (
+          <span className="mt-0.5 block text-[0.6875rem] leading-tight text-muted">{hint}</span>
+        )}
+      </span>
+    </button>
+  );
+}
+
 interface Props {
   cardId: string;
   /** Palet label milik board — dipakai pemilih label di dalam dialog. */
   boardLabels: Label[];
-  columnTitle: string;
   currentUser: UserBrief;
   /** Alamat kartu ini — yang sama dengan yang sedang dipakai bilah alamat. */
   shareUrl: string;
@@ -44,6 +183,14 @@ interface Props {
   onMove: () => void;
   /** Muat ulang board, supaya muka kartu di papan ikut berubah. */
   onBoardChange: () => void;
+  /** Minta penegasan hapus permanen — dialognya sendiri milik papan, sama
+      seperti pemilih papan tujuan; kartu ini hanya memintanya. */
+  onDelete: () => void;
+  /** Kartunya sungguh tak ada lagi (dihapus, atau bukan milik siapa yang
+      membuka) — beda dari arsip, yang masih bisa ditarik dan dibuka biasa.
+      Dialognya tidak tahu cara menutup dirinya sendiri lewat alamat; itu
+      urusan pemanggil. */
+  onNotFound: () => void;
 }
 
 /** Baris jejak waktu: "Dibuat oleh Rina · 2 Sep 2026, 17.40". */
@@ -61,13 +208,14 @@ function Trace({ verb, who, at }: { verb: string; who: UserBrief | null; at: Dat
 export function CardModal({
   cardId,
   boardLabels,
-  columnTitle,
   currentUser,
   shareUrl,
   networkStatus,
   onClose,
   onMove,
   onBoardChange,
+  onDelete,
+  onNotFound,
 }: Props) {
   const [detail, setDetail] = useState<CardDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +224,40 @@ export function CardModal({
   const [linkCopied, setLinkCopied] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   const openProfile = useOpenProfile();
+
+  /* Menu kartu: Awasi, salin tautan, pindah, arsip, dan hapus — dikumpulkan
+     jadi satu menu tiga titik, sama seperti menu kolom. Dipasang di <body>
+     lewat portal supaya tidak terpotong `overflow-hidden` dialognya sendiri. */
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuAnchorRef = useRef<HTMLDivElement>(null);
+  const menuPanelRef = useRef<HTMLDivElement>(null);
+  useDismiss(menuOpen, () => setMenuOpen(false), [menuAnchorRef, menuPanelRef]);
+
+  const [menuAnchor, setMenuAnchor] = useState<
+    { mode: "end"; right: number; top: number } | { mode: "center"; top: number } | null
+  >(null);
+  useLayoutEffect(() => {
+    if (!menuOpen) return;
+
+    const place = () => {
+      const rect = menuAnchorRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const top = rect.bottom + 8;
+      const panelWidth = Math.min(MENU_WIDTH, window.innerWidth - MENU_MARGIN * 2);
+      const leftIfEndAligned = rect.right - panelWidth;
+
+      setMenuAnchor(
+        leftIfEndAligned >= MENU_MARGIN
+          ? { mode: "end", right: window.innerWidth - rect.right, top }
+          : { mode: "center", top },
+      );
+    };
+
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [menuOpen]);
 
   /* Panel followup boleh disembunyikan, dan pilihannya diingat peramban —
      bukan server. Yang diatur di sini cara satu orang membaca kartu, dan
@@ -96,15 +278,34 @@ export function CardModal({
 
   useEffect(() => {
     if (!linkCopied) return;
-    const t = setTimeout(() => setLinkCopied(false), 1800);
+    const t = setTimeout(() => {
+      setLinkCopied(false);
+      // Menu ditutup bersamaan dengan tanda centangnya pudar, supaya orang
+      // sempat melihat konfirmasinya sebelum menunya lenyap.
+      setMenuOpen(false);
+    }, 1800);
     return () => clearTimeout(t);
   }, [linkCopied]);
+
+  /* Dibaca lewat ref, bukan kebergantungan `load` langsung: `onNotFound`
+     lahir baru setiap kali BoardView digambar ulang, dan menaruhnya di
+     larik kebergantungan berarti `load` — dan efek yang memanggilnya —
+     ikut dipasang ulang di setiap render, bukan cuma sekali per kartu. */
+  const onNotFoundRef = useRef(onNotFound);
+  onNotFoundRef.current = onNotFound;
 
   const load = useCallback(async () => {
     try {
       setDetail(await api.getCard(cardId));
       setError(null);
     } catch (e) {
+      // 404 bukan kegagalan biasa: kartunya sungguh tak ada lagi (dihapus,
+      // atau bukan milik siapa yang membuka), dan dialognya menyerahkan
+      // penutupan ke pemanggil alih-alih menampilkan pesan galat di sini.
+      if (e instanceof ApiError && e.status === 404) {
+        onNotFoundRef.current();
+        return;
+      }
       setError(e instanceof Error ? e.message : "Gagal memuat kartu");
     }
   }, [cardId]);
@@ -194,18 +395,19 @@ export function CardModal({
   );
 
   /**
-   * Arsipkan kartu ini — lewat `run`, sama seperti suntingan lain: kartu
-   * terarsip hilang dari papan utama begitu `onBoardChange` menarik ulang
-   * board (server sudah menyaringnya di GET /boards/:id), dan dialog ini
-   * ikut tertutup sendiri lewat efek yang sama yang menutupnya saat kartu
-   * dihapus — lihat `BoardView`, kartu yang tak lagi ditemukan di board
-   * membuat alamatnya kembali ke papan.
+   * Arsipkan atau pulihkan kartu ini — lewat `run`, sama seperti suntingan
+   * lain. Dialognya sengaja **tidak** menutup diri sendiri setelah
+   * mengarsipkan: kartu terarsip tetap bisa dibuka (lewat pencarian, lewat
+   * alamatnya) dan harus menampilkan keadaan arsipnya, bukan menghilang —
+   * beda dari hapus permanen, yang memang mengakhiri kartunya.
+   * `onBoardChange` tetap dipanggil supaya muka kartu di papan ikut
+   * digambar ulang (hilang saat diarsipkan, muncul lagi saat dipulihkan).
    */
-  const archiveCard = () =>
+  const setArchived = (archived: boolean) =>
     run(
-      (card) => ({ ...card, archivedAt: new Date() }),
-      () => api.archiveCard(cardId),
-      { kind: "card_archived" },
+      (card) => ({ ...card, archivedAt: archived ? new Date() : null }),
+      () => (archived ? api.archiveCard(cardId) : api.restoreCard(cardId)),
+      { kind: archived ? "card_archived" : "card_restored" },
     );
 
   /** Penambahan menunggu server dulu: id butir dan followup lahir di sana. */
@@ -394,7 +596,12 @@ export function CardModal({
     if ((before?.getTime() ?? null) === (after?.getTime() ?? null)) return;
 
     void run(
-      (card) => ({ ...card, dueAt: after }),
+      /* Tanda selesai ikut gugur di sini, meniru aturan server (lihat PATCH
+         /cards/:id): tanggal baru adalah tagihan baru, dan tanggal yang
+         dihapus tidak menyisakan apa pun untuk diselesaikan. Kalau tidak
+         ditiru, kartunya sesaat tampil hijau dengan tenggat yang sudah
+         berpindah — sampai jawaban server datang dan meralatnya sendiri. */
+      (card) => ({ ...card, dueAt: after, dueDoneAt: null }),
       () => api.updateCard(cardId, { dueAt }),
       after
         ? {
@@ -402,6 +609,21 @@ export function CardModal({
             detail: { from: before?.toISOString() ?? null, to: after.toISOString() },
           }
         : { kind: "due_cleared" },
+    );
+  };
+
+  /**
+   * Menandai tenggat selesai — atau membukanya lagi. Tanggalnya tidak
+   * disentuh: yang berubah cuma apakah ia masih menagih sesuatu, dan itulah
+   * yang membuat kartu berhenti terhitung terlambat.
+   */
+  const setDueDone = (done: boolean) => {
+    if (!detail?.dueAt) return;
+
+    void run(
+      (card) => ({ ...card, dueDoneAt: done ? new Date() : null }),
+      () => api.updateCard(cardId, { dueDone: done }),
+      { kind: done ? "due_done" : "due_undone" },
     );
   };
 
@@ -463,7 +685,24 @@ export function CardModal({
       >
         <header className="flex items-start gap-3 px-5 pt-4 pb-3">
           <div className="min-w-0 flex-1">
-            <span className="chip mb-2">{columnTitle}</span>
+            <div className="mb-2 flex flex-wrap items-center gap-1.5">
+              <span className="chip">
+                {detail ? detail.columnTitle : <SkeletonLine className="h-4 w-14" />}
+              </span>
+
+              {/* Cuma muncul untuk kartu terarsip — keterangan kapan, bukan
+                  cuma bahwa itu terjadi, karena "diarsipkan" tanpa waktu
+                  memaksa orang menebak sudah berapa lama kartu ini disimpan. */}
+              {detail?.archivedAt && (
+                <span
+                  className="chip text-muted"
+                  title={formatDateTime(detail.archivedAt)}
+                >
+                  <ArchiveBoxIcon className="size-3" />
+                  Diarsipkan · {formatRelative(detail.archivedAt)}
+                </span>
+              )}
+            </div>
 
             {detail && editingTitle ? (
               <textarea
@@ -494,15 +733,6 @@ export function CardModal({
             )}
           </div>
 
-          {detail && (
-            <WatchToggle
-              watching={detail.watching}
-              onChange={(watching) => void setWatching(watching)}
-              subject="kartu ini"
-              className="size-8 text-muted"
-            />
-          )}
-
           {/* Sakelar panel followup. Di kepala kartu bersama kenop lain yang
               bukan suntingan: yang diubahnya lebar bacaan, bukan isi kartu. */}
           <button
@@ -511,7 +741,7 @@ export function CardModal({
             aria-pressed={!followupHidden}
             aria-label={followupHidden ? "Tampilkan panel followup" : "Sembunyikan panel followup"}
             title={followupHidden ? "Tampilkan followup" : "Sembunyikan followup"}
-            className="grid size-8 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-line-soft hover:text-ink"
+            className="grid size-8 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-(--card-plate-hi) hover:text-ink"
           >
             <svg viewBox="0 -960 960 960" className="size-5" fill="currentColor" aria-hidden>
               {/* Anak panahnya menunjuk ke arah panelnya akan bergerak: ke
@@ -526,66 +756,129 @@ export function CardModal({
             </svg>
           </button>
 
-          {/* Pindah papan berdiri di deret kenop kepala kartu, bukan di dalam
-              isinya: ia tidak mengubah apa pun tentang kartu ini, ia
-              memindahkan kartunya — sekelas dengan menyalin tautan dan
-              menutup, bukan dengan menyunting deskripsi. */}
-          <button
-            type="button"
-            onClick={onMove}
-            aria-label="Pindahkan kartu ke papan lain"
-            title="Pindahkan ke papan lain"
-            className="grid size-8 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-line-soft hover:text-ink"
-          >
-            <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M13 4H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6" />
-              <path d="m16 8 4 4-4 4M20 12H10" />
-            </svg>
-          </button>
+          {/* Awasi, salin tautan, pindah, arsip, dan hapus — semuanya jarang
+              ditekan dibanding menyunting isi kartu, dan dikumpulkan jadi satu
+              menu tiga titik supaya kepala kartu tidak berderet kenop yang
+              sebagian besar menganggur. Pola dan penempatannya sama persis
+              dengan menu kolom: Awasi dan salin tautan dulu (sekadar
+              membaca/membagikan), lalu pindah dan arsip (memindahkan kartu
+              pergi dari papan), lalu hapus paling akhir dengan warna bahaya —
+              satu-satunya yang tidak bisa diurungkan. */}
+          {detail && (
+            <div ref={menuAnchorRef} className="relative shrink-0">
+              <button
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                aria-label="Menu kartu"
+                title="Menu kartu"
+                onClick={() => setMenuOpen((v) => !v)}
+                className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-full text-muted transition-colors hover:bg-(--card-plate-hi) hover:text-ink"
+              >
+                <MoreIcon />
+              </button>
 
-          {/* Arsipkan — sejajar Pindahkan: keduanya sama-sama membawa kartu
-              ini pergi dari papan, bukan menyunting isinya. Visualnya sama
-              tenangnya dengan kenop lain di sini; hapus permanen tetap
-              tinggal di tempatnya sendiri (muka kartu di papan) supaya
-              tetap terasa lebih "berbahaya" daripada arsip yang reversibel. */}
-          <button
-            type="button"
-            onClick={() => void archiveCard()}
-            aria-label="Arsipkan kartu"
-            title="Arsipkan"
-            className="grid size-8 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-line-soft hover:text-ink"
-          >
-            <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <rect x="3" y="4" width="18" height="4" rx="1" />
-              <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8" />
-              <path d="M10 12h4" />
-            </svg>
-          </button>
+              {menuOpen &&
+                menuAnchor &&
+                createPortal(
+                  <div
+                    ref={menuPanelRef}
+                    role="menu"
+                    aria-label="Menu kartu"
+                    style={
+                      menuAnchor.mode === "end"
+                        ? { right: menuAnchor.right, top: menuAnchor.top }
+                        : { left: "50%", top: menuAnchor.top, transform: "translateX(-50%)" }
+                    }
+                    className="sheet sheet-frost glass-lens fixed z-55 w-52 max-w-[calc(100vw-2rem)] rounded-2xl p-1.5"
+                  >
+                    <MenuItem
+                      icon={<EyeIcon watching={detail.watching} className="size-4 shrink-0" />}
+                      label={detail.watching ? "Berhenti mengawasi" : "Awasi kartu ini"}
+                      onClick={() => {
+                        void setWatching(!detail.watching);
+                        setMenuOpen(false);
+                      }}
+                    />
 
-          <button
-            type="button"
-            onClick={() => void copyLink()}
-            aria-label="Salin tautan kartu"
-            title={linkCopied ? "Tautan disalin" : "Salin tautan kartu"}
-            className="grid size-8 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-line-soft hover:text-ink"
-          >
-            {linkCopied ? (
-              <svg viewBox="0 0 24 24" className="size-5 text-ok" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="m5 12.5 4.5 4.5L19 7.5" />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M10 13.5a4 4 0 0 0 5.7.4l3-3a4 4 0 0 0-5.7-5.7l-1.6 1.6" />
-                <path d="M14 10.5a4 4 0 0 0-5.7-.4l-3 3a4 4 0 0 0 5.7 5.7l1.6-1.6" />
-              </svg>
-            )}
-          </button>
+                    <MenuItem
+                      icon={
+                        linkCopied ? (
+                          <CheckIcon className="size-4 shrink-0 text-ok" />
+                        ) : (
+                          <LinkIcon className="size-4 shrink-0" />
+                        )
+                      }
+                      label={linkCopied ? "Tautan disalin" : "Salin tautan kartu"}
+                      onClick={() => void copyLink()}
+                    />
+
+                    <span className="my-1 block h-px bg-line-soft" />
+
+                    {/* Pindah papan tidak mengubah apa pun tentang isi kartu
+                        ini, ia memindahkan kartunya — sekelas dengan Arsipkan
+                        di bawahnya, bukan dengan menyunting deskripsi.
+
+                        Padam selagi kartunya terarsip. Yang dipindahkan pemilih
+                        papan adalah kartu yang berdiri di sebuah kolom, dan
+                        kartu terarsip sudah tidak berdiri di mana pun: ia
+                        disaring dari papan (lihat `isNull(archivedAt)` di
+                        worker/routes/boards.ts), jadi papan asalnya sendiri
+                        tidak akan menemukannya lagi untuk dipindahkan.
+                        Pulihkan dulu, lalu pindahkan seperti kartu biasa. */}
+                    <MenuItem
+                      icon={<MoveOutIcon className="size-4 shrink-0" />}
+                      label="Pindahkan ke papan lain…"
+                      disabled={detail.archivedAt !== null}
+                      hint="Pulihkan dulu dari arsip"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onMove();
+                      }}
+                    />
+
+                    {/* Arsipkan/Pulihkan — butir yang sama gantian jadi
+                        Pulihkan begitu kartunya terarsip, bukan butir
+                        terpisah. Hapus permanen tinggal di bawahnya sendiri
+                        supaya tetap terasa lebih "berbahaya" daripada arsip
+                        yang reversibel. */}
+                    <MenuItem
+                      icon={
+                        detail.archivedAt ? (
+                          <RestoreBoxIcon className="size-4 shrink-0" />
+                        ) : (
+                          <ArchiveBoxIcon className="size-4 shrink-0" />
+                        )
+                      }
+                      label={detail.archivedAt ? "Pulihkan dari arsip" : "Arsipkan"}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        void setArchived(!detail.archivedAt);
+                      }}
+                    />
+
+                    <span className="my-1 block h-px bg-line-soft" />
+
+                    <MenuItem
+                      icon={<TrashIcon className="size-4 shrink-0" />}
+                      label="Hapus kartu"
+                      danger
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onDelete();
+                      }}
+                    />
+                  </div>,
+                  document.body,
+                )}
+            </div>
+          )}
 
           <button
             type="button"
             onClick={onClose}
             aria-label="Tutup kartu"
-            className="grid size-8 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-line-soft hover:text-ink"
+            className="grid size-8 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-(--card-plate-hi) hover:text-ink"
           >
             <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
               <path d="M6 6 18 18M18 6 6 18" />
@@ -630,7 +923,12 @@ export function CardModal({
                     onRemove={removePerson}
                   />
 
-                  <CardDue dueAt={detail.dueAt} onChange={setDue} />
+                  <CardDue
+                    dueAt={detail.dueAt}
+                    dueDoneAt={detail.dueDoneAt}
+                    onChange={setDue}
+                    onDoneChange={setDueDone}
+                  />
                 </div>
 
                 <section className="flex flex-col gap-2">

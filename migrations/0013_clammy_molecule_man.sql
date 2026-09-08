@@ -1,0 +1,1 @@
+ALTER TABLE `cards` ADD `due_done_at` integer;

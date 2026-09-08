@@ -7,9 +7,41 @@ export * from "./auth-schema";
 export const ROLES = ["owner", "admin", "member"] as const;
 export type Role = (typeof ROLES)[number];
 
+/**
+ * Warna label — kunci simbolik, bukan hex: peta warnanya milik tema.
+ *
+ * Berdiri paling atas karena tabel pertama pun sudah memakainya
+ * (`workspaces.color`), dan `enum` di sini dibaca saat tabelnya dirakit —
+ * bukan nanti saat barisnya ditulis.
+ */
+export const LABEL_COLORS = [
+  "slate",
+  "red",
+  "orange",
+  "amber",
+  "green",
+  "teal",
+  "sky",
+  "violet",
+  "pink",
+] as const;
+export type LabelColor = (typeof LABEL_COLORS)[number];
+
+/* Kolom memakai palet yang sama persis, dan itu disengaja: satu papan yang
+   memakai dua keluarga rona akan terbaca sebagai dua sistem yang kebetulan
+   bertumpuk. Aliasnya ada supaya sisi yang bicara soal kolom tidak perlu
+   menyebut "label" untuk sesuatu yang bukan label. */
+export const COLUMN_COLORS = LABEL_COLORS;
+export type ColumnColor = LabelColor;
+
 export const workspaces = sqliteTable("workspaces", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
+  /* Rona penanda di daftar — palet yang sama dengan label dan kolom, dengan
+     alasan yang sama (lihat LABEL_COLORS). Null berarti tanpa warna, dan
+     itulah keadaan istirahatnya: daftar yang setiap barisnya berwarna
+     berhenti bisa dipakai membedakan apa pun. */
+  color: text("color", { enum: LABEL_COLORS }),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });
@@ -55,27 +87,6 @@ export const invitations = sqliteTable(
   },
   (t) => [index("invitations_workspace_idx").on(t.workspaceId)],
 );
-
-/** Warna label — kunci simbolik, bukan hex: peta warnanya milik tema. */
-export const LABEL_COLORS = [
-  "slate",
-  "red",
-  "orange",
-  "amber",
-  "green",
-  "teal",
-  "sky",
-  "violet",
-  "pink",
-] as const;
-export type LabelColor = (typeof LABEL_COLORS)[number];
-
-/* Kolom memakai palet yang sama persis, dan itu disengaja: satu papan yang
-   memakai dua keluarga rona akan terbaca sebagai dua sistem yang kebetulan
-   bertumpuk. Aliasnya ada supaya sisi yang bicara soal kolom tidak perlu
-   menyebut "label" untuk sesuatu yang bukan label. */
-export const COLUMN_COLORS = LABEL_COLORS;
-export type ColumnColor = LabelColor;
 
 /* ── Latar papan ───────────────────────────────────────────────────
    Tiga cara sebuah papan bisa berlatar, dan ketiganya sengaja disimpan
@@ -134,6 +145,10 @@ export const boards = sqliteTable(
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
+    /* Rona penanda papan di daftar board — pasangan `workspaces.color`, palet
+       yang sama, null berarti tanpa warna. Beda dari latar papan di bawahnya:
+       yang ini dilihat dari luar, saat papannya belum dibuka. */
+    color: text("color", { enum: LABEL_COLORS }),
     /* Latar papan. "default" berarti ladang cahaya yang sama dengan sisa
        aplikasi — dan itu keadaan istirahatnya, bukan sekadar "belum dipilih".
        `backgroundValue` berisi kunci gradiasi atau id gambar, dan null untuk
@@ -210,6 +225,24 @@ export const cards = sqliteTable(
      */
     dueAt: integer("due_at", { mode: "timestamp_ms" }),
     /**
+     * Kapan tenggatnya dinyatakan selesai — bukan kapan tenggatnya jatuh.
+     *
+     * Null berarti tenggatnya masih menuntut sesuatu, dan itulah yang membuat
+     * kartu berhuruf merah begitu tanggalnya lewat. Terisi berarti pekerjaan
+     * yang ditagih tanggal itu sudah beres: tanggalnya tetap terbaca, tapi
+     * berhenti mendesak — tidak lagi terhitung terlambat di papan maupun di
+     * filter, dan tidak lagi jadi bahan kabar tenggat terlewat.
+     *
+     * Timestamp, bukan boolean, dengan alasan yang sama seperti `archivedAt`:
+     * "sudah selesai" hampir selalu disusul pertanyaan "sejak kapan", dan
+     * kolom bertanggal menjawab keduanya sekaligus.
+     *
+     * Cuma berarti selama `dueAt` ada. Kartu tanpa tenggat tidak bisa
+     * menyelesaikan tenggat, jadi menghapus tanggalnya ikut mengosongkan
+     * kolom ini (lihat PATCH /cards/:id).
+     */
+    dueDoneAt: integer("due_done_at", { mode: "timestamp_ms" }),
+    /**
      * Arsip — "selesai, tapi disimpan dulu", terpisah dari hapus permanen.
      *
      * Null berarti kartu masih aktif di papannya, dan itulah keadaan
@@ -250,6 +283,12 @@ export const ACTIVITY_KINDS = [
   "member_removed",
   "due_changed",
   "due_cleared",
+  /* Menyelesaikan tenggat bukan mengubah tenggat: tanggalnya tetap sama persis,
+     yang berubah cuma apakah ia masih menagih sesuatu. Dua catatan sendiri
+     supaya lini masa bisa mengatakan "menandai tenggat selesai", bukan
+     "memindahkan tenggat ke tanggal yang itu-itu juga". */
+  "due_done",
+  "due_undone",
   "attachment_added",
   "attachment_removed",
   "card_archived",

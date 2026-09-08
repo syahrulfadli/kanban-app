@@ -48,6 +48,11 @@
   --color-ink-soft-base: var(--color-ink-soft);
   --color-muted-base: var(--color-muted);
   --color-faint-base: var(--color-faint);
+  /* Dua sekawan lagi, untuk pembekuan yang sama tapi dipakai lebih jarang —
+     cincin tepi `.card-plain` (lihat catatan di sana), yang butuh garisnya
+     sendiri kembali setelah lolos dari petak tinta yang ditimpa foto. */
+  --color-line-base: var(--color-line);
+  --color-line-soft-base: var(--color-line-soft);
 
   /* Aksen — biru air, satu-satunya warna interaktif */
   --color-accent: #0284C7;
@@ -1138,6 +1143,22 @@ body {
     border-radius: 1.25rem;
     background-color: var(--dialog-fill);
     animation: dialog-in .24s var(--ease-spring) both;
+
+    /* Sama seperti `.card-plain` di bawah, dan alasannya sama: `ConfirmDialog`
+       dipanggil dari `ArchivePanel` untuk "Hapus permanen", dan panggilan
+       itu membuatnya lahir di dalam `.on-photo-top-end` — petak yang
+       tintanya ditimpa mengikuti kecerahan foto latar papan, bukan
+       mengikuti temanya sendiri. Reset ini tidak mengubah apa pun pada
+       pemakaian normalnya (ConfirmDialog/MoveDialog yang dipanggil
+       langsung dari BoardView, di luar petak itu): di sana nilai
+       `-base`-nya sudah sama persis dengan yang dipulihkan. */
+    --color-ink: var(--color-ink-base);
+    --color-ink-soft: var(--color-ink-soft-base);
+    --color-muted: var(--color-muted-base);
+    --color-faint: var(--color-faint-base);
+    --color-line: var(--color-line-base);
+    --color-line-soft: var(--color-line-soft-base);
+    color: var(--color-ink);
   }
 
   /* Kartu kanban — satu-satunya permukaan besar di aplikasi ini yang bukan
@@ -1152,11 +1173,41 @@ body {
                 0 28px 60px -28px rgb(15 23 42 / 0.45),
                 inset 0 0 0 1px var(--color-line-soft);
     animation: dialog-in .24s var(--ease-spring) both;
+
+    /* Sama seperti .sheet: pelat ini pekat sendiri, jadi tangga tintanya
+       harus pekat sendiri juga — dipulihkan ke nilai tema di sini, terlepas
+       dari apa pun yang menimpanya di leluhurnya.
+
+       Beda dari .sheet, `.card-plain` kadang lahir sebagai anak
+       `.on-photo-top-end` (lihat ArchivePanel, dipasang di kepala papan) —
+       petak yang tintanya ditimpa mengikuti kecerahan FOTO LATAR papan
+       (lihat blok "Tinta di atas foto" di bawah), bukan mengikuti rona
+       kolom. Tanpa baris ini, kartu arsip yang duduk di atas foto terang
+       mewarisi tinta gelap yang dipilih untuk foto itu — dan tinta gelap di
+       atas `--card-fill` yang sudah gelap sendiri di tema gelap nyaris tak
+       terbaca, padahal `--card-fill` sama sekali tidak berhubungan dengan
+       foto di baliknya. Cincin tepinya ikut dipulihkan dengan alasan yang
+       sama: tanpa ini cincin `.card-plain` bisa mewarisi garis terang di
+       atas kartu terang, atau sebaliknya. */
+    --color-ink: var(--color-ink-base);
+    --color-ink-soft: var(--color-ink-soft-base);
+    --color-muted: var(--color-muted-base);
+    --color-faint: var(--color-faint-base);
+    --color-line: var(--color-line-base);
+    --color-line-soft: var(--color-line-soft-base);
+    color: var(--color-ink);
   }
+  /* Bayangannya sendiri tidak menolong di sini — lebih gelap dari latar arang
+     yang sudah nyaris hitam, jadi tidak menambah apa-apa. Cincinnya yang
+     menandai tepi kartu, dan `--color-line-soft` (7% putih) terlalu tipis
+     untuk itu di atas `--card-fill` sepekat ini: kartunya nyaris menyatu
+     dengan tirai di baliknya. `--color-line` (12%) dipakai di sini, bukan
+     karena seleranya lain, tapi karena inilah SATU-SATUNYA penanda kartu ini
+     benda tersendiri, bukan bagian dari kelamnya di belakang. */
   [data-theme="dark"] .card-plain {
     box-shadow: 0 2px 6px rgb(0 0 0 / 0.40),
                 0 28px 60px -28px rgb(0 0 0 / 0.85),
-                inset 0 0 0 1px var(--color-line-soft);
+                inset 0 0 0 1px var(--color-line);
   }
 
   /* Di dalamnya, pelat kaca kehilangan pijakan: putih translusen di atas
