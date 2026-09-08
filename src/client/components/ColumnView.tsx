@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
 import {
   draggable,
@@ -13,6 +14,7 @@ import { CardItem, GHOST_FALLBACK } from "./CardItem";
 import { AddItemForm } from "./AddItemForm";
 import { ColorSwatches } from "./ColorSwatches";
 import { EyeIcon } from "./WatchToggle";
+import { useDismiss } from "../hooks/useDismiss";
 import { cn } from "../lib/cn";
 import { columnTint, labelTint } from "../lib/people";
 import type { BoardDetail, ColumnColor } from "../../shared/types";
@@ -188,7 +190,9 @@ export function ColumnView({
   const [cardSlot, setCardSlot] = useState<number | null>(null);
   const [editing, setEditing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const menuAnchorRef = useRef<HTMLDivElement>(null);
+  const menuPanelRef = useRef<HTMLDivElement>(null);
+  const cardListRef = useRef<HTMLUListElement>(null);
 
   /* Dibaca lewat ref — lihat catatan yang sama di CardItem. Kartu terakhir ikut
      di sini karena ruang kosong kolom selalu berarti "taruh di kaki daftar":
@@ -279,16 +283,39 @@ export function ColumnView({
     );
   }, [column.id]);
 
-  /* Pola yang sama dengan pemilih label: `pointerdown`, bukan `click`, supaya
-     pemilih sudah menutup sebelum kliknya mendarat di bawahnya. */
-  useEffect(() => {
+  /* Menu kolom dipasang di <body> lewat portal — lihat catatan .sheet-frost
+     di index.css: lembar yang bersarang di dalam pane ber-frost (kolom ini
+     sendiri) tidak bisa punya blur sungguhan sendiri, jadi ia harus keluar
+     dari sarangnya dulu untuk memakai kaca yang sama dengan menu profil. */
+  useDismiss(menuOpen, () => setMenuOpen(false), [menuAnchorRef, menuPanelRef]);
+
+  const MENU_MARGIN = 16;
+  const MENU_WIDTH = 208; // w-52
+
+  const [menuAnchor, setMenuAnchor] = useState<
+    { mode: "end"; right: number; top: number } | { mode: "center"; top: number } | null
+  >(null);
+  useLayoutEffect(() => {
     if (!menuOpen) return;
 
-    const onPointerDown = (e: PointerEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    const place = () => {
+      const rect = menuAnchorRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const top = rect.bottom + 8;
+      const panelWidth = Math.min(MENU_WIDTH, window.innerWidth - MENU_MARGIN * 2);
+      const leftIfEndAligned = rect.right - panelWidth;
+
+      setMenuAnchor(
+        leftIfEndAligned >= MENU_MARGIN
+          ? { mode: "end", right: window.innerWidth - rect.right, top }
+          : { mode: "center", top },
+      );
     };
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
+
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
   }, [menuOpen]);
 
   const commitTitle = (value: string) => {
@@ -494,7 +521,7 @@ export function ColumnView({
                 dipakai — sekali saat kolomnya dibentuk, lalu nyaris tidak pernah
                 lagi — dan tiga kenop yang menganggur di setiap kepala kolom
                 memakan ruang yang setiap hari dibutuhkan judulnya. */}
-            <div ref={menuRef} className="relative shrink-0">
+            <div ref={menuAnchorRef} className="relative shrink-0">
               <button
                 type="button"
                 aria-haspopup="menu"
@@ -507,84 +534,93 @@ export function ColumnView({
                 <MoreIcon />
               </button>
 
-              {menuOpen && (
-                <div
-                  role="menu"
-                  aria-label={`Menu kolom ${column.title}`}
-                  /* Lebarnya dipatok supaya sepuluh titik warna melipat jadi dua
-                     baris. Selebar isinya, deretan itu lebih lebar daripada
-                     kolomnya sendiri dan menjulur keluar papan. */
-                  className="sheet absolute top-full right-0 z-30 mt-2 w-52 rounded-2xl p-1.5"
-                >
-                  <MenuItem
-                    icon={<EyeIcon watching={column.watching} className="size-4 shrink-0" />}
-                    label={column.watching ? "Berhenti mengawasi" : "Awasi kolom"}
-                    onClick={() => {
-                      onWatchColumn(!column.watching);
-                      setMenuOpen(false);
-                    }}
-                  />
-
-                  <span className="my-1 block h-px bg-line-soft" />
-
-                  {/* Judulnya menyebut warna yang sedang dipakai, karena di dalam
-                      menu tidak ada lagi kenop berwarna yang menunjukkannya. */}
-                  <div className="px-2.5 pt-0.5 pb-1.5">
-                    <p className="mb-2 flex items-center gap-1.5 text-xs text-muted">
-                      {/* `labelTint`, bukan `columnTint`: yang menggambar titik
-                          ini adalah .label-dot, dan ia membaca `--label`.
-                          `columnTint` menyetel `--col` — nama yang sengaja
-                          berbeda supaya rona kolom tidak menetes ke chip label
-                          di dalamnya — jadi dipasang di sini titiknya berakhir
-                          tanpa isi. */}
-                      <span
-                        className={cn("label-dot size-3", column.color === null && "label-dot-none")}
-                        style={column.color ? labelTint(column.color) : undefined}
-                      />
-                      Warna kolom
-                    </p>
-
-                    <ColorSwatches
-                      clearable
-                      value={column.color}
-                      onChange={(color) => {
-                        onRecolorColumn(color);
+              {menuOpen &&
+                menuAnchor &&
+                createPortal(
+                  <div
+                    ref={menuPanelRef}
+                    role="menu"
+                    aria-label={`Menu kolom ${column.title}`}
+                    style={
+                      menuAnchor.mode === "end"
+                        ? { right: menuAnchor.right, top: menuAnchor.top }
+                        : { left: "50%", top: menuAnchor.top, transform: "translateX(-50%)" }
+                    }
+                    /* Lebarnya dipatok supaya sepuluh titik warna melipat jadi dua
+                       baris. Selebar isinya, deretan itu lebih lebar daripada
+                       kolomnya sendiri dan menjulur keluar papan. */
+                    className="sheet sheet-frost glass-lens fixed z-45 w-52 max-w-[calc(100vw-2rem)] rounded-2xl p-1.5"
+                  >
+                    <MenuItem
+                      icon={<EyeIcon watching={column.watching} className="size-4 shrink-0" />}
+                      label={column.watching ? "Berhenti mengawasi" : "Awasi kolom"}
+                      onClick={() => {
+                        onWatchColumn(!column.watching);
                         setMenuOpen(false);
                       }}
                     />
-                  </div>
 
-                  <span className="my-1 block h-px bg-line-soft" />
+                    <span className="my-1 block h-px bg-line-soft" />
 
-                  {/* Bertetangga dengan Hapus karena keduanya sama-sama
-                      mengeluarkan kolom ini dari papan — tapi di atasnya, dan
-                      tanpa warna bahaya: yang satu memindahkan, yang satu
-                      mengakhiri. */}
-                  <MenuItem
-                    icon={<MoveOutIcon />}
-                    label="Pindah ke papan lain…"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      onMoveColumn();
-                    }}
-                  />
+                    {/* Judulnya menyebut warna yang sedang dipakai, karena di dalam
+                        menu tidak ada lagi kenop berwarna yang menunjukkannya. */}
+                    <div className="px-2.5 pt-0.5 pb-1.5">
+                      <p className="mb-2 flex items-center gap-1.5 text-xs text-muted">
+                        {/* `labelTint`, bukan `columnTint`: yang menggambar titik
+                            ini adalah .label-dot, dan ia membaca `--label`.
+                            `columnTint` menyetel `--col` — nama yang sengaja
+                            berbeda supaya rona kolom tidak menetes ke chip label
+                            di dalamnya — jadi dipasang di sini titiknya berakhir
+                            tanpa isi. */}
+                        <span
+                          className={cn("label-dot size-3", column.color === null && "label-dot-none")}
+                          style={column.color ? labelTint(column.color) : undefined}
+                        />
+                        Warna kolom
+                      </p>
 
-                  <MenuItem
-                    icon={<TrashIcon />}
-                    label="Hapus kolom"
-                    danger
-                    onClick={() => {
-                      setMenuOpen(false);
-                      onDeleteColumn();
-                    }}
-                  />
-                </div>
-              )}
+                      <ColorSwatches
+                        clearable
+                        value={column.color}
+                        onChange={(color) => {
+                          onRecolorColumn(color);
+                          setMenuOpen(false);
+                        }}
+                      />
+                    </div>
+
+                    <span className="my-1 block h-px bg-line-soft" />
+
+                    {/* Bertetangga dengan Hapus karena keduanya sama-sama
+                        mengeluarkan kolom ini dari papan — tapi di atasnya, dan
+                        tanpa warna bahaya: yang satu memindahkan, yang satu
+                        mengakhiri. */}
+                    <MenuItem
+                      icon={<MoveOutIcon />}
+                      label="Pindah ke papan lain…"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onMoveColumn();
+                      }}
+                    />
+
+                    <MenuItem
+                      icon={<TrashIcon />}
+                      label="Hapus kolom"
+                      danger
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onDeleteColumn();
+                      }}
+                    />
+                  </div>,
+                  document.body,
+                )}
             </div>
           </div>
         </div>
 
-        <ul className="flex min-h-14 flex-1 flex-col gap-2 overflow-y-auto p-2">
+        <ul ref={cardListRef} className="flex min-h-14 flex-1 flex-col gap-2 overflow-y-auto p-2">
           {column.cards.map((card, i) => (
             <CardItem
               key={card.id}
@@ -619,7 +655,22 @@ export function ColumnView({
         </ul>
 
         <div className="column-chrome px-3 pb-3">
-          <AddItemForm placeholder="Tambah kartu…" submitLabel="Tambah Kartu" onSubmit={onAddCard} />
+          <AddItemForm
+            placeholder="Tambah kartu…"
+            submitLabel="Tambah Kartu"
+            onSubmit={async (title) => {
+              await onAddCard(title);
+              /* Kartu baru selalu mendarat di kaki daftar — begitu ia lahir,
+                 gulir ke sana supaya orang tidak perlu mencarinya sendiri di
+                 kolom yang sudah panjang. rAF, bukan langsung: DOM baru
+                 memuat kartunya setelah React menggambar ulang state yang
+                 barusan di-setBoard oleh onAddCard. */
+              requestAnimationFrame(() => {
+                const list = cardListRef.current;
+                if (list) list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
+              });
+            }}
+          />
         </div>
       </section>
     </div>

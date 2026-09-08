@@ -34,7 +34,7 @@ export function ThemeSwitch() {
     <div
       role="radiogroup"
       aria-label="Tema tampilan"
-      className="glass glass-quiet relative flex rounded-full p-1"
+      className="glass glass-quiet switch-track relative flex rounded-full p-1"
     >
       {/* Peluncur — satu elemen yang bergeser, bukan tiga latar yang
           dinyalakan bergantian, supaya perpindahannya terbaca sebagai gerak. */}

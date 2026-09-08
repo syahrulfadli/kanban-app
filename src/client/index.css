@@ -75,6 +75,11 @@
   /* Isian kapsul navigasi — jauh lebih tipis dari --glass-fill: lihat
      catatan .glass-liquid tentang kenapa ia tidak memakai token yang sama. */
   --glass-liquid-fill: rgb(255 255 255 / 0.14);
+  /* Isian pil sakelar tema — bersarang di dalam kapsul cair itu sendiri, jadi
+     --glass-fill biasa (0.42) berdiri terlalu putih di sampingnya di tema
+     terang. Di tema gelap --glass-fill sudah cukup tipis (0.05), jadi di sana
+     token ini menumpang nilai yang sama alih-alih punya angka sendiri. */
+  --switch-track-fill: rgb(255 255 255 / 0.22);
 
   /* Bayangan lebar dan sangat lembut: satu lapis kontak tipis supaya pane
      tidak melayang tanpa dasar, lalu satu lapis luas beropasitas rendah.
@@ -214,6 +219,7 @@
   --glass-blur: 14px;
   --glass-sat: 130%;
   --glass-liquid-fill: rgb(255 255 255 / 0.03);
+  --switch-track-fill: var(--glass-fill);
 
   --glass-depth: 0 1px 2px rgb(0 0 0 / 0.25),
                  0 12px 32px -16px rgb(0 0 0 / 0.55);
@@ -490,6 +496,11 @@ body {
     box-shadow: 0 1px 2px rgb(0 0 0 / 0.22), var(--glass-inner);
   }
 
+  /* Pil sakelar tema — lihat catatan --switch-track-fill. */
+  .switch-track {
+    background-color: var(--switch-track-fill);
+  }
+
   /* Lembar pop-up (menu profil). Nyaris pekat, dengan bayangan sedikit lebih
      tegas dari pane biasa supaya jelas mengambang di atas segalanya. */
   .sheet {
@@ -534,6 +545,16 @@ body {
   .sheet-frost {
     background-color: var(--sheet-frost-fill);
     backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  }
+
+  /* Lensa tepi untuk lembar pop-up (menu profil, menu kolom) yang sudah
+     dipindah keluar dari sarangnya lewat portal — sama seperti
+     .glass.glass-lens pada dialog, peta refraksinya di index.html
+     (#glassLens). Aturan terpisah dengan alasan yang sama: mesin yang tidak
+     mengerti url() di backdrop-filter membuang baris ini dan tetap mendapat
+     frost polos dari .sheet-frost. */
+  .sheet-frost.glass-lens {
+    backdrop-filter: url(#glassLens) blur(5px) saturate(140%);
   }
 
   /* Kenop sakelar tema. Butuh isian sendiri, bukan .glass-plate: dengan bevel

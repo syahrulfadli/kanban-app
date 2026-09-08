@@ -162,7 +162,7 @@ export function ProfilePopoverProvider({ children }: { children: ReactNode }) {
               width: PANEL_WIDTH,
               visibility: position ? "visible" : "hidden",
             }}
-            className="sheet fixed z-[56] rounded-2xl p-4 outline-none"
+            className="sheet sheet-frost glass-lens fixed z-[56] rounded-2xl p-4 outline-none"
           >
             <div className="flex items-center gap-3">
               {state.person.image ? (

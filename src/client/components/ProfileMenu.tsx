@@ -209,7 +209,7 @@ export function ProfileMenu() {
                 ? { right: anchor.right, bottom: anchor.bottom }
                 : { left: "50%", bottom: anchor.bottom, transform: "translateX(-50%)" }
             }
-            className="sheet sheet-frost fixed z-45 w-56 max-w-[calc(100vw-2rem)] rounded-2xl p-1.5"
+            className="sheet sheet-frost glass-lens fixed z-45 w-56 max-w-[calc(100vw-2rem)] rounded-2xl p-1.5"
           >
             <div className="px-2.5 py-2">
               <p className="truncate text-sm font-medium">{name}</p>

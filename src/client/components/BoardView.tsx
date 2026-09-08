@@ -164,6 +164,10 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
   const { board, loading, error, refresh, actions, live } = useBoard(boardId);
   const { data: session } = useSession();
 
+  /* Wadah gulir mendatar papan — dipakai untuk menggeser ke kolom baru begitu
+     ia lahir, selalu paling kanan. */
+  const mainRef = useRef<HTMLElement>(null);
+
   /* Tinta untuk teks yang duduk langsung di atas foto latar. Dipanggil dengan
      latar yang mungkin belum datang — sebelum itu ia tidak menuliskan apa pun,
      dan yang berlaku tetap tinta tema. */
@@ -413,7 +417,7 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
           cairan di dasar gelas harus berdiri di dasar papan — dan alasan itu
           sudah hilang bersama efeknya. `max-h-full` di kolom yang menahan
           kolom panjang supaya menggulir di dalam dirinya sendiri. */}
-      <main className="flex flex-1 items-start gap-4 overflow-x-auto px-5 pt-1 pb-24">
+      <main ref={mainRef} className="flex flex-1 items-start gap-4 overflow-x-auto px-5 pt-1 pb-24">
         {board.columns.map((column, i) => (
           <ColumnView
             key={column.id}
@@ -454,7 +458,15 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
           <AddItemForm
             placeholder="Nama kolom…"
             submitLabel="Tambah kolom"
-            onSubmit={actions.addColumn}
+            onSubmit={async (title) => {
+              await actions.addColumn(title);
+              /* Kolom baru selalu lahir paling kanan — gulir ke sana, sama
+                 seperti kartu baru menggulir kolomnya sendiri ke bawah. */
+              requestAnimationFrame(() => {
+                const el = mainRef.current;
+                if (el) el.scrollTo({ left: el.scrollWidth, behavior: "smooth" });
+              });
+            }}
           />
         </div>
       </main>
