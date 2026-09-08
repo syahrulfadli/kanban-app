@@ -3,6 +3,7 @@ import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { nanoid } from "nanoid";
 import {
   cardActivities,
+  cardAttachments,
   cardComments,
   cardLabels,
   cardMembers,
@@ -48,6 +49,7 @@ export interface CardExtras {
   labels: CardSummary["labels"];
   checklist: ChecklistProgress;
   commentCount: number;
+  attachmentCount: number;
   participants: UserBrief[];
   members: UserBrief[];
   watching: boolean;
@@ -57,6 +59,7 @@ const EMPTY_EXTRAS = (): CardExtras => ({
   labels: [],
   checklist: { total: 0, done: 0 },
   commentCount: 0,
+  attachmentCount: 0,
   participants: [],
   members: [],
   watching: false,
@@ -95,9 +98,9 @@ function bucket(map: Map<string, CardExtras>, cardId: string) {
 }
 
 /**
- * Label, progress checklist, jumlah followup, peserta, undangan, dan keadaan
- * Awasi untuk sekumpulan kartu — enam query tetap, tidak peduli berapa kartu
- * yang diminta.
+ * Label, progress checklist, jumlah followup, jumlah lampiran, peserta,
+ * undangan, dan keadaan Awasi untuk sekumpulan kartu — tujuh query tetap,
+ * tidak peduli berapa kartu yang diminta.
  *
  * `viewerId` hanya dipakai keadaan Awasi, yang memang pertanyaan tentang orang
  * yang sedang melihat, bukan tentang kartunya.
@@ -107,8 +110,15 @@ export async function loadCardExtras(
   scope: CardScope,
   viewerId: string,
 ): Promise<Map<string, CardExtras>> {
-  const [labelRows, checklistRows, commentRows, participantRows, memberRows, watchRows] =
-    await Promise.all([
+  const [
+    labelRows,
+    checklistRows,
+    commentRows,
+    attachmentRows,
+    participantRows,
+    memberRows,
+    watchRows,
+  ] = await Promise.all([
       db
         .select({ cardId: cardLabels.cardId, label: labels })
         .from(cardLabels)
@@ -133,6 +143,13 @@ export async function loadCardExtras(
         .from(cardComments)
         .where(scoped(db, cardComments.cardId, scope))
         .groupBy(cardComments.cardId)
+        .all(),
+
+      db
+        .select({ cardId: cardAttachments.cardId, total: sql<number>`count(*)` })
+        .from(cardAttachments)
+        .where(scoped(db, cardAttachments.cardId, scope))
+        .groupBy(cardAttachments.cardId)
         .all(),
 
       db
@@ -179,6 +196,8 @@ export async function loadCardExtras(
   }
 
   for (const row of commentRows) bucket(map, row.cardId).commentCount = row.total;
+
+  for (const row of attachmentRows) bucket(map, row.cardId).attachmentCount = row.total;
 
   for (const { cardId, ...person } of participantRows) {
     bucket(map, cardId).participants.push(person);

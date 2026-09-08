@@ -243,6 +243,7 @@ const app = new Hono<AppEnv>()
         labels: [],
         checklist: { total: 0, done: 0 },
         commentCount: 0,
+        attachmentCount: 0,
         participants: [toBrief(c.get("user"))],
         members: [],
         // Membuat kartu berarti mengawasinya — lewat jejaknya sebagai peserta.

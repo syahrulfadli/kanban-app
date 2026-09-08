@@ -85,6 +85,7 @@ export interface CardSummary extends Card {
   labels: Label[];
   checklist: ChecklistProgress;
   commentCount: number;
+  attachmentCount: number;
   /** Terurut dari yang paling awal menyentuh kartu — pembuat selalu di depan. */
   participants: UserBrief[];
   /**
@@ -334,7 +335,20 @@ export const MAX_AVATAR_BASE64 = 200_000;
 export const ATTACHMENT_IMAGE_MIMES = ["image/webp", "image/jpeg", "image/png"] as const;
 
 /** Berkas umum lain — ditampilkan sebagai ikon+nama+ukuran, klik untuk unduh. */
-export const ATTACHMENT_FILE_MIMES = ["application/pdf", "text/plain", "application/zip"] as const;
+export const ATTACHMENT_FILE_MIMES = [
+  "application/pdf",
+  "text/plain",
+  "application/zip",
+  // Word — format lama (.doc) dan format zip modern (.docx).
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  // Excel — sheet.
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  // PowerPoint — presentasi.
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+] as const;
 
 export const ATTACHMENT_MIMES = [...ATTACHMENT_IMAGE_MIMES, ...ATTACHMENT_FILE_MIMES] as const;
 export type AttachmentMime = (typeof ATTACHMENT_MIMES)[number];

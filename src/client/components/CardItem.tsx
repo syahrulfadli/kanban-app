@@ -10,6 +10,7 @@ import {
   type Edge,
 } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
 import { AvatarStack } from "./Avatar";
+import { AttachmentIcon } from "./CardAttachments";
 import { EyeIcon } from "./WatchToggle";
 import { cn } from "../lib/cn";
 import { dueState, formatDateTime, formatDueShort } from "../lib/format";
@@ -171,7 +172,8 @@ export function CardItem({
     onToggleLabels();
   };
 
-  const { checklist, labels, participants, members, commentCount, watching } = card;
+  const { checklist, labels, participants, members, commentCount, attachmentCount, watching } =
+    card;
   const faces = cardFaces(members, participants);
   const due = card.dueAt ? dueState(card.dueAt) : null;
   const percent = checklist.total ? Math.round((checklist.done / checklist.total) * 100) : 0;
@@ -281,6 +283,7 @@ export function CardItem({
             menulis. */}
         {(faces.length > 0 ||
           commentCount > 0 ||
+          attachmentCount > 0 ||
           card.description ||
           checklist.total > 0 ||
           card.dueAt ||
@@ -367,6 +370,19 @@ export function CardItem({
                 >
                   <path d="M4 6h16M4 12h16M4 18h10" />
                 </svg>
+              )}
+
+              {/* Klip saja sudah menjawab "ada berkasnya" — angkanya menyusul
+                  hanya kalau lebih dari satu, sama seperti checklist dan
+                  followup di sebelahnya. */}
+              {attachmentCount > 0 && (
+                <span
+                  className="flex items-center gap-1 text-[0.6875rem] font-semibold tabular-nums"
+                  title={`${attachmentCount} lampiran`}
+                >
+                  <AttachmentIcon />
+                  {attachmentCount > 1 && attachmentCount}
+                </span>
               )}
 
               {commentCount > 0 && (
