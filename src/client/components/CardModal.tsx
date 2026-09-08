@@ -4,6 +4,8 @@ import { CardDue } from "./CardDue";
 import { CardFollowup } from "./CardFollowup";
 import { CardLabels } from "./CardLabels";
 import { CardPeople } from "./CardPeople";
+import { Markdown } from "./Markdown";
+import { MarkdownField } from "./MarkdownField";
 import { WatchToggle } from "./WatchToggle";
 import { AvatarStack } from "./Avatar";
 import { CardDetailSkeleton, SkeletonLine } from "./Skeleton";
@@ -11,6 +13,7 @@ import { useStoredFlag } from "../hooks/useStoredFlag";
 import { api } from "../lib/api";
 import { optimisticActivity, type ActivityNote } from "../lib/activity";
 import { formatDateTime, formatRelative } from "../lib/format";
+import type { ChannelStatus } from "../lib/realtime";
 import type {
   CardCommentDetail,
   CardDetail,
@@ -28,6 +31,9 @@ interface Props {
   currentUser: UserBrief;
   /** Alamat kartu ini — yang sama dengan yang sedang dipakai bilah alamat. */
   shareUrl: string;
+  /** Status koneksi realtime board — dipakai deskripsi & followup untuk
+      memadamkan tombol Simpan/Kirim selagi tidak ada jalan ke server. */
+  networkStatus: ChannelStatus;
   onClose: () => void;
   /** Buka pemilih papan tujuan. Perpindahannya sendiri milik papan, bukan
       dialog ini: kartunya akan hilang dari papan yang sedang dibuka. */
@@ -54,6 +60,7 @@ export function CardModal({
   columnTitle,
   currentUser,
   shareUrl,
+  networkStatus,
   onClose,
   onMove,
   onBoardChange,
@@ -225,11 +232,10 @@ export function CardModal({
   };
 
   const commitDescription = (value: string) => {
-    const text = value.trim();
     setEditingDescription(false);
     if (!detail) return;
 
-    const description = text || null;
+    const description = value || null;
     if (description === (detail.description || null)) return;
     void run(
       (card) => ({ ...card, description }),
@@ -565,28 +571,26 @@ export function CardModal({
                   <span className="section-label">Deskripsi</span>
 
                   {editingDescription ? (
-                    <textarea
+                    <MarkdownField
                       autoFocus
                       rows={4}
-                      defaultValue={detail.description ?? ""}
-                      placeholder="Jelaskan kartu ini…"
-                      onBlur={(e) => commitDescription(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Escape") {
-                          e.stopPropagation();
-                          setEditingDescription(false);
-                        }
-                      }}
-                      className="field resize-y"
+                      value={detail.description ?? ""}
+                      placeholder="Jelaskan kartu ini… (Mendukung format Markdown)"
+                      allowEmpty
+                      status={networkStatus}
+                      onSave={commitDescription}
+                      onCancel={() => setEditingDescription(false)}
                     />
                   ) : (
                     <button
                       type="button"
                       onClick={() => setEditingDescription(true)}
-                      className="rounded-lg text-left text-sm leading-relaxed wrap-break-word whitespace-pre-wrap transition-colors hover:text-ink"
+                      className="rounded-lg text-left transition-colors hover:text-ink"
                     >
-                      {detail.description || (
-                        <span className="text-faint">Klik untuk menambah deskripsi…</span>
+                      {detail.description ? (
+                        <Markdown source={detail.description} className="text-sm" />
+                      ) : (
+                        <span className="text-sm text-faint">Klik untuk menambah deskripsi…</span>
                       )}
                     </button>
                   )}
@@ -607,6 +611,7 @@ export function CardModal({
                   comments={detail.comments}
                   activities={detail.activities}
                   currentUserId={currentUser.id}
+                  networkStatus={networkStatus}
                   onAdd={addComment}
                   onEdit={editComment}
                   onDelete={deleteComment}

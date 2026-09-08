@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "./Avatar";
+import { Markdown } from "./Markdown";
+import { MarkdownField } from "./MarkdownField";
 import { useStoredFlag } from "../hooks/useStoredFlag";
 import { describeActivity } from "../lib/activity";
 import { cn } from "../lib/cn";
 import { labelTint } from "../lib/people";
 import { formatDateTime, formatRelative } from "../lib/format";
+import type { ChannelStatus } from "../lib/realtime";
 import type { CardActivityDetail, CardCommentDetail } from "../../shared/types";
 
 interface Props {
@@ -13,6 +16,8 @@ interface Props {
   activities: CardActivityDetail[];
   /** Id user yang sedang login — hanya tulisannya sendiri yang boleh diubah. */
   currentUserId: string;
+  /** Status koneksi realtime board — memadamkan Kirim/Simpan selagi offline. */
+  networkStatus: ChannelStatus;
   onAdd: (body: string) => void;
   onEdit: (comment: CardCommentDetail, body: string) => void;
   onDelete: (comment: CardCommentDetail) => void;
@@ -95,11 +100,11 @@ export function CardFollowup({
   comments,
   activities,
   currentUserId,
+  networkStatus,
   onAdd,
   onEdit,
   onDelete,
 }: Props) {
-  const [draft, setDraft] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
 
@@ -124,17 +129,21 @@ export function CardFollowup({
     if (el) el.scrollTop = el.scrollHeight;
   }, [entries.length]);
 
-  const submit = () => {
-    const body = draft.trim();
-    if (!body) return;
+  /* MarkdownField mengelola draf di dalam dirinya sendiri dan tidak pernah
+     mendapat `value` baru selain saat dipasang ulang — jadi kunci ini yang
+     memaksa komposer lahir kembali dengan draf kosong setelah followup
+     terkirim atau dibatalkan. */
+  const [composerKey, setComposerKey] = useState(0);
+  const resetComposer = () => setComposerKey((k) => k + 1);
+
+  const submitNew = (body: string) => {
     onAdd(body);
-    setDraft("");
+    resetComposer();
   };
 
-  const commitEdit = (comment: CardCommentDetail, value: string) => {
-    const body = value.trim();
+  const commitEdit = (comment: CardCommentDetail, body: string) => {
     setEditing(null);
-    if (body && body !== comment.body) onEdit(comment, body);
+    onEdit(comment, body);
   };
 
   return (
@@ -199,27 +208,18 @@ export function CardFollowup({
                     </div>
 
                     {editing === comment.id ? (
-                      <textarea
+                      <MarkdownField
                         autoFocus
                         rows={3}
-                        defaultValue={comment.body}
-                        onBlur={(e) => commitEdit(comment, e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            commitEdit(comment, e.currentTarget.value);
-                          }
-                          if (e.key === "Escape") {
-                            e.stopPropagation();
-                            setEditing(null);
-                          }
-                        }}
-                        className="field mt-1 resize-none"
+                        value={comment.body}
+                        saveLabel="Simpan"
+                        status={networkStatus}
+                        onSave={(body) => commitEdit(comment, body)}
+                        onCancel={() => setEditing(null)}
+                        className="mt-1"
                       />
                     ) : (
-                      <p className="mt-0.5 text-sm leading-relaxed text-ink-soft wrap-break-word whitespace-pre-wrap">
-                        {comment.body}
-                      </p>
+                      <Markdown source={comment.body} className="mt-0.5 text-sm text-ink-soft" />
                     )}
 
                     {mine && editing !== comment.id && (
@@ -250,38 +250,18 @@ export function CardFollowup({
 
       {/* Kolom tulis tetap di kaki panel, tidak ikut menggulir: dari mana pun
           lini masa sedang dibaca, tempat menjawabnya selalu di tempat sama. */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          submit();
-        }}
-        className="flex flex-col gap-2 border-t border-line-soft px-5 py-3 md:px-4"
-      >
-        <textarea
+      <div className="border-t border-line-soft px-5 py-3 md:px-4">
+        <MarkdownField
+          key={composerKey}
+          value=""
           rows={2}
-          value={draft}
-          placeholder="Tulis followup… (Enter untuk kirim)"
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              submit();
-            }
-            if (e.key === "Escape") e.stopPropagation();
-          }}
-          className="field resize-none"
+          placeholder="Tulis followup… (Mendukung format Markdown)"
+          saveLabel="Kirim"
+          status={networkStatus}
+          onSave={submitNew}
+          onCancel={resetComposer}
         />
-        {draft.trim() && (
-          <div className="flex gap-1.5">
-            <button type="submit" className="btn btn-primary">
-              Kirim
-            </button>
-            <button type="button" onClick={() => setDraft("")} className="btn btn-ghost">
-              Batal
-            </button>
-          </div>
-        )}
-      </form>
+      </div>
     </section>
   );
 }

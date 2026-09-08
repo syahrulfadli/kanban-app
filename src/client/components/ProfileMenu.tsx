@@ -164,7 +164,7 @@ export function ProfileMenu() {
         aria-expanded={open}
         aria-label={`Menu profil ${name}`}
         className={cn(
-          "avatar overflow-hidden transition-transform hover:scale-105",
+          "avatar avatar-lg overflow-hidden transition-transform hover:scale-105",
           !image && "avatar-tinted",
         )}
         style={image ? undefined : avatarTint(name, email)}

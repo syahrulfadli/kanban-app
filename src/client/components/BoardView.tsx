@@ -500,6 +500,7 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
           columnTitle={open.columnTitle}
           shareUrl={`${location.origin}${location.pathname}${paths.card(boardId, open.cardId)}`}
           currentUser={{ ...session.user, image: session.user.image ?? null }}
+          networkStatus={live.status}
           onClose={leaveCard}
           onMove={() => askMoveCard(open.cardId)}
           onBoardChange={() => void refresh()}
