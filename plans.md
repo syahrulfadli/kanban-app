@@ -116,7 +116,92 @@ saya", "yang jatuh tempo minggu ini".
 - Tombol filter kasih indikator kecil (titik/angka) saat ada filter aktif,
   supaya gampang sadar filter masih menyala setelah reload.
 
-## 2. Arsip kartu / kolom
+## 2. Arsip kartu / kolom — **selesai (kartu saja)**
+
+Diimplementasikan **kartu saja** — kolom sengaja tidak ikut arsip di iterasi
+ini (lihat "Keputusan atas pertanyaan terbuka" di bawah).
+
+Skema: `cards.archivedAt` nullable (`src/db/schema.ts`, migrasi
+`0012_faulty_newton_destine.sql`, `drizzle-kit generate` murni diff lokal —
+tidak butuh akses D1 jaringan). Dua jenis aktivitas baru di
+`ACTIVITY_KINDS`: `card_archived`/`card_restored`, dengan kalimatnya di
+`src/shared/activity.ts` (`describeActivity` untuk lini masa kartu,
+`describeNotification` untuk kotak masuk) — dipakai ulang tanpa kode baru
+karena keduanya sudah generik atas `ActivityKind`.
+
+Endpoint baru di `src/worker/routes/cards.ts`: `POST /cards/:id/archive`
+dan `POST /cards/:id/restore`, mengikuti pola persis endpoint lain di file
+yang sama (update kolom, `markCardActivity` dengan `touchCard: false`
+karena `updatedAt`/`updatedBy` sudah ikut di-set di query utama,
+`touchBoard`, `notifyCardActivity`) — bukan endpoint ad-hoc. `GET
+/boards/:id` (`src/worker/routes/boards.ts`) diubah menyaring
+`isNull(cards.archivedAt)` dari `allCards`, dan menambah
+`archivedCount` (query `COUNT` terpisah, cukup untuk badge tanpa menarik
+seluruh daftar). Endpoint baru `GET /boards/:id/archived-cards` menjawab
+daftar arsipnya sendiri (id, judul, nama kolom asal, waktu arsip) — hanya
+dipanggil saat panelnya benar-benar dibuka, sama seperti daftar gambar
+latar di `BoardBackgroundPicker`.
+
+Klien: tombol "Arsipkan" (ikon kotak) di kepala `CardModal`, sejajar
+Pindahkan/Salin tautan — lewat `run()` yang sudah ada di situ (pola sama
+seperti label/tenggat), bukan `UndoToasts`. Ini beda dari saran awal di
+"Saran UI/UX" di bawah — lihat "Keputusan" untuk alasannya. Begitu
+diarsipkan, kartu hilang dari `board.columns` (server sudah menyaring), dan
+dialog kartunya **ikut menutup sendiri** lewat efek yang sudah ada di
+`BoardView` (kartu yang tak lagi ketemu di board membuat alamat kembali ke
+papan) — persis perilaku yang sudah ada untuk hapus permanen, tanpa kode
+tambahan.
+
+Komponen baru `ArchivePanel.tsx` — tombol chip + panel `.sheet` di kepala
+papan, sejajar `BoardFilter`/`BoardBackgroundPicker` (pola yang sama:
+`absolute`, tanpa portal, karena kepala papan bukan pane ber-frost). Badge
+angka di tombol hanya muncul kalau `archivedCount > 0`. Baris per kartu:
+judul, nama kolom asal + waktu relatif, tombol "Pulihkan" dan "Hapus
+permanen". "Hapus permanen" dikonfirmasi lewat `ConfirmDialog` yang sudah
+ada (dipasang lokal di `ArchivePanel`, bukan lewat `pending` milik
+`BoardView` — kartu arsip tidak ada di `board.columns`, jadi alur
+`askDeleteCard` yang mencari kartu dari situ tidak bisa dipakai ulang) lalu
+memanggil `api.deleteCard` yang sama dengan hapus biasa. Baik Pulihkan
+maupun Hapus permanen memanggil `refresh()` board setelahnya, supaya kartu
+yang dipulihkan muncul lagi di papan dan badge arsip ikut akurat di kedua
+kasus.
+
+**Keputusan atas pertanyaan terbuka:**
+- **Kartu saja, kolom tidak ikut arsip** — dikonfirmasi langsung saat mulai
+  implementasi. Migrasi, endpoint, dan panel jadi jauh lebih sederhana
+  (satu tabel, satu jenis baris di panel); kolom bisa disusulkan nanti
+  kalau ternyata dibutuhkan. Ini juga membuat pertanyaan "kartu di kolom
+  yang diarsipkan ikut tersembunyi atau independen?" jadi tidak relevan.
+- **Realtime & notifikasi**: tidak perlu event granular baru —
+  `touchBoard` yang sudah dipanggil membuat kolaborator lain menarik ulang
+  board lewat `board:changed`, dan karena kartu terarsip sudah tersaring
+  di query board, ia otomatis hilang dari layar mereka juga (mekanisme
+  yang sama persis dengan hapus permanen, yang memang sudah begini sejak
+  awal). `notifyCardActivity` dipanggil untuk archive/restore supaya
+  keduanya tercatat di kotak masuk peserta kartu, sama seperti perubahan
+  lain.
+- **Tidak pakai `UndoToasts`** — beda dari saran awal. Alasannya: arsip
+  itu sendiri *sudah* reversibel secara permanen lewat panel arsip (tombol
+  "Pulihkan" kapan saja, tidak dibatasi jendela 6 detik seperti undo
+  hapus/pindah). Menambah lapisan undo-toast di atas sesuatu yang sudah
+  reversibel hanya menambah kerumitan tanpa manfaat baru bagi pengguna —
+  `run()` (optimistik langsung + rollback kalau server menolak) sudah
+  cukup dan konsisten dengan pola suntingan kartu lain di `CardModal`.
+
+Diuji langsung di browser (Playwright headless, akun baru, workspace→
+board→kolom→2 kartu): badge Arsip tidak tampil angka saat kosong; buka
+Kartu 1 → klik Arsipkan → kartu hilang dari papan **dan** dialognya
+menutup sendiri, badge Arsip berubah jadi "1"; buka panel Arsip →
+menampilkan "Kartu 1" dengan nama kolom asal ("To Do") dan waktu relatif
+("baru saja"); klik Pulihkan → Kartu 1 kembali muncul di papan, badge
+kembali kosong; arsipkan Kartu 2, lalu "Hapus permanen" dari panel →
+dikonfirmasi lewat dialog yang menyebut nama kartu dan menegaskan "beda
+dari arsip, tidak bisa dipulihkan lagi" → kartu hilang dari panel arsip
+untuk selamanya, badge tetap kosong. Tidak ada error konsol React di
+sepanjang pengujian.
+
+**Susulan yang belum dikerjakan:** arsip kolom (di luar cakupan yang
+disepakati untuk iterasi ini).
 
 **Masalah:** saat ini kartu dan kolom sepertinya hanya bisa dihapus permanen
 (perlu dicek ulang alur hapus di `BoardView`/`ColumnView`/`CardModal`), belum

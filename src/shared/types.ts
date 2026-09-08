@@ -209,6 +209,18 @@ export interface BoardDetail extends Board {
   columns: ColumnSummary[];
   /** Latar yang sudah diresolusi — lihat BoardBackground di atas. */
   background: BoardBackground;
+  /** Jumlah kartu terarsip — cukup untuk badge tombol panel arsip, tanpa
+      menarik seluruh daftarnya (itu baru diminta saat panelnya dibuka). */
+  archivedCount: number;
+}
+
+/** Satu baris di panel arsip — cukup untuk daftar, bukan detail penuh kartu. */
+export interface ArchivedCard {
+  id: string;
+  title: string;
+  columnId: string;
+  columnTitle: string;
+  archivedAt: string;
 }
 
 /* ── Pencarian kartu ───────────────────────────────────────────────

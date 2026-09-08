@@ -209,6 +209,15 @@ export const cards = sqliteTable(
      * papan yang setiap kartunya bertenggat kehilangan gunanya tenggat.
      */
     dueAt: integer("due_at", { mode: "timestamp_ms" }),
+    /**
+     * Arsip — "selesai, tapi disimpan dulu", terpisah dari hapus permanen.
+     *
+     * Null berarti kartu masih aktif di papannya, dan itulah keadaan
+     * istirahatnya: kartu yang diarsipkan hilang dari tampilan board utama
+     * (lihat query `GET /boards/:id`) tapi barisnya tetap ada, bisa
+     * dipulihkan lewat panel arsip.
+     */
+    archivedAt: integer("archived_at", { mode: "timestamp_ms" }),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
   },
@@ -243,6 +252,8 @@ export const ACTIVITY_KINDS = [
   "due_cleared",
   "attachment_added",
   "attachment_removed",
+  "card_archived",
+  "card_restored",
 ] as const;
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
 

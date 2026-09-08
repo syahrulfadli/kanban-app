@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { monitorForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { extractClosestEdge } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
+import { ArchivePanel } from "./ArchivePanel";
 import { BoardBackgroundPicker, PhotoCredit } from "./BoardBackgroundPicker";
 import { BoardFilter } from "./BoardFilter";
 import { CardModal } from "./CardModal";
@@ -450,6 +451,11 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
             creators={creators}
             filter={filter}
             onChange={setFilter}
+          />
+          <ArchivePanel
+            boardId={boardId}
+            count={board.archivedCount}
+            onChanged={() => void refresh()}
           />
           <BoardBackgroundPicker
             boardId={boardId}

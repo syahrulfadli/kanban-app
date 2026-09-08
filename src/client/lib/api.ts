@@ -2,6 +2,7 @@ import type {
   AdminAccess,
   AdminBackgroundImage,
   AdminUserPage,
+  ArchivedCard,
   AttachmentMime,
   AvatarMime,
   BackgroundImageBrief,
@@ -195,6 +196,12 @@ export const api = {
     send<Card>(`/cards/${id}/move`, "POST", { columnId, index }),
   deleteCard: (id: string, options?: SendOptions) =>
     send<void>(`/cards/${id}`, "DELETE", undefined, options),
+
+  /* Arsip — terpisah dari hapus permanen di atas. */
+  archiveCard: (id: string) => send<Card>(`/cards/${id}/archive`, "POST"),
+  restoreCard: (id: string) => send<Card>(`/cards/${id}/restore`, "POST"),
+  listArchivedCards: (boardId: string) =>
+    request<ArchivedCard[]>(`/boards/${boardId}/archived-cards`),
 
   /* label — miliknya board, dipasang ke kartu */
   createLabel: (boardId: string, name: string, color: LabelColor) =>

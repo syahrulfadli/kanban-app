@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import {
   BOARD_BLUR_LEVELS,
@@ -24,6 +24,7 @@ import { VIEWER_PARAM } from "../board-room";
 import { extrasFor, loadCardExtras } from "../card-data";
 import { activeBackgrounds } from "./admin";
 import type {
+  ArchivedCard,
   BoardBackground,
   BoardDetail,
   MoveTargetWorkspace,
@@ -238,18 +239,22 @@ const app = new Hono<AppEnv>()
       .orderBy(asc(columns.position));
 
     const columnIds = cols.map((col) => col.id);
+    /* `isNull(archivedAt)` — kartu terarsip sengaja tidak ikut di sini. Papan
+       utama cuma menggambar kartu yang masih aktif; daftarnya yang lain ada
+       di /:id/archived-cards, ditarik terpisah hanya saat panel arsip
+       dibuka. */
     const allCards = columnIds.length
       ? await db
           .select()
           .from(cards)
-          .where(inArray(cards.columnId, columnIds))
+          .where(and(inArray(cards.columnId, columnIds), isNull(cards.archivedAt)))
           .orderBy(asc(cards.position))
       : [];
 
     // Label, progress checklist, jumlah followup, peserta, dan keadaan Awasi
     // ikut terangkut di payload board: kartu dan kolom harus bisa menggambar
     // semuanya tanpa dibuka dulu.
-    const [extras, boardLabels, watched, background] = await Promise.all([
+    const [extras, boardLabels, watched, background, archivedCountRow] = await Promise.all([
       loadCardExtras(db, { boardId: board.id }, userId),
       db
         .select()
@@ -263,6 +268,16 @@ const app = new Hono<AppEnv>()
         .where(and(eq(columns.boardId, board.id), eq(columnWatches.userId, userId)))
         .all(),
       resolveBackground(db, board),
+      /* Cuma dihitung, bukan ditarik seluruhnya — badge di tombol panel
+         arsip perlu tahu ada-tidaknya sesuatu untuk ditampilkan tanpa
+         memuat seluruh daftarnya lebih dulu. */
+      columnIds.length
+        ? db
+            .select({ count: sql<number>`count(*)` })
+            .from(cards)
+            .where(and(inArray(cards.columnId, columnIds), isNotNull(cards.archivedAt)))
+            .get()
+        : Promise.resolve({ count: 0 }),
     ]);
 
     const watchedColumns = new Set(watched.map((row) => row.columnId));
@@ -272,6 +287,7 @@ const app = new Hono<AppEnv>()
       role,
       background,
       labels: boardLabels,
+      archivedCount: archivedCountRow?.count ?? 0,
       columns: cols.map((col) => ({
         ...col,
         watching: watchedColumns.has(col.id),
@@ -282,6 +298,41 @@ const app = new Hono<AppEnv>()
     };
 
     return c.json(detail);
+  })
+
+  /**
+   * Daftar kartu terarsip di papan ini — hanya ditarik saat panel arsip
+   * dibuka (lihat `ArchivePanel`), bukan ikut payload board utama.
+   */
+  .get("/:id/archived-cards", async (c) => {
+    const db = c.get("db");
+    const userId = c.get("user").id;
+    const { board } = await requireBoard(db, c.req.param("id"), userId);
+
+    const cols = await db
+      .select({ id: columns.id })
+      .from(columns)
+      .where(eq(columns.boardId, board.id));
+    const columnIds = cols.map((col) => col.id);
+    if (columnIds.length === 0) return c.json([] satisfies ArchivedCard[]);
+
+    const rows = await db
+      .select({
+        id: cards.id,
+        title: cards.title,
+        columnId: cards.columnId,
+        columnTitle: columns.title,
+        archivedAt: cards.archivedAt,
+      })
+      .from(cards)
+      .innerJoin(columns, eq(cards.columnId, columns.id))
+      .where(and(inArray(cards.columnId, columnIds), isNotNull(cards.archivedAt)))
+      .orderBy(desc(cards.archivedAt))
+      .all();
+
+    return c.json(
+      rows.map((row) => ({ ...row, archivedAt: row.archivedAt!.toISOString() })) satisfies ArchivedCard[],
+    );
   })
 
   /**

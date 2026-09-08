@@ -193,6 +193,21 @@ export function CardModal({
     [cardId, currentUser, load, onBoardChange],
   );
 
+  /**
+   * Arsipkan kartu ini — lewat `run`, sama seperti suntingan lain: kartu
+   * terarsip hilang dari papan utama begitu `onBoardChange` menarik ulang
+   * board (server sudah menyaringnya di GET /boards/:id), dan dialog ini
+   * ikut tertutup sendiri lewat efek yang sama yang menutupnya saat kartu
+   * dihapus — lihat `BoardView`, kartu yang tak lagi ditemukan di board
+   * membuat alamatnya kembali ke papan.
+   */
+  const archiveCard = () =>
+    run(
+      (card) => ({ ...card, archivedAt: new Date() }),
+      () => api.archiveCard(cardId),
+      { kind: "card_archived" },
+    );
+
   /** Penambahan menunggu server dulu: id butir dan followup lahir di sana. */
   const insert = useCallback(
     async <T,>(
@@ -525,6 +540,25 @@ export function CardModal({
             <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M13 4H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6" />
               <path d="m16 8 4 4-4 4M20 12H10" />
+            </svg>
+          </button>
+
+          {/* Arsipkan — sejajar Pindahkan: keduanya sama-sama membawa kartu
+              ini pergi dari papan, bukan menyunting isinya. Visualnya sama
+              tenangnya dengan kenop lain di sini; hapus permanen tetap
+              tinggal di tempatnya sendiri (muka kartu di papan) supaya
+              tetap terasa lebih "berbahaya" daripada arsip yang reversibel. */}
+          <button
+            type="button"
+            onClick={() => void archiveCard()}
+            aria-label="Arsipkan kartu"
+            title="Arsipkan"
+            className="grid size-8 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-line-soft hover:text-ink"
+          >
+            <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <rect x="3" y="4" width="18" height="4" rx="1" />
+              <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8" />
+              <path d="M10 12h4" />
             </svg>
           </button>
 

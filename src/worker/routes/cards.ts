@@ -220,6 +220,7 @@ const app = new Hono<AppEnv>()
         // Kartu baru selalu lahir tanpa tenggat; ia dipasang belakangan, di
         // dialognya, oleh orang yang sudah tahu kapan kartu ini harus selesai.
         dueAt: null,
+        archivedAt: null,
         createdAt: now,
         updatedAt: now,
       };
@@ -813,6 +814,57 @@ const app = new Hono<AppEnv>()
     });
 
     return c.body(null, 204);
+  })
+
+  /* ── Arsip ────────────────────────────────────────────────────────
+     "Selesai, tapi disimpan dulu" — terpisah dari hapus permanen di atas.
+     Kartu terarsip tetap barisnya utuh (lihat `archivedAt` di schema),
+     cuma disaring dari payload board utama; daftarnya sendiri ada di
+     GET /boards/:id/archived-cards. */
+
+  .post("/:id/archive", async (c) => {
+    const db = c.get("db");
+    const userId = c.get("user").id;
+    const { card, boardId } = await requireCard(db, c.req.param("id"), userId);
+
+    // Sudah terarsip — klien optimistik boleh mengulang tanpa memicu error.
+    if (card.archivedAt) return c.json(card);
+
+    const updated = await db
+      .update(cards)
+      .set({ archivedAt: new Date(), updatedBy: userId, updatedAt: new Date() })
+      .where(eq(cards.id, card.id))
+      .returning()
+      .get();
+
+    const note = { kind: "card_archived" } as const;
+    await markCardActivity(db, card.id, userId, { touchCard: false, note });
+    await touchBoard(c, boardId);
+    notifyCardActivity(c, { cardId: card.id, boardId, cardTitle: card.title, notes: note });
+
+    return c.json(updated);
+  })
+
+  .post("/:id/restore", async (c) => {
+    const db = c.get("db");
+    const userId = c.get("user").id;
+    const { card, boardId } = await requireCard(db, c.req.param("id"), userId);
+
+    if (!card.archivedAt) return c.json(card);
+
+    const updated = await db
+      .update(cards)
+      .set({ archivedAt: null, updatedBy: userId, updatedAt: new Date() })
+      .where(eq(cards.id, card.id))
+      .returning()
+      .get();
+
+    const note = { kind: "card_restored" } as const;
+    await markCardActivity(db, card.id, userId, { touchCard: false, note });
+    await touchBoard(c, boardId);
+    notifyCardActivity(c, { cardId: card.id, boardId, cardTitle: card.title, notes: note });
+
+    return c.json(updated);
   })
 
   /* ── Orang pada kartu ──────────────────────────────────────────────

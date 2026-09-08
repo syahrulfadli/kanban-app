@@ -69,6 +69,10 @@ export function describeActivity(kind: ActivityKind, detail: ActivityDetail | nu
       return { verb: "menambahkan lampiran", subject: d.text };
     case "attachment_removed":
       return { verb: "menghapus lampiran", subject: d.text };
+    case "card_archived":
+      return { verb: "mengarsipkan kartu ini" };
+    case "card_restored":
+      return { verb: "memulihkan kartu ini dari arsip" };
   }
 }
 
@@ -148,6 +152,10 @@ export function describeNotification(
       return `menambahkan lampiran ${quoted(d.text, "baru")} di ${card}`;
     case "attachment_removed":
       return `menghapus lampiran ${quoted(d.text, "lama")} dari ${card}`;
+    case "card_archived":
+      return `mengarsipkan ${card}`;
+    case "card_restored":
+      return `memulihkan ${card} dari arsip`;
   }
 }
 
