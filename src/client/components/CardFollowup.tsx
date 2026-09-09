@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Avatar } from "./Avatar";
 import { Markdown } from "./Markdown";
 import { MarkdownField } from "./MarkdownField";
+import { PencilIcon, TrashIcon } from "./icons";
 import { useOpenProfile } from "./ProfilePopover";
 import { useStoredFlag } from "../hooks/useStoredFlag";
 import { describeActivity } from "../lib/activity";
@@ -264,19 +265,21 @@ export function CardFollowup({
                     )}
 
                     {mine && editing !== comment.id && (
-                        <span className="ml-auto flex gap-1 ">
+                        <span className="mt-1 flex gap-3">
                           <button
                             type="button"
                             onClick={() => setEditing(comment.id)}
-                            className="text-[0.6875rem] font-semibold text-faint transition-colors hover:text-ink"
+                            className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.6875rem] font-semibold text-faint transition-colors hover:bg-(--card-plate-hi) hover:text-ink"
                           >
-                            Ubah
+                            <PencilIcon className="size-3" />
+                            Edit
                           </button>
                           <button
                             type="button"
                             onClick={() => onDelete(comment)}
-                            className="text-[0.6875rem] font-semibold text-faint transition-colors hover:text-danger"
+                            className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.6875rem] font-semibold text-faint transition-colors hover:bg-danger/10 hover:text-danger"
                           >
+                            <TrashIcon className="size-3" />
                             Hapus
                           </button>
                         </span>

@@ -11,6 +11,7 @@ import { MarkdownField } from "./MarkdownField";
 import { EyeIcon } from "./WatchToggle";
 import { AvatarStack } from "./Avatar";
 import { CardDetailSkeleton, SkeletonLine } from "./Skeleton";
+import { PencilIcon, TrashIcon } from "./icons";
 import { useDismiss } from "../hooks/useDismiss";
 import { useStoredFlag } from "../hooks/useStoredFlag";
 import { useOpenProfile } from "./ProfilePopover";
@@ -86,16 +87,6 @@ function MoveOutIcon({ className }: { className?: string }) {
 }
 
 /** Tong sampah — hapus kartu, tidak seperti arsip: tidak bisa dipulihkan. */
-function TrashIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M4 7h16M10 11v6M14 11v6" />
-      <path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12" />
-      <path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
-    </svg>
-  );
-}
-
 /** Tiga titik mendatar — menu kartu, bentuknya sama persis dengan menu kolom. */
 function MoreIcon() {
   return (
@@ -681,7 +672,7 @@ export function CardModal({
            deskripsi dan lini masa berdesakan di jendela sempit padahal layarnya
            kosong. Dengan tinggi tetap, tiap kartu terbuka di bingkai yang sama
            dan ruang bacanya selalu selebar-lebarnya yang ada. */
-        className="card-plain relative flex h-full w-full max-w-4xl flex-col overflow-hidden outline-none"
+        className="card-plain relative flex h-full w-full max-w-6xl flex-col overflow-hidden outline-none"
       >
         <header className="flex items-start gap-3 px-5 pt-4 pb-3">
           <div className="min-w-0 flex-1">
@@ -932,7 +923,20 @@ export function CardModal({
                 </div>
 
                 <section className="flex flex-col gap-2">
-                  <span className="section-label">Deskripsi</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="section-label">Deskripsi</span>
+
+                    {!editingDescription && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingDescription(true)}
+                        className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.6875rem] font-semibold text-faint transition-colors hover:bg-(--card-plate-hi) hover:text-ink"
+                      >
+                        <PencilIcon className="size-3" />
+                        Edit
+                      </button>
+                    )}
+                  </div>
 
                   {editingDescription ? (
                     <MarkdownField
@@ -945,17 +949,15 @@ export function CardModal({
                       onSave={commitDescription}
                       onCancel={() => setEditingDescription(false)}
                     />
+                  ) : detail.description ? (
+                    <Markdown source={detail.description} className="text-sm" />
                   ) : (
                     <button
                       type="button"
                       onClick={() => setEditingDescription(true)}
-                      className="rounded-lg text-left transition-colors hover:text-ink"
+                      className="rounded-lg text-left text-sm text-faint transition-colors hover:text-ink"
                     >
-                      {detail.description ? (
-                        <Markdown source={detail.description} className="text-sm" />
-                      ) : (
-                        <span className="text-sm text-faint">Klik untuk menambah deskripsi…</span>
-                      )}
+                      Klik untuk menambah deskripsi…
                     </button>
                   )}
                 </section>
@@ -977,7 +979,7 @@ export function CardModal({
               </div>
 
               {!followupHidden && (
-              <div className="flex flex-col border-t border-line-soft md:min-h-0 md:w-80 md:shrink-0 md:border-t-0 md:border-l">
+              <div className="flex flex-col border-t border-line-soft md:min-h-0 md:w-3/8 md:shrink-0 md:border-t-0 md:border-l">
                 <CardFollowup
                   comments={detail.comments}
                   activities={detail.activities}
