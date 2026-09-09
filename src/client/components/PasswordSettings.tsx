@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+import { useT } from "../hooks/useLanguage";
 import { api } from "../lib/api";
 import { changePassword } from "../lib/auth-client";
 import type { LinkedAccount } from "./ProfileSettings";
@@ -14,6 +15,7 @@ import { FormSkeleton } from "./Skeleton";
  * tidak meminta kata sandi lama — tidak ada yang bisa disebut.
  */
 export function PasswordSettings({ accounts }: { accounts: LinkedAccount[] | null }) {
+  const t = useT();
   const currentId = useId();
   const nextId = useId();
 
@@ -28,7 +30,7 @@ export function PasswordSettings({ accounts }: { accounts: LinkedAccount[] | nul
      atau GitHub. Kerangkanya memasang dua: itu yang paling sering benar, dan
      kalau meleset yang hilang cuma satu kolom, bukan seluruh formulir. */
   if (!accounts) {
-    return <FormSkeleton fields={2} label="Memuat pengaturan kata sandi…" />;
+    return <FormSkeleton fields={2} label={t.passwordSettings.loadingSettings} />;
   }
 
   const hasPassword = accounts.some((a) => a.providerId === "credential");
@@ -54,8 +56,8 @@ export function PasswordSettings({ accounts }: { accounts: LinkedAccount[] | nul
           // terlihat, jadi diterjemahkan di sini.
           throw new Error(
             result.error.code === "INVALID_PASSWORD"
-              ? "Kata sandi sekarang tidak cocok."
-              : (result.error.message ?? "Kata sandi gagal diganti"),
+              ? t.passwordSettings.currentPasswordWrong
+              : (result.error.message ?? t.passwordSettings.changeFailed),
           );
         }
       } else {
@@ -64,13 +66,9 @@ export function PasswordSettings({ accounts }: { accounts: LinkedAccount[] | nul
 
       setCurrent("");
       setNext("");
-      setNotice(
-        hasPassword
-          ? "Kata sandi diganti. Sesi di perangkat lain sudah dikeluarkan."
-          : "Kata sandi dibuat. Sekarang Anda juga bisa masuk dengan email dan kata sandi.",
-      );
+      setNotice(hasPassword ? t.passwordSettings.changed : t.passwordSettings.created);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Kata sandi gagal disimpan");
+      setError(err instanceof Error ? err.message : t.passwordSettings.saveFailed);
     } finally {
       setBusy(false);
     }
@@ -81,7 +79,7 @@ export function PasswordSettings({ accounts }: { accounts: LinkedAccount[] | nul
       {hasPassword && (
         <div className="flex flex-col gap-1.5">
           <label htmlFor={currentId} className="text-xs font-medium text-muted">
-            Kata sandi sekarang
+            {t.passwordSettings.currentPasswordLabel}
           </label>
           <input
             id={currentId}
@@ -97,7 +95,7 @@ export function PasswordSettings({ accounts }: { accounts: LinkedAccount[] | nul
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor={nextId} className="text-xs font-medium text-muted">
-          Kata sandi baru
+          {t.passwordSettings.newPasswordLabel}
         </label>
         <input
           id={nextId}
@@ -106,7 +104,7 @@ export function PasswordSettings({ accounts }: { accounts: LinkedAccount[] | nul
           minLength={8}
           value={next}
           onChange={(e) => setNext(e.target.value)}
-          placeholder="Minimal 8 karakter"
+          placeholder={t.passwordSettings.minCharsPlaceholder}
           autoComplete="new-password"
           className="field"
         />
@@ -121,7 +119,7 @@ export function PasswordSettings({ accounts }: { accounts: LinkedAccount[] | nul
           disabled={busy || next.length < 8 || (hasPassword && current.length === 0)}
           className="btn btn-primary"
         >
-          {hasPassword ? "Ganti kata sandi" : "Buat kata sandi"}
+          {hasPassword ? t.passwordSettings.changeButton : t.passwordSettings.createButton}
         </button>
       </div>
     </form>

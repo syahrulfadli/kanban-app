@@ -15,6 +15,7 @@ import { AddItemForm } from "./AddItemForm";
 import { ColorSwatches } from "./ColorSwatches";
 import { EyeIcon } from "./WatchToggle";
 import { useDismiss } from "../hooks/useDismiss";
+import { useT } from "../hooks/useLanguage";
 import { cn } from "../lib/cn";
 import { columnTint, labelTint } from "../lib/people";
 import { isBoardFilterActive, matchesBoardFilter, type BoardFilterState } from "../lib/boardFilter";
@@ -176,6 +177,7 @@ export function ColumnView({
   onToggleLabels,
   filter,
 }: Props) {
+  const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   const plateRef = useRef<HTMLElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -392,8 +394,8 @@ export function ColumnView({
             <button
               type="button"
               aria-expanded={false}
-              aria-label={`Bentangkan kolom ${column.title}`}
-              title="Bentangkan kolom"
+              aria-label={t.columnView.expandAria(column.title)}
+              title={t.columnView.expandTitle}
               onClick={onToggleCollapse}
               className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-full text-faint transition-colors hover:bg-line-soft hover:text-ink"
             >
@@ -402,7 +404,7 @@ export function ColumnView({
 
             <h2
               className="column-title-vertical min-h-0 truncate text-sm font-semibold tracking-tight"
-              title={`${column.title} — ${column.cards.length} kartu`}
+              title={t.columnView.cardCountTitle(column.title, column.cards.length)}
             >
               {column.title}
             </h2>
@@ -486,7 +488,7 @@ export function ColumnView({
             <h2
               className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight"
               onDoubleClick={() => setEditing(true)}
-              title="Klik dua kali untuk mengganti nama"
+              title={t.columnView.renameHint}
             >
               {column.title}
             </h2>
@@ -501,8 +503,8 @@ export function ColumnView({
               tidak diam-diam memutus kabar dari sini. */}
           <div className="flex shrink-0 items-center gap-1.5">
             {column.watching && (
-              <span title="Kolom ini Anda awasi" className="flex text-faint">
-                <EyeIcon watching className="size-4" label="Kolom ini Anda awasi" />
+              <span title={t.columnView.watchedTitle} className="flex text-faint">
+                <EyeIcon watching className="size-4" label={t.columnView.watchedTitle} />
               </span>
             )}
             <span className="chip chip-plain font-normal tabular-nums">{column.cards.length}</span>
@@ -518,8 +520,8 @@ export function ColumnView({
             <button
               type="button"
               aria-expanded
-              aria-label={`Susutkan kolom ${column.title}`}
-              title="Susutkan kolom"
+              aria-label={t.columnView.collapseAria(column.title)}
+              title={t.columnView.collapseTitle}
               onClick={onToggleCollapse}
               className="grid size-6 shrink-0 cursor-pointer place-items-center rounded-full text-faint transition-colors hover:bg-line-soft hover:text-ink"
             >
@@ -535,8 +537,8 @@ export function ColumnView({
                 type="button"
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
-                aria-label={`Menu kolom ${column.title}`}
-                title="Menu kolom"
+                aria-label={t.columnView.menuAria(column.title)}
+                title={t.columnView.menuTitle}
                 onClick={() => setMenuOpen((v) => !v)}
                 className="grid size-6 cursor-pointer place-items-center rounded-full text-faint transition-colors hover:bg-line-soft hover:text-ink"
               >
@@ -549,7 +551,7 @@ export function ColumnView({
                   <div
                     ref={menuPanelRef}
                     role="menu"
-                    aria-label={`Menu kolom ${column.title}`}
+                    aria-label={t.columnView.menuAria(column.title)}
                     style={
                       menuAnchor.mode === "end"
                         ? { right: menuAnchor.right, top: menuAnchor.top }
@@ -562,7 +564,7 @@ export function ColumnView({
                   >
                     <MenuItem
                       icon={<EyeIcon watching={column.watching} className="size-4 shrink-0" />}
-                      label={column.watching ? "Berhenti mengawasi" : "Awasi kolom"}
+                      label={column.watching ? t.columnView.watchStop : t.columnView.watchStart}
                       onClick={() => {
                         onWatchColumn(!column.watching);
                         setMenuOpen(false);
@@ -585,7 +587,7 @@ export function ColumnView({
                           className={cn("label-dot size-3", column.color === null && "label-dot-none")}
                           style={column.color ? labelTint(column.color) : undefined}
                         />
-                        Warna kolom
+                        {t.columnView.colorLabel}
                       </p>
 
                       <ColorSwatches
@@ -606,7 +608,7 @@ export function ColumnView({
                         mengakhiri. */}
                     <MenuItem
                       icon={<MoveOutIcon />}
-                      label="Pindah ke papan lain…"
+                      label={t.columnView.moveToOtherBoard}
                       onClick={() => {
                         setMenuOpen(false);
                         onMoveColumn();
@@ -615,7 +617,7 @@ export function ColumnView({
 
                     <MenuItem
                       icon={<TrashIcon />}
-                      label="Hapus kolom"
+                      label={t.columnView.deleteColumn}
                       danger
                       onClick={() => {
                         setMenuOpen(false);
@@ -660,7 +662,7 @@ export function ColumnView({
               yang mana yang benar. */}
           {column.cards.length === 0 && cardSlot === null && (
             <li className="column-chrome rounded-xl border-2 border-dashed border-line px-3 py-6 text-center text-xs text-faint">
-              Belum ada kartu
+              {t.columnView.emptyColumn}
             </li>
           )}
 
@@ -669,15 +671,15 @@ export function ColumnView({
               bug: isinya bukan kosong, cuma sedang tersaring. */}
           {column.cards.length > 0 && visibleCount === 0 && cardSlot === null && (
             <li className="column-chrome rounded-xl border-2 border-dashed border-line px-3 py-6 text-center text-xs text-faint">
-              Tidak ada kartu yang cocok filter
+              {t.columnView.noMatchFilter}
             </li>
           )}
         </ul>
 
         <div className="column-chrome px-3 pb-3">
           <AddItemForm
-            placeholder="Tambah kartu…"
-            submitLabel="Tambah Kartu"
+            placeholder={t.columnView.addCardPlaceholder}
+            submitLabel={t.columnView.addCardSubmit}
             onSubmit={async (title) => {
               await onAddCard(title);
               /* Kartu baru selalu mendarat di kaki daftar — begitu ia lahir,

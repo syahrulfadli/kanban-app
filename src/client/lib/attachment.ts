@@ -6,7 +6,7 @@ import {
   MAX_ATTACHMENT_BASE64,
   type AttachmentMime,
 } from "../../shared/types";
-import { blobToBase64, encodeCanvas, type CanvasEncoding } from "./imageCodec";
+import { blobToBase64, encodeCanvas, MediaError, type CanvasEncoding } from "./imageCodec";
 
 /**
  * Menyiapkan berkas pilihan pengguna menjadi lampiran kartu.
@@ -36,7 +36,7 @@ const ENCODINGS: CanvasEncoding[] = [
 
 async function prepareImage(file: File): Promise<AttachmentUpload> {
   const bitmap = await createImageBitmap(file).catch(() => {
-    throw new Error("Gambarnya tidak bisa dibaca");
+    throw new MediaError("unreadableImage");
   });
 
   const scale = Math.min(1, ATTACHMENT_MAX_DIMENSION / Math.max(bitmap.width, bitmap.height));
@@ -48,7 +48,7 @@ async function prepareImage(file: File): Promise<AttachmentUpload> {
   canvas.height = height;
 
   const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Browser ini tidak bisa memproses gambar");
+  if (!ctx) throw new MediaError("cantProcessImage");
 
   ctx.drawImage(bitmap, 0, 0, width, height);
   bitmap.close();
@@ -57,7 +57,7 @@ async function prepareImage(file: File): Promise<AttachmentUpload> {
   const data = await blobToBase64(blob);
 
   if (data.length > MAX_ATTACHMENT_BASE64) {
-    throw new Error("Gambarnya terlalu besar setelah diproses — coba yang lain");
+    throw new MediaError("tooLargeAfterProcessingRetry");
   }
 
   const mime = (ATTACHMENT_IMAGE_MIMES as readonly string[]).includes(blob.type)
@@ -69,12 +69,12 @@ async function prepareImage(file: File): Promise<AttachmentUpload> {
 
 async function prepareFile(file: File): Promise<AttachmentUpload> {
   if (!(ATTACHMENT_FILE_MIMES as readonly string[]).includes(file.type)) {
-    throw new Error("Tipe berkas ini belum didukung");
+    throw new MediaError("unsupportedFileType");
   }
 
   const data = await blobToBase64(file);
   if (data.length > MAX_ATTACHMENT_BASE64) {
-    throw new Error("Berkasnya terlalu besar — maksimal sekitar 350 KB");
+    throw new MediaError("tooLarge350kb");
   }
 
   return { filename: file.name, mime: file.type as AttachmentMime, data, preview: null };
@@ -82,7 +82,7 @@ async function prepareFile(file: File): Promise<AttachmentUpload> {
 
 export async function prepareAttachment(file: File): Promise<AttachmentUpload> {
   if (file.size > MAX_FILE_BYTES) {
-    throw new Error("Berkasnya terlalu besar — maksimal 12 MB");
+    throw new MediaError("tooLarge12mbFile");
   }
 
   if (file.type.startsWith("image/")) return prepareImage(file);

@@ -14,71 +14,111 @@ export interface ActivityPhrase {
   color?: LabelColor;
 }
 
-export function describeActivity(kind: ActivityKind, detail: ActivityDetail | null): ActivityPhrase {
+/**
+ * Bentuk kamus yang dibutuhkan `describeActivity` — didefinisikan di sini,
+ * bukan diimpor dari `client/i18n`, supaya kode bersama ini tidak bergantung
+ * pada klien. Kamus bahasa di klien cukup cocok bentuknya (diperiksa lewat
+ * `satisfies` di sana) tanpa perlu tahu-menahu soal antarmuka ini.
+ */
+export interface ActivityStrings {
+  cardCreated: string;
+  titleChanged: string;
+  descriptionUpdated: string;
+  descriptionRemoved: string;
+  movedFrom: (from: string) => string;
+  otherColumn: string;
+  transferredTo: (to: string) => string;
+  otherColumnShort: string;
+  labelAdded: string;
+  labelRemoved: string;
+  checklistAdded: string;
+  checklistChecked: string;
+  checklistUnchecked: string;
+  checklistRenamed: string;
+  checklistRemoved: string;
+  commentDeleted: string;
+  memberAdded: string;
+  memberRemoved: string;
+  dueMoved: string;
+  dueSet: string;
+  dueCleared: string;
+  dueDone: string;
+  dueUndone: string;
+  attachmentAdded: string;
+  attachmentRemoved: string;
+  cardArchived: string;
+  cardRestored: string;
+}
+
+export function describeActivity(
+  kind: ActivityKind,
+  detail: ActivityDetail | null,
+  s: ActivityStrings,
+): ActivityPhrase {
   const d = detail ?? {};
 
   switch (kind) {
     case "card_created":
-      return { verb: "membuat kartu ini" };
+      return { verb: s.cardCreated };
     case "title_changed":
-      return { verb: "mengubah judul jadi", subject: d.to ?? undefined };
+      return { verb: s.titleChanged, subject: d.to ?? undefined };
     case "description_changed":
-      return { verb: d.to ? "memperbarui deskripsi" : "menghapus deskripsi" };
+      return { verb: d.to ? s.descriptionUpdated : s.descriptionRemoved };
     case "card_moved":
-      return { verb: `memindahkan dari ${d.from ?? "kolom lain"} ke`, subject: d.to ?? undefined };
+      return { verb: s.movedFrom(d.from ?? s.otherColumn), subject: d.to ?? undefined };
     /* Papan tujuan yang ditonjolkan, bukan kolomnya: kartu ini sudah tidak ada
        di papan tempat baris ini pertama kali ditulis, dan yang pertama ingin
        diketahui orang yang membacanya adalah ke mana ia pergi. */
     case "card_transferred":
       return {
-        verb: `memindahkan ke kolom ${d.to ?? "lain"} di papan`,
+        verb: s.transferredTo(d.to ?? s.otherColumnShort),
         subject: d.text,
       };
     case "label_added":
-      return { verb: "menambahkan label", subject: d.text, color: d.color };
+      return { verb: s.labelAdded, subject: d.text, color: d.color };
     case "label_removed":
-      return { verb: "melepas label", subject: d.text, color: d.color };
+      return { verb: s.labelRemoved, subject: d.text, color: d.color };
     case "checklist_added":
-      return { verb: "menambah butir", subject: d.text };
+      return { verb: s.checklistAdded, subject: d.text };
     case "checklist_checked":
-      return { verb: "menyelesaikan", subject: d.text };
+      return { verb: s.checklistChecked, subject: d.text };
     case "checklist_unchecked":
-      return { verb: "membuka lagi", subject: d.text };
+      return { verb: s.checklistUnchecked, subject: d.text };
     case "checklist_renamed":
-      return { verb: "mengubah butir jadi", subject: d.to ?? undefined };
+      return { verb: s.checklistRenamed, subject: d.to ?? undefined };
     case "checklist_removed":
-      return { verb: "menghapus butir", subject: d.text };
+      return { verb: s.checklistRemoved, subject: d.text };
     case "comment_deleted":
-      return { verb: "menghapus sebuah followup" };
+      return { verb: s.commentDeleted };
     case "member_added":
-      return { verb: "mengundang", subject: d.text };
+      return { verb: s.memberAdded, subject: d.text };
     case "member_removed":
-      return { verb: "mengeluarkan", subject: d.text };
+      return { verb: s.memberRemoved, subject: d.text };
     /* Tanggalnya diformat tanpa menyebut zona, jadi ia jatuh ke zona pembaca —
        dan itu memang yang benar di sini: baris ini digambar di peramban orang
        yang sedang membukanya, bukan di worker. Sisi server memakai pintu lain
        (describeNotification), yang menyebut zonanya sendiri. */
     case "due_changed":
       return {
-        verb: d.from ? "memindahkan tenggat ke" : "menetapkan tenggat",
+        verb: d.from ? s.dueMoved : s.dueSet,
         subject: d.to ? formatStamp(d.to) : undefined,
       };
     case "due_cleared":
-      return { verb: "menghapus tenggat" };
+      return { verb: s.dueCleared };
     /* Tanggalnya tidak ikut disebut: ia masih terpasang di kartu yang sama,
        terbaca beberapa sentimeter dari baris ini. */
     case "due_done":
-      return { verb: "menandai tenggat selesai" };
+      return { verb: s.dueDone };
     case "due_undone":
-      return { verb: "membuka lagi tenggat" };
+      return { verb: s.dueUndone };
     case "attachment_added":
-      return { verb: "menambahkan lampiran", subject: d.text };
+      return { verb: s.attachmentAdded, subject: d.text };
     case "attachment_removed":
-      return { verb: "menghapus lampiran", subject: d.text };
+      return { verb: s.attachmentRemoved, subject: d.text };
     case "card_archived":
-      return { verb: "mengarsipkan kartu ini" };
+      return { verb: s.cardArchived };
     case "card_restored":
-      return { verb: "memulihkan kartu ini dari arsip" };
+      return { verb: s.cardRestored };
   }
 }
 

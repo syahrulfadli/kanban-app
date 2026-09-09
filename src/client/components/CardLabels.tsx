@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ColorSwatches } from "./ColorSwatches";
+import { useT } from "../hooks/useLanguage";
 import { labelTint } from "../lib/people";
 import type { Label, LabelColor } from "../../shared/types";
 
@@ -21,6 +22,7 @@ export function CardLabels({
   onRename,
   onDelete,
 }: Props) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [draftName, setDraftName] = useState("");
@@ -64,7 +66,7 @@ export function CardLabels({
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="section-label">Label</span>
+      <span className="section-label">{t.cardLabels.sectionTitle}</span>
 
       <div ref={ref} className="relative flex flex-wrap items-center gap-1.5">
         {cardLabels.map((label) => (
@@ -72,7 +74,7 @@ export function CardLabels({
             <span className="truncate">{label.name}</span>
             <button
               type="button"
-              aria-label={`Lepas label ${label.name}`}
+              aria-label={t.cardLabels.detachAria(label.name)}
               onClick={() => onToggle(label, false)}
               className="-mr-1 grid size-4 shrink-0 place-items-center rounded-full opacity-60 transition-opacity hover:opacity-100"
             >
@@ -93,19 +95,19 @@ export function CardLabels({
           <svg viewBox="0 0 24 24" className="size-3" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
             <path d="M12 5v14M5 12h14" />
           </svg>
-          Label
+          {t.cardLabels.addButton}
         </button>
 
         {open && (
           <div
             role="dialog"
-            aria-label="Pilih label"
+            aria-label={t.cardLabels.pickerAria}
             className="sheet absolute top-full left-0 z-20 mt-2 w-72 rounded-2xl p-2"
           >
             <div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto">
               {boardLabels.length === 0 && (
                 <p className="px-2 py-3 text-center text-xs text-faint">
-                  Board ini belum punya label.
+                  {t.cardLabels.noLabels}
                 </p>
               )}
 
@@ -128,14 +130,14 @@ export function CardLabels({
                     <ColorSwatches value={draftColor} onChange={(c) => c && setDraftColor(c)} />
                     <div className="flex items-center gap-1.5">
                       <button type="button" onClick={commitEdit} className="btn btn-primary">
-                        Simpan
+                        {t.common.save}
                       </button>
                       <button
                         type="button"
                         onClick={() => setEditing(null)}
                         className="btn btn-ghost"
                       >
-                        Batal
+                        {t.common.cancel}
                       </button>
                       <button
                         type="button"
@@ -145,7 +147,7 @@ export function CardLabels({
                         }}
                         className="btn btn-ghost ml-auto text-danger hover:bg-danger/10 hover:text-danger"
                       >
-                        Hapus
+                        {t.common.delete}
                       </button>
                     </div>
                   </div>
@@ -181,7 +183,7 @@ export function CardLabels({
 
                     <button
                       type="button"
-                      aria-label={`Ubah label ${label.name}`}
+                      aria-label={t.cardLabels.editAria(label.name)}
                       onClick={() => startEdit(label)}
                       className="grid size-7 shrink-0 place-items-center rounded-lg text-faint transition-colors hover:bg-line-soft hover:text-ink"
                     >
@@ -199,7 +201,7 @@ export function CardLabels({
             <div className="flex flex-col gap-2 p-1">
               <input
                 value={newName}
-                placeholder="Nama label baru…"
+                placeholder={t.cardLabels.newLabelPlaceholder}
                 onChange={(e) => setNewName(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
@@ -220,7 +222,7 @@ export function CardLabels({
                 disabled={!newName.trim()}
                 className="btn btn-primary disabled:opacity-50"
               >
-                Buat label
+                {t.cardLabels.createLabel}
               </button>
             </div>
           </div>

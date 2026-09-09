@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useLanguage, useT } from "../hooks/useLanguage";
 import { cn } from "../lib/cn";
 import { dueState, formatDateTime, formatRelative } from "../lib/format";
 
@@ -42,6 +43,8 @@ function preset(days: number): string {
 const firstGuess = () => (new Date().getHours() < DEFAULT_HOUR ? preset(0) : preset(1));
 
 export function CardDue({ dueAt, dueDoneAt, onChange, onDoneChange }: Props) {
+  const t = useT();
+  const { language } = useLanguage();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const ref = useRef<HTMLDivElement>(null);
@@ -82,7 +85,7 @@ export function CardDue({ dueAt, dueDoneAt, onChange, onDoneChange }: Props) {
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="section-label">Tenggat</span>
+      <span className="section-label">{t.cardDue.sectionTitle}</span>
 
       <div ref={ref} className="relative flex flex-wrap items-center gap-1.5">
         <button
@@ -90,7 +93,7 @@ export function CardDue({ dueAt, dueDoneAt, onChange, onDoneChange }: Props) {
           aria-haspopup="dialog"
           aria-expanded={open}
           onClick={() => (open ? setOpen(false) : start())}
-          title={dueAt ? "Ubah tenggat" : "Pasang tenggat"}
+          title={dueAt ? t.cardDue.changeDue : t.cardDue.setDue}
           className={cn(
             "chip transition-colors hover:text-ink",
             /* Rona hanya dipakai saat waktunya benar-benar menuntut sesuatu.
@@ -110,7 +113,7 @@ export function CardDue({ dueAt, dueDoneAt, onChange, onDoneChange }: Props) {
             <path d="M8 3v3M16 3v3M4 9h16" />
             <rect x="4" y="5" width="16" height="16" rx="2.5" />
           </svg>
-          {dueAt ? formatDateTime(dueAt) : "Tenggat"}
+          {dueAt ? formatDateTime(dueAt, language) : t.cardDue.dueButtonDefault}
         </button>
 
         {/* Silangnya menempel pada chip tanggal karena ia milik tanggal itu —
@@ -120,7 +123,7 @@ export function CardDue({ dueAt, dueDoneAt, onChange, onDoneChange }: Props) {
         {dueAt && (
           <button
             type="button"
-            aria-label="Hapus tenggat"
+            aria-label={t.cardDue.removeDueAria}
             onClick={clear}
             className="grid size-6 shrink-0 place-items-center rounded-full text-faint transition-colors hover:bg-line-soft hover:text-danger"
           >
@@ -143,8 +146,8 @@ export function CardDue({ dueAt, dueDoneAt, onChange, onDoneChange }: Props) {
             onClick={() => onDoneChange(!done)}
             title={
               done && dueDoneAt
-                ? `Ditandai selesai ${formatDateTime(dueDoneAt)} — klik untuk membukanya lagi`
-                : "Tandai tenggat ini selesai — waktunya berhenti menagih"
+                ? t.cardDue.doneAtTitle(formatDateTime(dueDoneAt, language))
+                : t.cardDue.markDoneTitle
             }
             className={cn(
               "chip cursor-pointer transition-colors",
@@ -166,25 +169,27 @@ export function CardDue({ dueAt, dueDoneAt, onChange, onDoneChange }: Props) {
               <circle cx="12" cy="12" r="9" strokeDasharray={done ? undefined : "3 3"} />
               <path d="m8.5 12.2 2.4 2.4 4.6-4.9" />
             </svg>
-            {done && dueDoneAt ? `Selesai · ${formatRelative(dueDoneAt)}` : "Tandai selesai"}
+            {done && dueDoneAt
+              ? t.cardDue.doneLabel(formatRelative(dueDoneAt, language, t))
+              : t.cardDue.markDoneButton}
           </button>
         )}
 
         {state === "overdue" && (
-          <span className="text-[0.6875rem] font-semibold text-danger">Lewat tenggat</span>
+          <span className="text-[0.6875rem] font-semibold text-danger">{t.cardDue.overdue}</span>
         )}
 
         {open && (
           <div
             role="dialog"
-            aria-label="Atur tenggat"
+            aria-label={t.cardDue.dialogAria}
             className="sheet absolute top-full left-0 z-20 mt-2 w-72 rounded-2xl p-3"
           >
             <div className="mb-2 flex flex-wrap gap-1.5">
               {[
-                ["Hari ini", 0],
-                ["Besok", 1],
-                ["Pekan depan", 7],
+                [t.cardDue.presetToday, 0],
+                [t.cardDue.presetTomorrow, 1],
+                [t.cardDue.presetNextWeek, 7],
               ].map(([label, days]) => (
                 /* Pintasan mengisi kolomnya, tidak langsung menyimpan: jam
                    bawaannya cuma tebakan, dan orang yang menekan "besok"
@@ -220,10 +225,10 @@ export function CardDue({ dueAt, dueDoneAt, onChange, onDoneChange }: Props) {
 
             <div className="mt-2 flex items-center gap-1.5">
               <button type="button" onClick={commit} disabled={!draft} className="btn btn-primary">
-                Simpan
+                {t.common.save}
               </button>
               <button type="button" onClick={() => setOpen(false)} className="btn btn-ghost">
-                Batal
+                {t.common.cancel}
               </button>
               {dueAt && (
                 <button
@@ -231,7 +236,7 @@ export function CardDue({ dueAt, dueDoneAt, onChange, onDoneChange }: Props) {
                   onClick={clear}
                   className="btn btn-ghost ml-auto text-danger hover:bg-danger/10 hover:text-danger"
                 >
-                  Hapus
+                  {t.common.delete}
                 </button>
               )}
             </div>

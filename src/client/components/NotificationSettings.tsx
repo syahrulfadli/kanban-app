@@ -1,5 +1,7 @@
 import { useId } from "react";
 import type { usePush } from "../hooks/usePush";
+import { useT } from "../hooks/useLanguage";
+import type { Translations } from "../i18n/id";
 import { useSound } from "../hooks/useSound";
 import type { NotificationSettings as Prefs } from "../../shared/types";
 import { ToggleListSkeleton } from "./Skeleton";
@@ -34,28 +36,30 @@ function Row({
   );
 }
 
-/* Ketiganya bicara tentang hal yang Anda awasi, kecuali yang terakhir — dan
+/* Ketiganya bicara tentang hal yang Anda ikuti, kecuali yang terakhir — dan
    perbedaan itulah yang perlu terbaca di sini. Dua kanal pertama mengikuti
    mata: kartu yang Anda sentuh atau nyalakan sendiri, dan kolom yang Anda
-   awasi. Yang ketiga adalah siaran ke seluruh workspace, dan defaultnya mati
-   justru karena ia tidak menunggu Anda mengawasi apa pun. */
-const PREFS: { key: keyof Prefs; title: string; hint: string }[] = [
-  {
-    key: "comments",
-    title: "Followup",
-    hint: "Saat ada yang menulis di kartu yang Anda awasi.",
-  },
-  {
-    key: "changes",
-    title: "Perubahan",
-    hint: "Judul, deskripsi, label, checklist, dan perpindahan kolom — di kartu dan kolom yang Anda awasi.",
-  },
-  {
-    key: "newCards",
-    title: "Kartu baru",
-    hint: "Setiap kartu baru di papan mana pun di workspace Anda, diawasi atau tidak.",
-  },
-];
+   ikuti. Yang ketiga adalah siaran ke seluruh workspace, dan defaultnya mati
+   justru karena ia tidak menunggu Anda mengikuti apa pun. */
+function getPrefs(t: Translations): { key: keyof Prefs; title: string; hint: string }[] {
+  return [
+    {
+      key: "comments",
+      title: t.notificationSettings.followupTitle,
+      hint: t.notificationSettings.followupHint,
+    },
+    {
+      key: "changes",
+      title: t.notificationSettings.changesTitle,
+      hint: t.notificationSettings.changesHint,
+    },
+    {
+      key: "newCards",
+      title: t.notificationSettings.newCardsTitle,
+      hint: t.notificationSettings.newCardsHint,
+    },
+  ];
+}
 
 /**
  * Nada di dalam aplikasi. Berdiri sendiri dari push: ia berbunyi selagi
@@ -67,12 +71,13 @@ const PREFS: { key: keyof Prefs; title: string; hint: string }[] = [
  * ditanyakan siapa pun, di halaman yang sudah panjang.
  */
 function SoundRow() {
+  const t = useT();
   const sound = useSound();
 
   return (
     <Row
-      title="Bunyi"
-      hint="Nada pendek saat kabar baru masuk, dan saat kartu atau kolom mendarat setelah diseret. Berlaku di perangkat ini saja."
+      title={t.notificationSettings.soundTitle}
+      hint={t.notificationSettings.soundHint}
       checked={sound.enabled}
       onChange={(next) => {
         sound.setEnabled(next);
@@ -89,6 +94,8 @@ function SoundRow() {
  * pilihan kanal di bawahnya berlaku untuk orangnya di semua perangkat.
  */
 function PushSettings({ push }: { push: ReturnType<typeof usePush> }) {
+  const t = useT();
+
   if (push.loading) {
     return <ToggleListSkeleton rows={4} />;
   }
@@ -98,7 +105,7 @@ function PushSettings({ push }: { push: ReturnType<typeof usePush> }) {
   if (!push.available) {
     return (
       <p className="glass-plate rounded-xl px-3 py-2.5 text-xs leading-relaxed text-muted">
-        Server ini belum dipasangi kunci notifikasi, jadi notifikasi belum bisa dinyalakan.
+        {t.notificationSettings.noVapidKey}
       </p>
     );
   }
@@ -107,26 +114,24 @@ function PushSettings({ push }: { push: ReturnType<typeof usePush> }) {
     <>
       {push.support === "install-first" ? (
         <p className="rounded-xl bg-accent-soft px-3 py-2.5 text-xs leading-relaxed text-accent-ink">
-          Di iPhone dan iPad, notifikasi baru bisa dinyalakan setelah aplikasi ini ditambahkan ke
-          Layar Utama — lewat tombol Bagikan, lalu “Tambahkan ke Layar Utama”.
+          {t.notificationSettings.iosInstallFirst}
         </p>
       ) : push.support === "unsupported" ? (
         <p className="glass-plate rounded-xl px-3 py-2.5 text-xs leading-relaxed text-muted">
-          Browser ini belum mendukung notifikasi push.
+          {t.notificationSettings.unsupportedBrowser}
         </p>
       ) : push.blocked ? (
         <p className="glass-plate rounded-xl px-3 py-2.5 text-xs leading-relaxed text-muted">
-          Notifikasi diblokir untuk situs ini. Izinkan lagi lewat pengaturan situs di browser
-          Anda, lalu muat ulang halaman ini.
+          {t.notificationSettings.blocked}
         </p>
       ) : (
         <>
           <Row
-            title="Perangkat ini"
+            title={t.notificationSettings.thisDeviceTitle}
             hint={
               push.enabled
-                ? "Perangkat ini menerima notifikasi."
-                : "Nyalakan untuk menerima notifikasi di sini."
+                ? t.notificationSettings.deviceEnabledHint
+                : t.notificationSettings.deviceDisabledHint
             }
             checked={push.enabled}
             onChange={(next) => void (next ? push.enable() : push.disable())}
@@ -136,7 +141,7 @@ function PushSettings({ push }: { push: ReturnType<typeof usePush> }) {
           {/* Pilihan kanal hanya berarti kalau ada yang mengirim ke sini. */}
           {push.enabled && (
             <div className="mt-1 divide-y divide-line-soft border-t border-line-soft">
-              {PREFS.map((pref) => (
+              {getPrefs(t).map((pref) => (
                 <Row
                   key={pref.key}
                   title={pref.title}
@@ -167,7 +172,7 @@ function PushSettings({ push }: { push: ReturnType<typeof usePush> }) {
 
           {push.errorDetail && (
             <p className="mt-2 text-[0.6875rem] break-words text-faint">
-              Pesan asli browser: {push.errorDetail}
+              {t.notificationSettings.originalBrowserMessage(push.errorDetail)}
             </p>
           )}
         </div>
@@ -185,7 +190,7 @@ function PushSettings({ push }: { push: ReturnType<typeof usePush> }) {
             disabled={push.busy}
             className="btn btn-glass"
           >
-            Kirim percobaan
+            {t.notificationSettings.sendTest}
           </button>
         </div>
       )}

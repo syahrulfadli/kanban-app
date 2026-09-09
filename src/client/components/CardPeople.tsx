@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "./Avatar";
 import { useOpenProfile } from "./ProfilePopover";
+import { useT } from "../hooks/useLanguage";
 import { api } from "../lib/api";
 import type { MemberSummary, UserBrief } from "../../shared/types";
 
@@ -21,6 +22,7 @@ interface Props {
 const SEARCH_FROM = 7;
 
 export function CardPeople({ members, workspaceId, onAdd, onRemove }: Props) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [people, setPeople] = useState<MemberSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +45,7 @@ export function CardPeople({ members, workspaceId, onAdd, onRemove }: Props) {
         const rows = await api.listMembers(workspaceId);
         if (alive) setPeople(rows);
       } catch (e) {
-        if (alive) setError(e instanceof Error ? e.message : "Gagal memuat anggota");
+        if (alive) setError(e instanceof Error ? e.message : t.cardPeople.loadError);
       }
     })();
 
@@ -86,7 +88,7 @@ export function CardPeople({ members, workspaceId, onAdd, onRemove }: Props) {
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="section-label">Orang</span>
+      <span className="section-label">{t.cardPeople.sectionTitle}</span>
 
       <div ref={ref} className="relative flex flex-wrap items-center gap-1.5">
         {members.map((person) => (
@@ -97,7 +99,7 @@ export function CardPeople({ members, workspaceId, onAdd, onRemove }: Props) {
           <span
             key={person.id}
             className="chip gap-1.5 py-0.5 pr-1 pl-1"
-            title={`${person.name} · ${person.email}`}
+            title={t.cardPeople.personTitle(person.name, person.email)}
           >
             <button
               type="button"
@@ -109,7 +111,7 @@ export function CardPeople({ members, workspaceId, onAdd, onRemove }: Props) {
             </button>
             <button
               type="button"
-              aria-label={`Keluarkan ${person.name} dari kartu`}
+              aria-label={t.cardPeople.removeAria(person.name)}
               onClick={() => onRemove(person)}
               className="grid size-4 shrink-0 place-items-center rounded-full text-faint transition-colors hover:text-danger"
             >
@@ -130,20 +132,20 @@ export function CardPeople({ members, workspaceId, onAdd, onRemove }: Props) {
           <svg viewBox="0 0 24 24" className="size-3" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
             <path d="M12 5v14M5 12h14" />
           </svg>
-          Orang
+          {t.cardPeople.addButton}
         </button>
 
         {open && (
           <div
             role="dialog"
-            aria-label="Undang orang ke kartu"
+            aria-label={t.cardPeople.pickerAria}
             className="sheet absolute top-full left-0 z-20 mt-2 w-72 rounded-2xl p-2"
           >
             {(people?.length ?? 0) >= SEARCH_FROM && (
               <input
                 autoFocus
                 value={query}
-                placeholder="Cari nama…"
+                placeholder={t.cardPeople.searchPlaceholder}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Escape") {
@@ -159,12 +161,14 @@ export function CardPeople({ members, workspaceId, onAdd, onRemove }: Props) {
               {error && <p className="px-2 py-3 text-center text-xs text-danger">{error}</p>}
 
               {!people && !error && (
-                <p className="px-2 py-3 text-center text-xs text-faint">Memuat anggota…</p>
+                <p className="px-2 py-3 text-center text-xs text-faint">
+                  {t.cardPeople.loadingMembers}
+                </p>
               )}
 
               {people && shown.length === 0 && !error && (
                 <p className="px-2 py-3 text-center text-xs text-faint">
-                  {needle ? "Tidak ada yang cocok." : "Workspace ini belum punya anggota lain."}
+                  {needle ? t.cardPeople.noMatches : t.cardPeople.noOtherMembers}
                 </p>
               )}
 

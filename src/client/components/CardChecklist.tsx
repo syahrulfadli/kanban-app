@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useT } from "../hooks/useLanguage";
 import { cn } from "../lib/cn";
 import type { ChecklistItem } from "../../shared/types";
 
@@ -29,6 +30,7 @@ function ChecklistIcon() {
 }
 
 export function CardChecklist({ items, onToggle, onRename, onDelete, onAdd }: Props) {
+  const t = useT();
   const [draft, setDraft] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
   /* Kolom isian disembunyikan sampai diminta: sebagian besar waktu orang
@@ -60,7 +62,7 @@ export function CardChecklist({ items, onToggle, onRename, onDelete, onAdd }: Pr
   return (
     <section className="flex flex-col gap-2.5">
       <div className="section-label">
-        <span>Checklist</span>
+        <span>{t.cardChecklist.sectionTitle}</span>
         {items.length > 0 && (
           <span
             className={cn("tabular-nums normal-case", complete ? "text-ok" : "text-muted")}
@@ -77,7 +79,7 @@ export function CardChecklist({ items, onToggle, onRename, onDelete, onAdd }: Pr
           aria-valuenow={percent}
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-label="Progress checklist"
+          aria-label={t.cardChecklist.progressAria}
         >
           <div className="progress-bar" data-complete={complete} style={{ width: `${percent}%` }} />
         </div>
@@ -125,7 +127,7 @@ export function CardChecklist({ items, onToggle, onRename, onDelete, onAdd }: Pr
 
             <button
               type="button"
-              aria-label={`Hapus butir ${item.text}`}
+              aria-label={t.cardChecklist.deleteItemAria(item.text)}
               onClick={() => onDelete(item)}
               className="grid size-6 shrink-0 place-items-center rounded-full text-faint opacity-0 transition-[opacity,color] group-hover:opacity-100 hover:bg-danger/10 hover:text-danger focus-visible:opacity-100"
             >
@@ -148,7 +150,7 @@ export function CardChecklist({ items, onToggle, onRename, onDelete, onAdd }: Pr
           <input
             autoFocus
             value={draft}
-            placeholder="Tulis butir baru…"
+            placeholder={t.cardChecklist.newItemPlaceholder}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Escape") {
@@ -163,10 +165,10 @@ export function CardChecklist({ items, onToggle, onRename, onDelete, onAdd }: Pr
             disabled={!draft.trim()}
             className="btn btn-primary disabled:opacity-50"
           >
-            Tambah
+            {t.common.add}
           </button>
           <button type="button" onClick={closeAdd} className="btn btn-ghost">
-            Batal
+            {t.common.cancel}
           </button>
         </form>
       ) : (
@@ -176,7 +178,7 @@ export function CardChecklist({ items, onToggle, onRename, onDelete, onAdd }: Pr
           className="btn btn-glass self-start px-3 py-1.5 text-muted hover:text-ink"
         >
           <ChecklistIcon />
-          Tambah check list
+          {t.cardChecklist.addChecklist}
         </button>
       )}
     </section>

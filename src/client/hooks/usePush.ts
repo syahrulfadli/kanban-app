@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
+import { useT } from "./useLanguage";
 import {
   currentSubscription,
   detectSupport,
@@ -19,6 +20,7 @@ import { DEFAULT_NOTIFICATION_SETTINGS, type NotificationSettings } from "../../
  * yang sudah diberikan tapi langganannya dicabut tetap berarti mati.
  */
 export function usePush() {
+  const t = useT();
   const [support] = useState<PushSupport>(detectSupport);
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [prefs, setPrefs] = useState<NotificationSettings>(DEFAULT_NOTIFICATION_SETTINGS);
@@ -55,24 +57,34 @@ export function usePush() {
         // melakukannya sekali tiap aplikasi dibuka, di semua halaman.
         setEnabled(subscription !== null);
       } catch (e) {
-        if (alive.current) setError(e instanceof Error ? e.message : "Gagal memuat pengaturan");
+        if (alive.current) setError(e instanceof Error ? e.message : t.push.loadSettingsError);
       } finally {
         if (alive.current) setLoading(false);
       }
     })();
-  }, []);
+  }, [t]);
 
   /**
-   * Kegagalan yang sudah membawa keterangannya sendiri (lihat PushSetupError)
-   * ditampilkan utuh; sisanya cukup kalimatnya.
+   * Kegagalan yang sudah membawa alasannya sendiri (lihat PushSetupError)
+   * diterjemahkan lewat kamus bahasa; sisanya cukup kalimatnya.
    */
-  const fail = useCallback((e: unknown, fallback: string) => {
-    if (!alive.current) return;
+  const fail = useCallback(
+    (e: unknown, fallback: string) => {
+      if (!alive.current) return;
 
-    setError(e instanceof Error ? e.message : fallback);
-    setErrorHints(e instanceof PushSetupError ? e.hints : []);
-    setErrorDetail(e instanceof PushSetupError ? e.detail : null);
-  }, []);
+      if (e instanceof PushSetupError) {
+        const info = t.pushErrors[e.reason];
+        setError(info.message);
+        setErrorHints(info.hints);
+        setErrorDetail(e.detail);
+      } else {
+        setError(e instanceof Error ? e.message : fallback);
+        setErrorHints([]);
+        setErrorDetail(null);
+      }
+    },
+    [t],
+  );
 
   /** Bungkus aksi yang menyentuh jaringan: satu pada satu waktu, pesan seragam. */
   const run = useCallback(
@@ -86,12 +98,12 @@ export function usePush() {
         const message = await action();
         if (alive.current) setNotice(message);
       } catch (e) {
-        fail(e, "Terjadi kesalahan");
+        fail(e, t.common.errorGeneric);
       } finally {
         if (alive.current) setBusy(false);
       }
     },
-    [fail],
+    [fail, t],
   );
 
   const enable = useCallback(async () => {
@@ -123,21 +135,21 @@ export function usePush() {
       } catch (e) {
         if (!alive.current) return;
         setPrefs(previous);
-        fail(e, "Gagal menyimpan pilihan");
+        fail(e, t.push.savePrefError);
       }
     },
-    [fail, prefs],
+    [fail, prefs, t],
   );
 
   const test = useCallback(async () => {
     await run(async () => {
       const subscription = await currentSubscription();
-      if (!subscription) throw new Error("Perangkat ini belum berlangganan");
+      if (!subscription) throw new Error(t.push.notSubscribed);
 
       await api.sendTestPush(subscription.endpoint);
-      return "Notifikasi percobaan dikirim.";
+      return t.push.testSent;
     });
-  }, [run]);
+  }, [run, t]);
 
   return {
     support,

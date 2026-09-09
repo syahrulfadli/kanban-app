@@ -13,6 +13,7 @@ import { useBackdropInk } from "../hooks/useBackdropInk";
 import { useBoard } from "../hooks/useBoard";
 import { useBoardFilter } from "../hooks/useBoardFilter";
 import { useCollapsedColumns } from "../hooks/useCollapsedColumns";
+import { useT } from "../hooks/useLanguage";
 import { playDropSound } from "../hooks/useSound";
 import { useSession } from "../lib/auth-client";
 import { navigate, paths } from "../lib/route";
@@ -44,6 +45,7 @@ function LiveIndicator({
   viewers: UserBrief[];
   meId?: string;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -55,11 +57,11 @@ function LiveIndicator({
   const label =
     status === "live"
       ? people > 1
-        ? `${people} orang di board ini`
-        : "Terhubung"
+        ? t.boardView.peopleOnBoard(people)
+        : t.boardView.connected
       : status === "connecting"
-        ? "Menyambungkan…"
-        : "Terputus — mencoba lagi";
+        ? t.boardView.connecting
+        : t.boardView.disconnected;
 
   // Orang terakhir pergi selagi daftarnya terbuka: daftarnya ikut tutup,
   // bukan menggantung berisi satu nama.
@@ -122,7 +124,7 @@ function LiveIndicator({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        aria-label={`${label} — lihat siapa saja`}
+        aria-label={t.boardView.seeWhoSuffix(label)}
         title={label}
         className="chip cursor-pointer transition-colors hover:bg-line-soft"
       >
@@ -136,14 +138,16 @@ function LiveIndicator({
            ini tidak bersarang di dalam pane ber-frost mana pun, dan kacanya
            boleh langsung mengaburkan papan di bawahnya. */
         <div className="sheet sheet-frost absolute top-full right-0 z-30 mt-2 w-56 rounded-2xl p-1.5">
-          <p className="px-2.5 py-1.5 text-xs text-muted">Sedang membuka papan ini</p>
+          <p className="px-2.5 py-1.5 text-xs text-muted">{t.boardView.viewersHeading}</p>
 
           <ul className="flex flex-col">
             {viewers.map((viewer) => (
               <li key={viewer.id} className="flex items-center gap-2 rounded-xl px-2.5 py-1.5">
                 <Avatar person={viewer} size="sm" />
                 <span className="min-w-0 flex-1 truncate text-sm">{viewer.name}</span>
-                {viewer.id === meId && <span className="shrink-0 text-xs text-faint">Anda</span>}
+                {viewer.id === meId && (
+                  <span className="shrink-0 text-xs text-faint">{t.boardView.you}</span>
+                )}
               </li>
             ))}
           </ul>
@@ -165,6 +169,7 @@ interface BoardProps {
 }
 
 export function BoardView({ boardId, openCardId }: BoardProps) {
+  const t = useT();
   const { board, loading, error, refresh, actions, live } = useBoard(boardId);
   const { data: session } = useSession();
 
@@ -400,12 +405,12 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
         <div className="glass glass-frost rounded-2xl p-6 text-center">
-          <p className="text-sm text-danger">{error ?? "Board tidak ditemukan."}</p>
+          <p className="text-sm text-danger">{error ?? t.boardView.notFound}</p>
           <button
             onClick={() => navigate(paths.workspaces)}
             className="btn btn-glass mt-4"
           >
-            ← Kembali ke daftar workspace
+            {t.boardView.backToWorkspaces}
           </button>
         </div>
       </div>
@@ -430,7 +435,7 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
           onClick={() => navigate(paths.workspace(board.workspaceId))}
           className="text-sm text-muted hover:text-ink"
         >
-          Board
+          {t.boardView.boardCrumb}
         </button>
         <span className="text-faint">/</span>
         <h1 className="min-w-0 truncate text-sm font-medium">{board.title}</h1>
@@ -512,8 +517,8 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
         {/* Gelas kosong: hanya garis, menunggu diisi. */}
         <div className="glass-column bg-white/50 dark:bg-zinc-700/70 h-fit w-72 shrink-0 border-2 border-dashed border-zinc-500/50 p-2">
           <AddItemForm
-            placeholder="Nama kolom…"
-            submitLabel="Tambah kolom"
+            placeholder={t.boardView.newColumnPlaceholder}
+            submitLabel={t.boardView.newColumnSubmit}
             onSubmit={async (title) => {
               await actions.addColumn(title);
               /* Kolom baru selalu lahir paling kanan — gulir ke sana, sama
@@ -540,21 +545,19 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
 
       {pending && (
         <ConfirmDialog
-          title={pending.kind === "card" ? "Hapus kartu?" : "Hapus kolom?"}
+          title={pending.kind === "card" ? t.boardView.deleteCardTitle : t.boardView.deleteColumnTitle}
           body={
             pending.kind === "card" ? (
-              <>
-                “{pending.title}” akan dihapus bersama checklist, label, dan followup-nya.
-              </>
+              t.boardView.deleteCardBody(pending.title)
             ) : (
               <>
                 “{pending.title}” akan dihapus
-                {pending.cards > 0 && <> bersama {pending.cards} kartu di dalamnya</>}. Kolom yang
-                terhapus tidak bisa dipulihkan setelah jendela urung tutup.
+                {pending.cards > 0 && <> {t.boardView.deleteColumnBodyWithCards(pending.cards)}</>}.{" "}
+                {t.boardView.deleteColumnBodySuffix}
               </>
             )
           }
-          confirmLabel={pending.kind === "card" ? "Hapus kartu" : "Hapus kolom"}
+          confirmLabel={pending.kind === "card" ? t.boardView.deleteCardConfirm : t.boardView.deleteColumnConfirm}
           onConfirm={confirmDelete}
           onCancel={() => setPending(null)}
         />

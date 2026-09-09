@@ -4,23 +4,19 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { MembersSkeleton } from "./Skeleton";
 import { api } from "../lib/api";
 import { useSession } from "../lib/auth-client";
+import { useLanguage, useT } from "../hooks/useLanguage";
 import { cn } from "../lib/cn";
 import type { AdminUserSummary, LoginMethod } from "../../shared/types";
 
 /** Jeda sebelum ketikan di kotak cari berangkat ke server. */
 const SEARCH_DEBOUNCE_MS = 250;
 
-const METHOD_LABEL: Record<LoginMethod, string> = {
-  credential: "Email",
-  google: "Google",
-  github: "GitHub",
-};
-
-const dateFormat = new Intl.DateTimeFormat("id-ID", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-});
+const dateFormat = (language: string) =>
+  new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 
 /**
  * Formulir kata sandi baru, muncul di dalam baris akunnya.
@@ -38,6 +34,7 @@ function PasswordForm({
   onDone: (message: string) => void;
   onError: (message: string) => void;
 }) {
+  const t = useT();
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -48,12 +45,9 @@ function PasswordForm({
     try {
       await api.resetUserPassword(person.id, value);
       setValue("");
-      onDone(
-        `Kata sandi ${person.name} diganti. Sesi lamanya diputus — perangkat ` +
-          "yang sudah masuk berhenti terlayani dalam beberapa menit.",
-      );
+      onDone(t.adminUsers.passwordChangedNotice(person.name));
     } catch (err) {
-      onError(err instanceof Error ? err.message : "Gagal mengganti kata sandi");
+      onError(err instanceof Error ? err.message : t.adminUsers.passwordChangeError);
     } finally {
       setBusy(false);
     }
@@ -62,9 +56,7 @@ function PasswordForm({
   return (
     <form onSubmit={submit} className="mt-2 border-t border-line-soft pt-2.5">
       <p className="text-xs leading-relaxed text-muted">
-        Sampaikan kata sandi ini lewat jalur lain — aplikasi belum punya layanan email.
-        Semua sesi {person.name} diputus, tapi perangkat yang sudah masuk baru berhenti
-        terlayani dalam beberapa menit: sesi disimpan sebentar di cookie-nya sendiri.
+        {t.adminUsers.passwordFormHint(person.name)}
       </p>
 
       <div className="mt-2 flex gap-2">
@@ -75,7 +67,7 @@ function PasswordForm({
           onChange={(e) => setValue(e.target.value)}
           minLength={8}
           maxLength={128}
-          placeholder="Kata sandi baru — minimal 8 huruf"
+          placeholder={t.adminUsers.newPasswordPlaceholder}
           /* Sengaja bukan `type="password"`: yang mengetik bukan pemilik
              akunnya, dan ia justru harus bisa membaca apa yang akan ia
              sampaikan. Bahaya bahu-membaca di sini lebih kecil daripada
@@ -84,7 +76,7 @@ function PasswordForm({
           className="field min-w-0 flex-1"
         />
         <button type="submit" disabled={busy} className="btn btn-primary">
-          {busy ? "Menyimpan…" : "Simpan"}
+          {busy ? t.common.saving : t.common.save}
         </button>
       </div>
     </form>
@@ -92,6 +84,13 @@ function PasswordForm({
 }
 
 export function AdminUsers() {
+  const t = useT();
+  const { language } = useLanguage();
+  const METHOD_LABEL: Record<LoginMethod, string> = {
+    credential: t.adminUsers.methodEmail,
+    google: t.adminUsers.methodGoogle,
+    github: t.adminUsers.methodGithub,
+  };
   const { data: session } = useSession();
 
   const [query, setQuery] = useState("");
@@ -135,9 +134,9 @@ export function AdminUsers() {
       setError(null);
     } catch (e) {
       if (id !== request.current) return;
-      setError(e instanceof Error ? e.message : "Gagal memuat daftar akun");
+      setError(e instanceof Error ? e.message : t.adminUsers.loadListError);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     setUsers(null);
@@ -155,7 +154,7 @@ export function AdminUsers() {
       setUsers((prev) => [...(prev ?? []), ...page.items]);
       setCursor(page.nextCursor);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Gagal memuat halaman berikutnya");
+      setError(e instanceof Error ? e.message : t.adminUsers.loadMoreError);
     }
   };
 
@@ -166,7 +165,7 @@ export function AdminUsers() {
       if (done) setNote(done);
       await load(term);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Aksi gagal");
+      setError(e instanceof Error ? e.message : t.adminUsers.actionError);
     }
   };
 
@@ -177,11 +176,11 @@ export function AdminUsers() {
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Cari nama atau email…"
+          placeholder={t.adminUsers.searchPlaceholder}
           className="field min-w-0 flex-1"
         />
-        <span className="chip shrink-0 tabular-nums" title="Seluruh akun di aplikasi">
-          {total} akun
+        <span className="chip shrink-0 tabular-nums" title={t.adminUsers.totalAccountsTitle}>
+          {t.adminUsers.accountsCount(total)}
         </span>
       </div>
 
@@ -196,7 +195,7 @@ export function AdminUsers() {
 
       {users?.length === 0 && (
         <p className="mt-4 rounded-2xl border border-dashed border-line px-4 py-6 text-center text-sm text-muted">
-          {term ? `Tidak ada akun yang cocok dengan “${term}”.` : "Belum ada akun."}
+          {term ? t.adminUsers.noMatches(term) : t.adminUsers.noAccounts}
         </p>
       )}
 
@@ -218,7 +217,7 @@ export function AdminUsers() {
 
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">
-                    {person.name} {isSelf && <span className="text-faint">(Anda)</span>}
+                    {person.name} {isSelf && <span className="text-faint">{t.membersPage.you}</span>}
                   </p>
                   <p className="truncate text-xs text-muted">{person.email}</p>
 
@@ -228,11 +227,11 @@ export function AdminUsers() {
                         className={cn("chip text-[11px]", person.fromEnv && "text-accent-ink")}
                         title={
                           person.fromEnv
-                            ? "Admin lewat ADMIN_EMAILS di konfigurasi server"
-                            : "Diangkat lewat panel ini"
+                            ? t.adminUsers.adminFromEnvTitle
+                            : t.adminUsers.adminFromPanelTitle
                         }
                       >
-                        {person.fromEnv ? "Admin (konfigurasi)" : "Admin"}
+                        {person.fromEnv ? t.adminUsers.adminConfigLabel : t.adminUsers.adminLabel}
                       </span>
                     )}
 
@@ -243,11 +242,11 @@ export function AdminUsers() {
                     )}
 
                     <span className="chip text-[11px] tabular-nums">
-                      {person.workspaces} workspace
+                      {t.adminUsers.workspacesCount(person.workspaces)}
                     </span>
 
                     <span className="text-[11px] text-faint">
-                      Bergabung {dateFormat.format(new Date(person.createdAt))}
+                      {t.adminUsers.joinedLabel(dateFormat(language).format(new Date(person.createdAt)))}
                     </span>
                   </p>
                 </div>
@@ -269,13 +268,13 @@ export function AdminUsers() {
                       void act(
                         () => api.setUserAdmin(person.id, !person.admin),
                         person.admin
-                          ? `${person.name} bukan admin lagi`
-                          : `${person.name} sekarang admin aplikasi`,
+                          ? t.adminUsers.demotedNotice(person.name)
+                          : t.adminUsers.promotedNotice(person.name),
                       );
                     }}
                     className="btn btn-ghost px-2.5 py-1 text-xs"
                   >
-                    {person.admin ? "Cabut admin" : "Jadikan admin"}
+                    {person.admin ? t.adminUsers.revokeAdmin : t.adminUsers.makeAdmin}
                   </button>
                 )}
 
@@ -284,7 +283,7 @@ export function AdminUsers() {
                     onClick={() => setResetting(resetting === person.id ? null : person.id)}
                     className="btn btn-ghost px-2.5 py-1 text-xs"
                   >
-                    {resetting === person.id ? "Tutup" : "Ganti kata sandi"}
+                    {resetting === person.id ? t.common.close : t.adminUsers.changePassword}
                   </button>
                 )}
 
@@ -293,7 +292,7 @@ export function AdminUsers() {
                     onClick={() => setPending(person)}
                     className="btn btn-ghost px-2.5 py-1 text-xs hover:bg-danger/10 hover:text-danger"
                   >
-                    Hapus akun
+                    {t.adminUsers.deleteAccount}
                   </button>
                 )}
               </div>
@@ -316,25 +315,19 @@ export function AdminUsers() {
 
       {cursor && (
         <button onClick={() => void more()} className="btn btn-glass mt-3 w-full">
-          Muat lebih banyak
+          {t.common.loadMore}
         </button>
       )}
 
       {leaving && session && (
         <ConfirmDialog
-          title="Cabut status admin Anda sendiri?"
-          body={
-            <>
-              Halaman ini akan langsung tertutup untuk Anda. Yang bisa
-              mengembalikannya hanya admin lain — atau email Anda dimasukkan ke
-              ADMIN_EMAILS di konfigurasi server.
-            </>
-          }
-          confirmLabel="Cabut status admin saya"
+          title={t.adminUsers.revokeSelfTitle}
+          body={t.adminUsers.revokeSelfBody}
+          confirmLabel={t.adminUsers.revokeSelfConfirm}
           onConfirm={() => {
             void act(
               () => api.setUserAdmin(session.user.id, false),
-              "Status admin Anda dicabut",
+              t.adminUsers.revokeSelfNotice,
             );
             setLeaving(false);
           }}
@@ -344,18 +337,11 @@ export function AdminUsers() {
 
       {pending && (
         <ConfirmDialog
-          title="Hapus akun ini?"
-          body={
-            <>
-              Akun {pending.name} ({pending.email}) akan dihapus beserta sesi, foto profil,
-              dan kotak masuknya. Workspace yang hanya beranggotakan dia ikut terhapus;
-              kartu dan followup yang pernah ia tulis tetap tinggal tanpa nama. Ini tidak
-              bisa diurungkan.
-            </>
-          }
-          confirmLabel="Hapus akun"
+          title={t.adminUsers.deleteAccountTitle}
+          body={t.adminUsers.deleteAccountBody(pending.name, pending.email)}
+          confirmLabel={t.adminUsers.deleteAccountConfirm}
           onConfirm={() => {
-            void act(() => api.deleteUser(pending.id), `Akun ${pending.name} dihapus`);
+            void act(() => api.deleteUser(pending.id), t.adminUsers.deletedNotice(pending.name));
             setPending(null);
           }}
           onCancel={() => setPending(null)}

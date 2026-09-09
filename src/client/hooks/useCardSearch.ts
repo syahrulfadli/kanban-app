@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { useT } from "./useLanguage";
 import { MIN_QUERY_LENGTH } from "../../shared/search";
 import type { CardSearchHit } from "../../shared/types";
 
@@ -18,6 +19,7 @@ const DEBOUNCE_MS = 220;
  * yang terakhir diketik, bukan atas ketikan yang sudah dihapus.
  */
 export function useCardSearch(query: string) {
+  const t = useT();
   const [hits, setHits] = useState<CardSearchHit[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +52,7 @@ export function useCardSearch(query: string) {
         .catch((e: unknown) => {
           if (!alive) return;
           setHits([]);
-          setError(e instanceof Error ? e.message : "Pencarian gagal");
+          setError(e instanceof Error ? e.message : t.cardSearch.searchError);
         })
         .finally(() => {
           if (alive) setLoading(false);
@@ -61,7 +63,7 @@ export function useCardSearch(query: string) {
       alive = false;
       clearTimeout(timer);
     };
-  }, [term, ready]);
+  }, [term, ready, t]);
 
   return { hits, loading, error, ready, term };
 }

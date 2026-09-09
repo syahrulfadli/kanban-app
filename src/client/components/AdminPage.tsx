@@ -3,13 +3,9 @@ import { AdminUsers } from "./AdminUsers";
 import { AppHeader } from "./AppHeader";
 import { ListSkeleton } from "./Skeleton";
 import { useAdminAccess } from "../hooks/useAdminAccess";
+import { useT } from "../hooks/useLanguage";
 import { cn } from "../lib/cn";
 import { navigate, paths, type AdminTab } from "../lib/route";
-
-const TABS: { tab: AdminTab; label: string; path: string }[] = [
-  { tab: "backgrounds", label: "Latar papan", path: paths.admin },
-  { tab: "users", label: "Pengguna", path: paths.adminUsers },
-];
 
 /**
  * Panel admin aplikasi.
@@ -23,32 +19,36 @@ const TABS: { tab: AdminTab; label: string; path: string }[] = [
  * ke alamat ini melihat kalimat, bukan deretan galat.
  */
 export function AdminPage({ tab }: { tab: AdminTab }) {
+  const t = useT();
   const { admin, checked } = useAdminAccess();
+
+  const TABS: { tab: AdminTab; label: string; path: string }[] = [
+    { tab: "backgrounds", label: t.adminPage.tabBackgrounds, path: paths.admin },
+    { tab: "users", label: t.adminPage.tabUsers, path: paths.adminUsers },
+  ];
 
   return (
     <>
       <AppHeader>
         <span className="text-faint">/</span>
-        <span className="truncate text-sm font-medium">Admin</span>
+        <span className="truncate text-sm font-medium">{t.adminPage.crumb}</span>
       </AppHeader>
 
       <div className="mx-auto w-full max-w-2xl px-5 pb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Panel admin</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{t.adminPage.title}</h1>
 
         {/* Selagi jawabannya belum datang, yang tampil kerangka daftar —
             bukan kalimat penolakan. Menolak dulu lalu berubah pikiran
             sepersekian detik kemudian adalah tuduhan yang ditarik kembali. */}
         {!checked ? (
           <div className="mt-6">
-            <ListSkeleton rows={3} label="Memeriksa akses admin" />
+            <ListSkeleton rows={3} label={t.adminPage.checkingAccess} />
           </div>
         ) : !admin ? (
           <Denied />
         ) : (
           <>
-            <p className="mt-1 text-sm leading-relaxed text-muted">
-              Yang diurus di sini berlaku untuk seluruh aplikasi, bukan untuk satu workspace.
-            </p>
+            <p className="mt-1 text-sm leading-relaxed text-muted">{t.adminPage.scopeHint}</p>
 
             {/* Kapsul dua tab. Bukan bilah bertepi: halaman ini bagian dari
                 aplikasi yang sama, dan garis pemisah di bawah tab membelah
@@ -83,11 +83,12 @@ export function AdminPage({ tab }: { tab: AdminTab }) {
    — bagi yang tersesat ke sini, deskripsi fitur yang tidak bisa ia buka cuma
    membuat halaman ini terasa seperti pintu yang dikunci di depan mukanya. */
 function Denied() {
+  const t = useT();
   return (
     <div className="mt-6 rounded-2xl border border-dashed border-line px-5 py-8 text-center">
-      <p className="text-sm text-muted">Halaman ini hanya untuk admin aplikasi.</p>
+      <p className="text-sm text-muted">{t.adminPage.deniedMessage}</p>
       <button onClick={() => navigate(paths.workspaces)} className="btn btn-glass mt-4">
-        ← Kembali ke daftar workspace
+        {t.boardView.backToWorkspaces}
       </button>
     </div>
   );

@@ -1,6 +1,7 @@
 import { useRef, useState, type RefObject } from "react";
 import { ColorSwatches } from "./ColorSwatches";
 import { useDismiss } from "../hooks/useDismiss";
+import { useT } from "../hooks/useLanguage";
 import { cn } from "../lib/cn";
 import { labelTint } from "../lib/people";
 import type { LabelColor } from "../../shared/types";
@@ -45,6 +46,7 @@ export function NameColorPopover({
   onClose,
   anchorRef,
 }: Props) {
+  const t = useT();
   const [draft, setDraft] = useState(name);
   const [tint, setTint] = useState<LabelColor | null>(color);
   const ref = useRef<HTMLDivElement>(null);
@@ -65,13 +67,15 @@ export function NameColorPopover({
     <div
       ref={ref}
       role="dialog"
-      aria-label={`Ubah ${subject}`}
+      aria-label={t.nameColorPopover.editAria(subject)}
       /* Berlabuh ke kanan barisnya — tombol pemicunya duduk di ujung kanan,
          dan panel yang tumbuh ke kiri dari situ tidak akan terpotong tepi
          layar di lebar mana pun. */
       className="sheet absolute top-full right-0 z-30 mt-1.5 w-64 rounded-2xl p-3 text-left"
     >
-      <label className="block text-xs font-semibold tracking-tight">Nama {subject}</label>
+      <label className="block text-xs font-semibold tracking-tight">
+        {t.nameColorPopover.nameLabel(subject)}
+      </label>
       <input
         autoFocus
         value={draft}
@@ -105,16 +109,16 @@ export function NameColorPopover({
           className={cn("label-dot size-3", tint === null && "label-dot-none")}
           style={tint ? labelTint(tint) : undefined}
         />
-        Warna penanda
+        {t.nameColorPopover.markerColor}
       </p>
       <ColorSwatches clearable value={tint} onChange={setTint} />
 
       <div className="mt-3 flex items-center gap-1.5">
         <button type="button" onClick={commit} disabled={!draft.trim()} className="btn btn-primary">
-          Simpan
+          {t.common.save}
         </button>
         <button type="button" onClick={onClose} className="btn btn-ghost">
-          Batal
+          {t.common.cancel}
         </button>
       </div>
     </div>

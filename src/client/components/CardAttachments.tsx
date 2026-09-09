@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { isAttachmentImage, MAX_ATTACHMENT_BASE64 } from "../../shared/types";
 import type { CardAttachmentDetail } from "../../shared/types";
+import { useT } from "../hooks/useLanguage";
 import { ATTACHMENT_ACCEPT } from "../lib/attachment";
 import { cn } from "../lib/cn";
 import { Lightbox } from "./Lightbox";
@@ -40,6 +41,7 @@ function AttachmentRow({
   onOpen: () => void;
   onDelete: () => void;
 }) {
+  const t = useT();
   const image = isAttachmentImage(attachment.mime);
 
   const thumb = image ? (
@@ -78,7 +80,7 @@ function AttachmentRow({
 
       <button
         type="button"
-        aria-label={`Hapus lampiran ${attachment.filename}`}
+        aria-label={t.cardAttachments.deleteAttachmentAria(attachment.filename)}
         onClick={onDelete}
         className="grid size-6 shrink-0 place-items-center rounded-full text-faint opacity-0 transition-[opacity,color] group-hover:opacity-100 hover:bg-danger/10 hover:text-danger focus-visible:opacity-100"
       >
@@ -91,13 +93,14 @@ function AttachmentRow({
 }
 
 export function CardAttachments({ attachments, uploading, onAdd, onDelete }: Props) {
+  const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<CardAttachmentDetail | null>(null);
 
   return (
     <section className="flex flex-col gap-2.5">
       <div className="section-label">
-        <span>Lampiran</span>
+        <span>{t.cardAttachments.sectionTitle}</span>
         {attachments.length > 0 && (
           <span className="tabular-nums normal-case text-muted">{attachments.length}</span>
         )}
@@ -124,10 +127,10 @@ export function CardAttachments({ attachments, uploading, onAdd, onDelete }: Pro
           className={cn("btn btn-glass self-start px-3 py-1.5 text-muted hover:text-ink", uploading && "opacity-50")}
         >
           <AttachmentIcon />
-          {uploading ? "Memproses…" : "Tambah lampiran"}
+          {uploading ? t.common.processing : t.cardAttachments.addAttachment}
         </button>
         <span className="text-xs text-faint">
-          maks {Math.round(MAX_ATTACHMENT_BASE64 / 1000)} KB per berkas
+          {t.cardAttachments.maxSize(Math.round(MAX_ATTACHMENT_BASE64 / 1000))}
         </span>
       </div>
 

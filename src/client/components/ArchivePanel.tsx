@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { useLanguage, useT } from "../hooks/useLanguage";
 import { api } from "../lib/api";
 import { formatDateTime, formatRelative } from "../lib/format";
 import { navigate, paths } from "../lib/route";
@@ -36,6 +37,8 @@ interface Props {
  * baris ini sebagai aksi cepat tanpa perlu membuka kartunya dulu.
  */
 export function ArchivePanel({ boardId, count, onChanged }: Props) {
+  const t = useT();
+  const { language } = useLanguage();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<ArchivedCard[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +56,7 @@ export function ArchivePanel({ boardId, count, onChanged }: Props) {
         const rows = await api.listArchivedCards(boardId);
         if (alive) setItems(rows);
       } catch (e) {
-        if (alive) setError(e instanceof Error ? e.message : "Gagal memuat arsip");
+        if (alive) setError(e instanceof Error ? e.message : t.archivePanel.loadError);
       }
     })();
 
@@ -79,7 +82,7 @@ export function ArchivePanel({ boardId, count, onChanged }: Props) {
       await api.restoreCard(id);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Gagal memulihkan kartu");
+      setError(e instanceof Error ? e.message : t.archivePanel.restoreError);
     } finally {
       onChanged();
     }
@@ -95,13 +98,14 @@ export function ArchivePanel({ boardId, count, onChanged }: Props) {
       await api.deleteCard(id);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Gagal menghapus kartu");
+      setError(e instanceof Error ? e.message : t.archivePanel.deleteError);
     } finally {
       onChanged();
     }
   };
 
-  const pendingTitle = items?.find((item) => item.id === pendingDeleteId)?.title ?? "Kartu ini";
+  const pendingTitle =
+    items?.find((item) => item.id === pendingDeleteId)?.title ?? t.archivePanel.defaultCardName;
 
   return (
     <>
@@ -110,12 +114,12 @@ export function ArchivePanel({ boardId, count, onChanged }: Props) {
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label={count > 0 ? `Arsip, ${count} kartu` : "Arsip"}
-        title="Arsip kartu"
+        aria-label={count > 0 ? t.archivePanel.archiveAria(count) : t.archivePanel.archiveButton}
+        title={t.archivePanel.archiveTitle}
         className="chip shrink-0 cursor-pointer transition-colors hover:bg-line-soft"
       >
         <ArchiveIcon className="size-3.5" />
-        <span className="hidden sm:inline">Arsip</span>
+        <span className="hidden sm:inline">{t.archivePanel.archiveButton}</span>
         {count > 0 && (
           <span className="grid size-4 place-items-center rounded-full bg-accent text-[0.625rem] leading-none font-semibold text-accent-on tabular-nums">
             {count}
@@ -142,16 +146,16 @@ export function ArchivePanel({ boardId, count, onChanged }: Props) {
             ref={dialogRef}
             role="dialog"
             aria-modal="true"
-            aria-label="Arsip kartu"
+            aria-label={t.archivePanel.dialogLabel}
             tabIndex={-1}
             className="card-plain relative flex max-h-[min(80vh,36rem)] w-full max-w-lg flex-col overflow-hidden outline-none"
           >
             <div className="flex items-center gap-2 px-5 pt-4 pb-3">
-              <h2 className="text-base font-semibold tracking-tight">Arsip</h2>
+              <h2 className="text-base font-semibold tracking-tight">{t.archivePanel.archiveButton}</h2>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                aria-label="Tutup arsip"
+                aria-label={t.archivePanel.closeAria}
                 // `--card-plate-hi`, bukan `hover:bg-line-soft`: garis rambut
                 // 7% putihnya nyaris tak kelihatan di atas `--card-fill` yang
                 // sepekat ini — token yang sama dipakai `.btn-glass:hover` di
@@ -168,12 +172,12 @@ export function ArchivePanel({ boardId, count, onChanged }: Props) {
               {error && <p className="px-3 py-6 text-center text-sm text-danger">{error}</p>}
 
               {!error && items === null && (
-                <p className="px-3 py-6 text-center text-sm text-muted">Memuat…</p>
+                <p className="px-3 py-6 text-center text-sm text-muted">{t.archivePanel.loading}</p>
               )}
 
               {!error && items && items.length === 0 && (
                 <p className="px-3 py-10 text-center text-sm leading-relaxed text-muted">
-                  Belum ada kartu yang diarsipkan.
+                  {t.archivePanel.empty}
                 </p>
               )}
 
@@ -194,8 +198,8 @@ export function ArchivePanel({ boardId, count, onChanged }: Props) {
                     <p className="truncate text-sm font-medium text-ink">{item.title}</p>
                     <p className="mt-0.5 truncate text-xs text-muted">
                       {item.columnTitle} ·{" "}
-                      <span title={formatDateTime(item.archivedAt)}>
-                        {formatRelative(item.archivedAt)}
+                      <span title={formatDateTime(item.archivedAt, language)}>
+                        {formatRelative(item.archivedAt, language, t)}
                       </span>
                     </p>
                   </button>
@@ -213,7 +217,7 @@ export function ArchivePanel({ boardId, count, onChanged }: Props) {
                          tanpa membuat mereka menyaingi judul kartunya. */
                       className="cursor-pointer rounded-lg px-2 py-1.5 text-xs text-ink-soft transition-colors hover:bg-accent-soft hover:text-accent-ink"
                     >
-                      Pulihkan
+                      {t.archivePanel.restore}
                     </button>
                     <button
                       type="button"
@@ -223,7 +227,7 @@ export function ArchivePanel({ boardId, count, onChanged }: Props) {
                       }}
                       className="cursor-pointer rounded-lg px-2 py-1.5 text-xs text-ink-soft transition-colors hover:bg-danger/10 hover:text-danger"
                     >
-                      Hapus permanen
+                      {t.archivePanel.deletePermanent}
                     </button>
                   </div>
                 </div>
@@ -235,9 +239,9 @@ export function ArchivePanel({ boardId, count, onChanged }: Props) {
 
       {pendingDeleteId && (
         <ConfirmDialog
-          title="Hapus kartu secara permanen?"
-          body={`"${pendingTitle}" akan hilang selamanya — beda dari arsip, ini tidak bisa dipulihkan lagi.`}
-          confirmLabel="Hapus permanen"
+          title={t.archivePanel.confirmDeleteTitle}
+          body={t.archivePanel.confirmDeleteBody(pendingTitle)}
+          confirmLabel={t.archivePanel.deletePermanent}
           onConfirm={() => void confirmDeletePermanent()}
           onCancel={() => setPendingDeleteId(null)}
         />

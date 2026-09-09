@@ -1,4 +1,6 @@
 import { AvatarStack } from "./Avatar";
+import { useT } from "../hooks/useLanguage";
+import type { Translations } from "../i18n/id";
 import { cn } from "../lib/cn";
 import { labelTint } from "../lib/people";
 import { navigate, paths } from "../lib/route";
@@ -145,47 +147,53 @@ interface PreviewCard {
   comments?: number;
 }
 
-const PREVIEW: { title: string; cards: PreviewCard[] }[] = [
-  {
-    title: "Rencana",
-    cards: [
-      {
-        text: "Susun materi rapat",
-        labels: [{ name: "Riset", color: "sky" }],
-        people: [person("Rina")],
-      },
-      {
-        text: "Kumpulkan umpan balik",
-        labels: [
-          { name: "Riset", color: "violet" },
-          { name: "Nanti", color: "slate" },
-        ],
-        comments: 3,
-      },
-    ],
-  },
-  {
-    title: "Dikerjakan",
-    cards: [
-      {
-        text: "Rapikan halaman depan",
-        labels: [{ name: "Desain", color: "amber" }],
-        people: [person("Adi"), person("Sari")],
-        checklist: { done: 2, total: 5 },
-      },
-    ],
-  },
-  {
-    title: "Selesai",
-    cards: [
-      {
-        text: "Rilis versi 1.0",
-        labels: [{ name: "Rilis", color: "green" }],
-        checklist: { done: 4, total: 4 },
-      },
-    ],
-  },
-];
+/* Data papan contoh datang dari kamus bahasa aktif — supaya ilustrasinya ikut
+   berganti bahasa bersama sisa halaman, bukan cuma teks di sekelilingnya. */
+function buildPreview(t: Translations): { title: string; cards: PreviewCard[] }[] {
+  const { previewColumns: col, previewCards: card, previewLabels: label } = t.landing;
+
+  return [
+    {
+      title: col.plan,
+      cards: [
+        {
+          text: card.meetingNotes,
+          labels: [{ name: label.research, color: "sky" }],
+          people: [person("Rina")],
+        },
+        {
+          text: card.gatherFeedback,
+          labels: [
+            { name: label.research, color: "violet" },
+            { name: label.later, color: "slate" },
+          ],
+          comments: 3,
+        },
+      ],
+    },
+    {
+      title: col.doing,
+      cards: [
+        {
+          text: card.homepage,
+          labels: [{ name: label.design, color: "amber" }],
+          people: [person("Adi"), person("Sari")],
+          checklist: { done: 2, total: 5 },
+        },
+      ],
+    },
+    {
+      title: col.done,
+      cards: [
+        {
+          text: card.release,
+          labels: [{ name: label.release, color: "green" }],
+          checklist: { done: 4, total: 4 },
+        },
+      ],
+    },
+  ];
+}
 
 function PreviewCard({ card }: { card: PreviewCard }) {
   const { checklist } = card;
@@ -258,10 +266,10 @@ function PreviewCard({ card }: { card: PreviewCard }) {
   );
 }
 
-function BoardPreview() {
+function BoardPreview({ columns }: { columns: { title: string; cards: PreviewCard[] }[] }) {
   return (
     <div className="mt-7 grid grid-cols-3 items-start gap-2.5" aria-hidden>
-      {PREVIEW.map((column) => (
+      {columns.map((column) => (
         <div key={column.title} className="glass-plate flex flex-col gap-2 rounded-2xl p-2">
           {/* Kepala kolom yang sama dengan di papan: nama di kiri, jumlah
               kartunya sebagai chip di kanan. */}
@@ -289,105 +297,92 @@ function BoardPreview() {
  * tidak ditawari mendaftar — ia ditawari jalan kembali ke papannya.
  */
 export function LandingPage({ signedIn = false }: { signedIn?: boolean }) {
+  const t = useT();
+  const l = t.landing;
   const daftar = () => navigate(paths.daftar);
   const masuk = () => navigate(paths.masuk);
   const buka = () => navigate(paths.workspaces);
+  const preview = buildPreview(t);
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4 sm:p-6">
       {/* ── Pembuka ── */}
       <section className="glass glass-frost rounded-3xl p-7 sm:p-10">
-        <p className="section-label">Papan kanban kolaboratif</p>
+        <p className="section-label">{l.kicker}</p>
 
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-          Lihat pekerjaan Anda bergerak.
+          {l.heroTitle}
         </h1>
 
-        <p className="mt-3 max-w-xl text-[0.9375rem] leading-relaxed text-muted">
-          Tulis tiap pekerjaan sebagai satu kartu, letakkan di kolom yang sesuai, lalu geser
-          saat kartunya maju. Semua orang di papan melihat perubahan yang sama, saat itu juga.
-        </p>
+        <p className="mt-3 max-w-xl text-[0.9375rem] leading-relaxed text-muted">{l.heroBody}</p>
 
         <div className="mt-6 flex flex-wrap items-center gap-2.5">
           {signedIn ? (
             <button type="button" onClick={buka} className="btn btn-primary px-5 py-2.5">
-              Buka workspace saya
+              {l.openMyWorkspace}
             </button>
           ) : (
             <>
               <button type="button" onClick={daftar} className="btn btn-primary px-5 py-2.5">
-                Mulai sekarang
+                {l.getStarted}
               </button>
               <button type="button" onClick={masuk} className="btn btn-glass px-5 py-2.5">
-                Sudah punya akun
+                {l.alreadyHaveAccount}
               </button>
             </>
           )}
         </div>
 
-        <BoardPreview />
+        <BoardPreview columns={preview} />
       </section>
 
       {/* ── Apa itu kanban ── */}
       <section className="glass glass-frost rounded-3xl p-7 sm:p-9">
-        <h2 className="text-xl font-semibold tracking-tight">Apa itu kanban?</h2>
+        <h2 className="text-xl font-semibold tracking-tight">{l.whatIsKanbanTitle}</h2>
 
         <p className="mt-3 max-w-xl text-[0.9375rem] leading-relaxed text-muted">
-          <span className="text-ink-soft">Kanban</span> — “papan penanda” dalam bahasa Jepang —
-          berasal dari lini produksi Toyota: sebuah kartu ikut berjalan bersama pekerjaan, supaya siapa pun bisa
-          melihat apa yang sedang dikerjakan tanpa perlu bertanya. Prinsipnya tidak berubah saat
-          papannya pindah ke layar.
+          <span className="text-ink-soft">Kanban</span> {l.whatIsKanbanBody}
         </p>
 
         <ul className="mt-6 flex flex-col gap-3">
-          <Step n={1} title="Pekerjaan dibuat terlihat">
-            Satu kartu untuk satu pekerjaan, semuanya di satu papan. Yang tidak tertulis di papan
-            tidak sedang dikerjakan.
+          <Step n={1} title={l.step1Title}>
+            {l.step1Body}
           </Step>
-          <Step n={2} title="Kolom adalah tahapnya">
-            Beri nama kolom sesuai alur kerja Anda — rencana, dikerjakan, selesai — lalu biarkan
-            kartunya bergerak dari kiri ke kanan.
+          <Step n={2} title={l.step2Title}>
+            {l.step2Body}
           </Step>
-          <Step n={3} title="Batasi yang berjalan">
-            Kolom “dikerjakan” yang menumpuk adalah tanda untuk menyelesaikan, bukan untuk
-            menambah. Menyelesaikan lebih berguna daripada memulai.
+          <Step n={3} title={l.step3Title}>
+            {l.step3Body}
           </Step>
         </ul>
       </section>
 
       {/* ── Fungsi aplikasi ── */}
       <section className="glass glass-frost rounded-3xl p-7 sm:p-9">
-        <h2 className="text-xl font-semibold tracking-tight">Yang dikerjakan aplikasi ini</h2>
+        <h2 className="text-xl font-semibold tracking-tight">{l.whatThisAppDoesTitle}</h2>
 
         <p className="mt-3 max-w-xl text-[0.9375rem] leading-relaxed text-muted">
-          Papan kanban untuk tim kecil: satu tempat bersama untuk pekerjaan, dengan kabar yang
-          menyusul ke perangkat Anda saat ada yang berubah.
+          {l.whatThisAppDoesBody}
         </p>
 
         <div className="mt-6 grid gap-2.5 sm:grid-cols-2">
-          <Feature icon={ICONS.realtime} title="Berubah di semua layar">
-            Kartu yang digeser seseorang langsung pindah di layar rekan-rekannya. Tidak ada
-            tombol segarkan.
+          <Feature icon={ICONS.realtime} title={l.featureRealtimeTitle}>
+            {l.featureRealtimeBody}
           </Feature>
-          <Feature icon={ICONS.card} title="Kartu yang cukup dalam">
-            Label berwarna, checklist dengan progres, thread followup, dan jejak siapa membuat
-            serta mengubahnya.
+          <Feature icon={ICONS.card} title={l.featureCardTitle}>
+            {l.featureCardBody}
           </Feature>
-          <Feature icon={ICONS.bell} title="Kabar yang menyusul">
-            Peserta sebuah kartu dikabari lewat notifikasi meski aplikasinya tertutup. Kabar yang
-            sama menumpuk di kotak masuk di dalam aplikasi.
+          <Feature icon={ICONS.bell} title={l.featureBellTitle}>
+            {l.featureBellBody}
           </Feature>
-          <Feature icon={ICONS.people} title="Workspace dan anggota">
-            Kelompokkan papan per workspace, undang rekan lewat tautan, dan atur siapa boleh
-            mengubah apa.
+          <Feature icon={ICONS.people} title={l.featurePeopleTitle}>
+            {l.featurePeopleBody}
           </Feature>
-          <Feature icon={ICONS.install} title="Bisa dipasang">
-            Pasang sebagai aplikasi di ponsel atau komputer, lengkap dengan ikon sendiri dan
-            tema terang/gelap.
+          <Feature icon={ICONS.install} title={l.featureInstallTitle}>
+            {l.featureInstallBody}
           </Feature>
-          <Feature icon={ICONS.free} title="Gratis, sungguhan">
-            Berjalan penuh di free tier Cloudflare — tidak ada server yang perlu dibayari, tidak
-            ada masa coba yang habis.
+          <Feature icon={ICONS.free} title={l.featureFreeTitle}>
+            {l.featureFreeBody}
           </Feature>
         </div>
       </section>
@@ -396,12 +391,10 @@ export function LandingPage({ signedIn = false }: { signedIn?: boolean }) {
       <section className="glass glass-frost flex flex-col items-start gap-4 rounded-3xl p-7 sm:flex-row sm:items-center sm:justify-between sm:p-9">
         <div>
           <h2 className="text-lg font-semibold tracking-tight">
-            {signedIn ? "Kembali ke papan Anda" : "Buat papan pertama Anda"}
+            {signedIn ? l.closingSignedInTitle : l.closingSignedOutTitle}
           </h2>
           <p className="mt-1 text-sm text-muted">
-            {signedIn
-              ? "Halaman ini tetap di tempatnya — buka lagi kapan pun ada yang perlu dibaca ulang."
-              : "Cukup email dan kata sandi — papan kosong siap dalam satu menit."}
+            {signedIn ? l.closingSignedInBody : l.closingSignedOutBody}
           </p>
         </div>
 
@@ -410,7 +403,7 @@ export function LandingPage({ signedIn = false }: { signedIn?: boolean }) {
           onClick={signedIn ? buka : daftar}
           className="btn btn-primary shrink-0 px-5 py-2.5"
         >
-          {signedIn ? "Buka workspace" : "Mulai sekarang"}
+          {signedIn ? l.openWorkspace : l.getStarted}
         </button>
       </section>
     </div>

@@ -14,10 +14,12 @@ import { CardDetailSkeleton, SkeletonLine } from "./Skeleton";
 import { PencilIcon, TrashIcon } from "./icons";
 import { useDismiss } from "../hooks/useDismiss";
 import { useStoredFlag } from "../hooks/useStoredFlag";
+import { useLanguage, useT } from "../hooks/useLanguage";
 import { useOpenProfile } from "./ProfilePopover";
 import { api, ApiError } from "../lib/api";
 import { optimisticActivity, type ActivityNote } from "../lib/activity";
 import { prepareAttachment } from "../lib/attachment";
+import { MediaError } from "../lib/imageCodec";
 import { cn } from "../lib/cn";
 import { formatDateTime, formatRelative } from "../lib/format";
 import type { ChannelStatus } from "../lib/realtime";
@@ -186,12 +188,19 @@ interface Props {
 
 /** Baris jejak waktu: "Dibuat oleh Rina · 2 Sep 2026, 17.40". */
 function Trace({ verb, who, at }: { verb: string; who: UserBrief | null; at: Date | string }) {
+  const t = useT();
+  const { language } = useLanguage();
   return (
     <p className="text-[0.6875rem] text-faint">
       {verb}
-      {who && <> oleh <span className="font-medium text-muted">{who.name}</span></>}
+      {who && (
+        <>
+          {" "}
+          {t.common.by} <span className="font-medium text-muted">{who.name}</span>
+        </>
+      )}
       {" · "}
-      <span title={formatDateTime(at)}>{formatRelative(at)}</span>
+      <span title={formatDateTime(at, language)}>{formatRelative(at, language, t)}</span>
     </p>
   );
 }
@@ -208,6 +217,8 @@ export function CardModal({
   onDelete,
   onNotFound,
 }: Props) {
+  const t = useT();
+  const { language } = useLanguage();
   const [detail, setDetail] = useState<CardDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -263,7 +274,7 @@ export function CardModal({
       await navigator.clipboard.writeText(shareUrl);
       setLinkCopied(true);
     } catch {
-      setError("Tautan gagal disalin — salin saja dari bilah alamat");
+      setError(t.cardModal.linkCopyError);
     }
   };
 
@@ -297,9 +308,9 @@ export function CardModal({
         onNotFoundRef.current();
         return;
       }
-      setError(e instanceof Error ? e.message : "Gagal memuat kartu");
+      setError(e instanceof Error ? e.message : t.cardModal.loadError);
     }
-  }, [cardId]);
+  }, [cardId, t]);
 
   useEffect(() => {
     void load();
@@ -326,7 +337,7 @@ export function CardModal({
       await api.watchCard(cardId, watching);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Perubahan gagal disimpan");
+      setError(e instanceof Error ? e.message : t.cardModal.saveError);
       await load();
     } finally {
       // Muka kartu di papan punya matanya sendiri untuk digambar ulang.
@@ -376,13 +387,13 @@ export function CardModal({
         await commit();
         setError(null);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Perubahan gagal disimpan");
+        setError(e instanceof Error ? e.message : t.cardModal.saveError);
         await load();
       } finally {
         onBoardChange();
       }
     },
-    [cardId, currentUser, load, onBoardChange],
+    [cardId, currentUser, load, onBoardChange, t],
   );
 
   /**
@@ -429,12 +440,12 @@ export function CardModal({
         // optimistik di atas, jadi tidak ada yang perlu dipulihkan lewat
         // `load()` — memanggilnya di sini hanya akan langsung menghapus
         // pesan error ini lewat `setError(null)`-nya sendiri begitu berhasil.
-        setError(e instanceof Error ? e.message : "Perubahan gagal disimpan");
+        setError(e instanceof Error ? e.message : t.cardModal.saveError);
       } finally {
         onBoardChange();
       }
     },
-    [cardId, currentUser, onBoardChange],
+    [cardId, currentUser, onBoardChange, t],
   );
 
   const commitTitle = (value: string) => {
@@ -544,7 +555,9 @@ export function CardModal({
     setUploadingAttachment(true);
     void insert(
       async () => {
-        const upload = await prepareAttachment(file);
+        const upload = await prepareAttachment(file).catch((e: unknown) => {
+          throw e instanceof MediaError ? new Error(t.mediaErrors[e.reason]) : e;
+        });
         return api.uploadAttachment(cardId, upload);
       },
       (card, attachment) => ({ ...card, attachments: [...card.attachments, attachment] }),
@@ -661,7 +674,7 @@ export function CardModal({
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label={detail ? `Kartu ${detail.title}` : "Memuat kartu"}
+        aria-label={detail ? t.cardModal.cardAria(detail.title) : t.cardModal.loadingAria}
         tabIndex={-1}
         onKeyDown={(e) => {
           if (e.key === "Escape") onClose();
@@ -687,10 +700,10 @@ export function CardModal({
               {detail?.archivedAt && (
                 <span
                   className="chip text-muted"
-                  title={formatDateTime(detail.archivedAt)}
+                  title={formatDateTime(detail.archivedAt, language)}
                 >
                   <ArchiveBoxIcon className="size-3" />
-                  Diarsipkan · {formatRelative(detail.archivedAt)}
+                  {t.cardModal.archivedLabel} · {formatRelative(detail.archivedAt, language, t)}
                 </span>
               )}
             </div>
@@ -716,7 +729,7 @@ export function CardModal({
             ) : (
               <h2
                 onClick={() => detail && setEditingTitle(true)}
-                title="Klik untuk mengubah judul"
+                title={t.cardModal.editTitleHint}
                 className="cursor-text text-base leading-snug font-semibold wrap-break-word whitespace-pre-wrap"
               >
                 {detail?.title ?? <SkeletonLine className="my-2 w-56" />}
@@ -730,8 +743,8 @@ export function CardModal({
             type="button"
             onClick={toggleFollowup}
             aria-pressed={!followupHidden}
-            aria-label={followupHidden ? "Tampilkan panel followup" : "Sembunyikan panel followup"}
-            title={followupHidden ? "Tampilkan followup" : "Sembunyikan followup"}
+            aria-label={followupHidden ? t.cardModal.showFollowupAria : t.cardModal.hideFollowupAria}
+            title={followupHidden ? t.cardModal.showFollowupTitle : t.cardModal.hideFollowupTitle}
             className="grid size-8 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-(--card-plate-hi) hover:text-ink"
           >
             <svg viewBox="0 -960 960 960" className="size-5" fill="currentColor" aria-hidden>
@@ -761,8 +774,8 @@ export function CardModal({
                 type="button"
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
-                aria-label="Menu kartu"
-                title="Menu kartu"
+                aria-label={t.cardModal.cardMenuLabel}
+                title={t.cardModal.cardMenuLabel}
                 onClick={() => setMenuOpen((v) => !v)}
                 className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-full text-muted transition-colors hover:bg-(--card-plate-hi) hover:text-ink"
               >
@@ -775,7 +788,7 @@ export function CardModal({
                   <div
                     ref={menuPanelRef}
                     role="menu"
-                    aria-label="Menu kartu"
+                    aria-label={t.cardModal.cardMenuLabel}
                     style={
                       menuAnchor.mode === "end"
                         ? { right: menuAnchor.right, top: menuAnchor.top }
@@ -785,7 +798,7 @@ export function CardModal({
                   >
                     <MenuItem
                       icon={<EyeIcon watching={detail.watching} className="size-4 shrink-0" />}
-                      label={detail.watching ? "Berhenti mengawasi" : "Awasi kartu ini"}
+                      label={detail.watching ? t.cardModal.watchStop : t.cardModal.watchStart}
                       onClick={() => {
                         void setWatching(!detail.watching);
                         setMenuOpen(false);
@@ -800,7 +813,7 @@ export function CardModal({
                           <LinkIcon className="size-4 shrink-0" />
                         )
                       }
-                      label={linkCopied ? "Tautan disalin" : "Salin tautan kartu"}
+                      label={linkCopied ? t.cardModal.linkCopiedLabel : t.cardModal.copyLinkLabel}
                       onClick={() => void copyLink()}
                     />
 
@@ -819,9 +832,9 @@ export function CardModal({
                         Pulihkan dulu, lalu pindahkan seperti kartu biasa. */}
                     <MenuItem
                       icon={<MoveOutIcon className="size-4 shrink-0" />}
-                      label="Pindahkan ke papan lain…"
+                      label={t.cardModal.moveToOtherBoard}
                       disabled={detail.archivedAt !== null}
-                      hint="Pulihkan dulu dari arsip"
+                      hint={t.cardModal.moveDisabledHint}
                       onClick={() => {
                         setMenuOpen(false);
                         onMove();
@@ -841,7 +854,7 @@ export function CardModal({
                           <ArchiveBoxIcon className="size-4 shrink-0" />
                         )
                       }
-                      label={detail.archivedAt ? "Pulihkan dari arsip" : "Arsipkan"}
+                      label={detail.archivedAt ? t.cardModal.restoreLabel : t.cardModal.archiveLabel}
                       onClick={() => {
                         setMenuOpen(false);
                         void setArchived(!detail.archivedAt);
@@ -852,7 +865,7 @@ export function CardModal({
 
                     <MenuItem
                       icon={<TrashIcon className="size-4 shrink-0" />}
-                      label="Hapus kartu"
+                      label={t.cardModal.deleteCardLabel}
                       danger
                       onClick={() => {
                         setMenuOpen(false);
@@ -868,7 +881,7 @@ export function CardModal({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Tutup kartu"
+            aria-label={t.cardModal.closeCardAria}
             className="grid size-8 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-(--card-plate-hi) hover:text-ink"
           >
             <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
@@ -924,7 +937,7 @@ export function CardModal({
 
                 <section className="flex flex-col gap-2">
                   <div className="flex items-center gap-1.5">
-                    <span className="section-label">Deskripsi</span>
+                    <span className="section-label">{t.cardModal.descriptionLabel}</span>
 
                     {!editingDescription && (
                       <button
@@ -933,7 +946,7 @@ export function CardModal({
                         className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.6875rem] font-semibold text-faint transition-colors hover:bg-(--card-plate-hi) hover:text-ink"
                       >
                         <PencilIcon className="size-3" />
-                        Edit
+                        {t.common.edit}
                       </button>
                     )}
                   </div>
@@ -943,7 +956,7 @@ export function CardModal({
                       autoFocus
                       rows={4}
                       value={detail.description ?? ""}
-                      placeholder="Jelaskan kartu ini… (Mendukung format Markdown)"
+                      placeholder={t.cardModal.descriptionPlaceholder}
                       allowEmpty
                       status={networkStatus}
                       onSave={commitDescription}
@@ -957,7 +970,7 @@ export function CardModal({
                       onClick={() => setEditingDescription(true)}
                       className="rounded-lg text-left text-sm text-faint transition-colors hover:text-ink"
                     >
-                      Klik untuk menambah deskripsi…
+                      {t.cardModal.addDescriptionPrompt}
                     </button>
                   )}
                 </section>
@@ -1006,11 +1019,11 @@ export function CardModal({
               />
 
               <div className="ml-auto text-right">
-                <Trace verb="Dibuat" who={detail.createdByUser} at={detail.createdAt} />
+                <Trace verb={t.common.createdVerb} who={detail.createdByUser} at={detail.createdAt} />
                 {new Date(detail.updatedAt).getTime() -
                   new Date(detail.createdAt).getTime() >
                   1000 && (
-                  <Trace verb="Diubah" who={detail.updatedByUser} at={detail.updatedAt} />
+                  <Trace verb={t.common.editedVerb} who={detail.updatedByUser} at={detail.updatedAt} />
                 )}
               </div>
             </footer>

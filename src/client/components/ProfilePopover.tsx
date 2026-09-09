@@ -12,6 +12,7 @@ import { Avatar } from "./Avatar";
 import { Lightbox } from "./Lightbox";
 import { Skeleton } from "./Skeleton";
 import { useDismiss } from "../hooks/useDismiss";
+import { useT } from "../hooks/useLanguage";
 import { api } from "../lib/api";
 import { AVATAR_SIZE } from "../../shared/types";
 import type { MemberStats, UserBrief } from "../../shared/types";
@@ -71,6 +72,7 @@ interface State {
  * discroll).
  */
 export function ProfilePopoverProvider({ children }: { children: ReactNode }) {
+  const t = useT();
   const [state, setState] = useState<State | null>(null);
   const [position, setPosition] = useState<Position | null>(null);
   const [stats, setStats] = useState<MemberStats | null>(null);
@@ -136,7 +138,7 @@ export function ProfilePopoverProvider({ children }: { children: ReactNode }) {
         const rows = await api.getMemberStats(state.workspaceId, state.person.id);
         if (alive) setStats(rows);
       } catch (e) {
-        if (alive) setError(e instanceof Error ? e.message : "Gagal memuat statistik");
+        if (alive) setError(e instanceof Error ? e.message : t.profilePopover.loadStatsError);
       }
     })();
 
@@ -155,7 +157,7 @@ export function ProfilePopoverProvider({ children }: { children: ReactNode }) {
             ref={panelRef}
             tabIndex={-1}
             role="dialog"
-            aria-label={`Profil ${state.person.name}`}
+            aria-label={t.profilePopover.profileAria(state.person.name)}
             style={{
               top: position?.top ?? 0,
               left: position?.left ?? -9999,
@@ -168,7 +170,7 @@ export function ProfilePopoverProvider({ children }: { children: ReactNode }) {
               {state.person.image ? (
                 <button
                   type="button"
-                  aria-label={`Lihat foto profil ${state.person.name} ukuran penuh`}
+                  aria-label={t.profilePopover.viewFullPhotoAria(state.person.name)}
                   onClick={() => setShowPhoto(true)}
                   className="shrink-0 rounded-full transition-opacity hover:opacity-80"
                 >
@@ -193,7 +195,7 @@ export function ProfilePopoverProvider({ children }: { children: ReactNode }) {
                   ) : (
                     <Skeleton className="mx-auto h-7 w-10" />
                   )}
-                  <p className="mt-0.5 text-xs text-muted">followup</p>
+                  <p className="mt-0.5 text-xs text-muted">{t.profileMenu.comments}</p>
                 </div>
                 <div>
                   {stats ? (
@@ -201,7 +203,7 @@ export function ProfilePopoverProvider({ children }: { children: ReactNode }) {
                   ) : (
                     <Skeleton className="mx-auto h-7 w-10" />
                   )}
-                  <p className="mt-0.5 text-xs text-muted">kartu dibuat</p>
+                  <p className="mt-0.5 text-xs text-muted">{t.profileMenu.cardsCreated}</p>
                 </div>
               </div>
             )}
@@ -213,7 +215,7 @@ export function ProfilePopoverProvider({ children }: { children: ReactNode }) {
         showPhoto &&
         createPortal(
           <Lightbox
-            label={`Foto profil ${state.person.name}`}
+            label={t.profilePopover.photoLabel(state.person.name)}
             onClose={() => setShowPhoto(false)}
           >
             <img

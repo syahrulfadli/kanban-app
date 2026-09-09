@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
+import { useT } from "./useLanguage";
 import { insertAt, moveCardLocal, moveColumnLocal } from "../lib/reorder";
 import { useBoardChannel } from "../lib/realtime";
 import { useUndo } from "../components/UndoToasts";
@@ -9,6 +10,7 @@ import type { BoardDetail, CardSummary, ColumnColor } from "../../shared/types";
 const REMOTE_REFRESH_DEBOUNCE_MS = 200;
 
 export function useBoard(boardId: string) {
+  const t = useT();
   const [board, setBoard] = useState<BoardDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -31,11 +33,11 @@ export function useBoard(boardId: string) {
       });
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Gagal memuat board");
+      setError(e instanceof Error ? e.message : t.boardView.loadDataError);
     } finally {
       setLoading(false);
     }
-  }, [boardId]);
+  }, [boardId, t]);
 
   useEffect(() => {
     setLoading(true);
@@ -61,11 +63,11 @@ export function useBoard(boardId: string) {
         await commit();
         setError(null);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Perubahan gagal disimpan");
+        setError(e instanceof Error ? e.message : t.cardModal.saveError);
         await refresh();
       }
     },
-    [refresh],
+    [refresh, t],
   );
 
   const actions = {
@@ -114,7 +116,7 @@ export function useBoard(boardId: string) {
       setBoard((b) => (b ? patchColumn(b, (cards) => cards.filter((c) => c.id !== cardId)) : b));
 
       undo({
-        message: `Kartu “${card.title}” dihapus`,
+        message: t.boardView.cardDeletedToast(card.title),
         commit: async (options) => {
           await api.deleteCard(cardId, options);
           hidden.current.delete(cardId);
@@ -190,7 +192,7 @@ export function useBoard(boardId: string) {
       setBoard((b) => (b ? { ...b, columns: b.columns.filter((col) => col.id !== columnId) } : b));
 
       undo({
-        message: `Kolom “${column.title}” dihapus`,
+        message: t.boardView.columnDeletedToast(column.title),
         commit: async (options) => {
           await api.deleteColumn(columnId, options);
           hidden.current.delete(columnId);

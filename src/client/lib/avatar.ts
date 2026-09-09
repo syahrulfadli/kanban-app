@@ -1,5 +1,5 @@
 import { AVATAR_MIMES, AVATAR_SIZE, MAX_AVATAR_BASE64, type AvatarMime } from "../../shared/types";
-import { blobToBase64, encodeCanvas, type CanvasEncoding } from "./imageCodec";
+import { blobToBase64, encodeCanvas, MediaError, type CanvasEncoding } from "./imageCodec";
 
 /**
  * Menyiapkan berkas pilihan pengguna menjadi foto profil.
@@ -35,14 +35,14 @@ const ENCODINGS: CanvasEncoding[] = [
 
 export async function prepareAvatar(file: File): Promise<AvatarUpload> {
   if (!file.type.startsWith("image/")) {
-    throw new Error("Berkas itu bukan gambar");
+    throw new MediaError("notAnImage");
   }
   if (file.size > MAX_FILE_BYTES) {
-    throw new Error("Gambarnya terlalu besar — maksimal 12 MB");
+    throw new MediaError("tooLarge12mbImage");
   }
 
   const bitmap = await createImageBitmap(file).catch(() => {
-    throw new Error("Gambarnya tidak bisa dibaca");
+    throw new MediaError("unreadableImage");
   });
 
   const canvas = document.createElement("canvas");
@@ -50,7 +50,7 @@ export async function prepareAvatar(file: File): Promise<AvatarUpload> {
   canvas.height = AVATAR_SIZE;
 
   const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Browser ini tidak bisa memproses gambar");
+  if (!ctx) throw new MediaError("cantProcessImage");
 
   // Pangkas dari tengah: sisi terpendeknya yang menentukan, jadi foto potret
   // maupun lanskap sama-sama jadi persegi tanpa gepeng.
@@ -72,7 +72,7 @@ export async function prepareAvatar(file: File): Promise<AvatarUpload> {
   const data = await blobToBase64(blob);
 
   if (data.length > MAX_AVATAR_BASE64) {
-    throw new Error("Gambarnya terlalu besar setelah diproses");
+    throw new MediaError("tooLargeAfterProcessing");
   }
 
   const mime = (AVATAR_MIMES as readonly string[]).includes(blob.type)

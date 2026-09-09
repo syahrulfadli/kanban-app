@@ -5,6 +5,7 @@ import { AppHeader } from "./AppHeader";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { NameColorPopover } from "./NameColorPopover";
 import { useUndo } from "./UndoToasts";
+import { useT } from "../hooks/useLanguage";
 import { cn } from "../lib/cn";
 import { labelTint } from "../lib/people";
 import { insertAt } from "../lib/reorder";
@@ -13,6 +14,7 @@ import { ListSkeleton, SkeletonLine } from "./Skeleton";
 import type { Board, LabelColor, WorkspaceSummary } from "../../shared/types";
 
 export function WorkspacePage({ workspaceId }: { workspaceId: string }) {
+  const t = useT();
   const [workspace, setWorkspace] = useState<WorkspaceSummary | null>(null);
   const [boards, setBoards] = useState<Board[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +32,7 @@ export function WorkspacePage({ workspaceId }: { workspaceId: string }) {
         setWorkspace(workspaces.find((w) => w.id === workspaceId) ?? null);
         setBoards(list);
       })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Gagal memuat board"));
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : t.workspacePage.loadError));
   }, [workspaceId]);
 
   const create = async (title: string) => {
@@ -49,7 +51,7 @@ export function WorkspacePage({ workspaceId }: { workspaceId: string }) {
       await api.updateBoard(board.id, next);
     } catch (e: unknown) {
       setBoards((prev) => prev?.map((b) => (b.id === board.id ? board : b)) ?? null);
-      setError(e instanceof Error ? e.message : "Gagal menyimpan board");
+      setError(e instanceof Error ? e.message : t.workspacePage.saveError);
     }
   };
 
@@ -63,7 +65,7 @@ export function WorkspacePage({ workspaceId }: { workspaceId: string }) {
     setBoards((prev) => prev?.filter((b) => b.id !== board.id) ?? null);
 
     undo({
-      message: `Board “${board.title}” dihapus`,
+      message: t.workspacePage.deletedToast(board.title),
       commit: (options) => api.deleteBoard(board.id, options),
       revert: () => setBoards((prev) => (prev ? insertAt(prev, board, index) : prev)),
       onError: setError,
@@ -83,12 +85,12 @@ export function WorkspacePage({ workspaceId }: { workspaceId: string }) {
 
       <div className="mx-auto w-full max-w-2xl px-5 pb-6">
         <div className="flex items-center gap-3">
-          <h1 className="flex-1 text-2xl font-semibold tracking-tight">Board</h1>
+          <h1 className="flex-1 text-2xl font-semibold tracking-tight">{t.workspacePage.title}</h1>
           <button
             onClick={() => navigate(paths.members(workspaceId))}
             className="btn btn-glass"
           >
-            Anggota
+            {t.workspacePage.membersButton}
           </button>
         </div>
 
@@ -96,7 +98,7 @@ export function WorkspacePage({ workspaceId }: { workspaceId: string }) {
 
         {!boards && !error && (
           <div className="mt-6">
-            <ListSkeleton label="Memuat daftar board…" />
+            <ListSkeleton label={t.workspacePage.loadingList} />
           </div>
         )}
 
@@ -132,8 +134,8 @@ export function WorkspacePage({ workspaceId }: { workspaceId: string }) {
                 onClick={() => setEditingId((id) => (id === board.id ? null : board.id))}
                 aria-haspopup="dialog"
                 aria-expanded={editingId === board.id}
-                aria-label={`Ubah board ${board.title}`}
-                title="Ubah nama & warna"
+                aria-label={t.workspacePage.editAria(board.title)}
+                title={t.workspacePage.editTitle}
                 className={cn(
                   "grid size-6 shrink-0 place-items-center rounded-full transition-colors hover:bg-accent-soft hover:text-accent-ink",
                   editingId === board.id ? "text-accent-ink" : "text-faint",
@@ -159,7 +161,7 @@ export function WorkspacePage({ workspaceId }: { workspaceId: string }) {
               {workspace && workspace.role !== "member" && (
                 <button
                   onClick={() => setPending(board)}
-                  aria-label={`Hapus board ${board.title}`}
+                  aria-label={t.workspacePage.deleteAria(board.title)}
                   className="grid size-6 shrink-0 place-items-center rounded-full text-faint transition-colors hover:bg-danger/10 hover:text-danger"
                 >
                   <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
@@ -172,26 +174,25 @@ export function WorkspacePage({ workspaceId }: { workspaceId: string }) {
 
           {boards?.length === 0 && (
             <li className="rounded-2xl border border-dashed border-line px-4 py-8 text-center text-sm text-muted">
-              Belum ada board di workspace ini.
+              {t.workspacePage.empty}
             </li>
           )}
         </ul>
 
         <div className="mt-3">
-          <AddItemForm placeholder="Nama board…" submitLabel="Board baru" onSubmit={create} />
+          <AddItemForm
+            placeholder={t.workspacePage.newBoardPlaceholder}
+            submitLabel={t.workspacePage.newBoardSubmit}
+            onSubmit={create}
+          />
         </div>
       </div>
 
       {pending && (
         <ConfirmDialog
-          title="Hapus board?"
-          body={
-            <>
-              “{pending.title}” akan dihapus bersama seluruh kolom dan kartu di dalamnya. Setelah
-              jendela urung tutup, isinya tidak bisa dipulihkan.
-            </>
-          }
-          confirmLabel="Hapus board"
+          title={t.workspacePage.confirmDeleteTitle}
+          body={t.workspacePage.confirmDeleteBody(pending.title)}
+          confirmLabel={t.workspacePage.confirmDeleteConfirmLabel}
           onConfirm={() => remove(pending)}
           onCancel={() => setPending(null)}
         />

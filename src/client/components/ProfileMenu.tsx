@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Skeleton } from "./Skeleton";
 import { forgetAdminAccess, useAdminAccess } from "../hooks/useAdminAccess";
 import { useDismiss } from "../hooks/useDismiss";
+import { useT } from "../hooks/useLanguage";
 import { api } from "../lib/api";
 import { signOut, useSession } from "../lib/auth-client";
 import { cn } from "../lib/cn";
@@ -86,6 +87,7 @@ function Item({
 
 export function ProfileMenu() {
   const { data: session } = useSession();
+  const t = useT();
   /* Pintu ke panel admin hanya muncul bagi yang boleh membukanya — bukan demi
      keamanan (server yang menjaganya), melainkan supaya menu ini tidak
      menawarkan halaman yang berakhir dengan kalimat penolakan. */
@@ -184,7 +186,7 @@ export function ProfileMenu() {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={`Menu profil ${name}`}
+        aria-label={t.profileMenu.menuLabel(name)}
         className={cn(
           "avatar avatar-lg overflow-hidden transition-transform hover:scale-105",
           !image && "avatar-tinted",
@@ -222,7 +224,7 @@ export function ProfileMenu() {
                   ) : (
                     <Skeleton className="mx-auto h-7 w-10" />
                   )}
-                  <p className="mt-0.5 text-xs text-muted">followup</p>
+                  <p className="mt-0.5 text-xs text-muted">{t.profileMenu.comments}</p>
                 </div>
                 <div>
                   {stats ? (
@@ -230,7 +232,7 @@ export function ProfileMenu() {
                   ) : (
                     <Skeleton className="mx-auto h-7 w-10" />
                   )}
-                  <p className="mt-0.5 text-xs text-muted">kartu dibuat</p>
+                  <p className="mt-0.5 text-xs text-muted">{t.profileMenu.cardsCreated}</p>
                 </div>
               </div>
             </div>
@@ -243,7 +245,7 @@ export function ProfileMenu() {
                 ke sana ada di sini, satu ketukan dari halaman mana pun. */}
             <Item
               icon={ABOUT}
-              label="Pengantar"
+              label={t.profileMenu.intro}
               onClick={() => {
                 setOpen(false);
                 navigate(paths.pengantar);
@@ -253,7 +255,7 @@ export function ProfileMenu() {
             {admin && (
               <Item
                 icon={SHIELD}
-                label="Panel admin"
+                label={t.profileMenu.adminPanel}
                 onClick={() => {
                   setOpen(false);
                   navigate(paths.admin);
@@ -263,7 +265,7 @@ export function ProfileMenu() {
 
             <Item
               icon={GEAR}
-              label="Pengaturan"
+              label={t.profileMenu.settings}
               onClick={() => {
                 setOpen(false);
                 navigate(paths.settings);
@@ -272,7 +274,7 @@ export function ProfileMenu() {
 
             <Item
               icon={EXIT}
-              label="Keluar"
+              label={t.profileMenu.signOut}
               danger
               onClick={() => {
                 setOpen(false);

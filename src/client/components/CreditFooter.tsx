@@ -1,3 +1,4 @@
+import { useT } from "../hooks/useLanguage";
 import { cn } from "../lib/cn";
 
 /* Logo React — atom dengan tiga orbit. Digambar inline supaya tidak ada
@@ -30,6 +31,7 @@ const DRAWER = 32;
    `open` datang berkelanjutan dari useCreditReveal, jadi kreditnya mengikuti
    tarikan: naik, menjernih, dan menetap di ujung tarikan. */
 export function CreditFooter({ open }: { open: number }) {
+  const t = useT();
   const hidden = open < 0.01;
 
   return (
@@ -64,7 +66,8 @@ export function CreditFooter({ open }: { open: number }) {
             <ReactMark />
           </span>
           <span>
-            Dibuat oleh <span className="credit-name">Syahrul</span> dengan React
+            {t.creditFooter.prefix} <span className="credit-name">Syahrul</span>{" "}
+            {t.creditFooter.suffix}
           </span>
         </p>
       </div>

@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useT } from "../hooks/useLanguage";
 import { api } from "../lib/api";
 import type { MoveTargetWorkspace } from "../../shared/types";
 
@@ -29,6 +30,7 @@ interface Props {
  * kanan papan tujuan.
  */
 export function MoveDialog({ subject, boardId, onCancel, onMove }: Props) {
+  const t = useT();
   const [spaces, setSpaces] = useState<MoveTargetWorkspace[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -59,7 +61,7 @@ export function MoveDialog({ subject, boardId, onCancel, onMove }: Props) {
         );
       })
       .catch((e: unknown) => {
-        if (alive) setError(e instanceof Error ? e.message : "Gagal memuat daftar papan");
+        if (alive) setError(e instanceof Error ? e.message : t.moveDialog.loadError);
       });
 
     return () => {
@@ -88,7 +90,7 @@ export function MoveDialog({ subject, boardId, onCancel, onMove }: Props) {
     try {
       await onMove({ boardId: chosen.id, columnId: needsColumn ? columnId : null });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Perpindahan gagal");
+      setError(e instanceof Error ? e.message : t.moveDialog.moveError);
       setBusy(false);
     }
   };
@@ -112,34 +114,34 @@ export function MoveDialog({ subject, boardId, onCancel, onMove }: Props) {
         className="glass glass-lens card-dialog relative w-full max-w-sm p-5 outline-none"
       >
         <h2 id={labelId} className="text-base font-semibold tracking-tight">
-          {subject.kind === "column" ? "Pindahkan kolom" : "Pindahkan kartu"}
+          {subject.kind === "column" ? t.moveDialog.moveColumnTitle : t.moveDialog.moveCardTitle}
         </h2>
 
         <p className="mt-2 text-sm leading-relaxed text-muted">
           {subject.kind === "column" ? (
             <>
               “{subject.title}”
-              {subject.cards > 0 && <> beserta {subject.cards} kartu di dalamnya</>} pindah ke
-              ujung papan tujuan.
+              {subject.cards > 0 && <> {t.moveDialog.columnBodyWithCards(subject.cards)}</>}{" "}
+              {t.moveDialog.columnBodySuffix}
             </>
           ) : (
-            <>“{subject.title}” pindah ke dasar kolom yang Anda pilih.</>
+            t.moveDialog.cardBody(subject.title)
           )}{" "}
           {/* Yang paling mungkin mengejutkan disebut lebih dulu daripada
               ditemukan sendiri: label milik papan, jadi ia harus ikut
               berpindah — lihat catatan di worker/transfer.ts. */}
-          Labelnya ikut, dan yang belum ada di papan tujuan dibuatkan di sana.
+          {t.moveDialog.labelsNote}
         </p>
 
         {empty ? (
           <p className="mt-4 rounded-lg bg-line-soft px-3 py-2 text-sm text-muted">
-            Belum ada papan lain yang bisa jadi tujuan.
+            {t.moveDialog.noOtherBoards}
           </p>
         ) : (
           <div className="mt-4 flex flex-col gap-3">
             <div className="flex flex-col gap-1.5">
               <label htmlFor={boardField} className="section-label">
-                Papan tujuan
+                {t.moveDialog.targetBoardLabel}
               </label>
 
               <select
@@ -156,7 +158,9 @@ export function MoveDialog({ subject, boardId, onCancel, onMove }: Props) {
                   setColumnId("");
                 }}
               >
-                <option value="">{spaces === null ? "Memuat papan…" : "Pilih papan…"}</option>
+                <option value="">
+                  {spaces === null ? t.moveDialog.loadingBoards : t.moveDialog.chooseBoard}
+                </option>
 
                 {(spaces ?? []).map((space) => (
                   <optgroup key={space.id} label={space.name}>
@@ -170,7 +174,9 @@ export function MoveDialog({ subject, boardId, onCancel, onMove }: Props) {
                         disabled={needsColumn && board.columns.length === 0}
                       >
                         {board.title}
-                        {needsColumn && board.columns.length === 0 && " — belum ada kolom"}
+                        {needsColumn &&
+                          board.columns.length === 0 &&
+                          ` ${t.moveDialog.noColumnsSuffix}`}
                       </option>
                     ))}
                   </optgroup>
@@ -181,7 +187,7 @@ export function MoveDialog({ subject, boardId, onCancel, onMove }: Props) {
             {needsColumn && (
               <div className="flex flex-col gap-1.5">
                 <label htmlFor={columnField} className="section-label">
-                  Kolom tujuan
+                  {t.moveDialog.targetColumnLabel}
                 </label>
 
                 <select
@@ -191,7 +197,9 @@ export function MoveDialog({ subject, boardId, onCancel, onMove }: Props) {
                   value={columnId}
                   onChange={(e) => setColumnId(e.target.value)}
                 >
-                  <option value="">{chosen ? "Pilih kolom…" : "Pilih papan dulu…"}</option>
+                  <option value="">
+                    {chosen ? t.moveDialog.chooseColumn : t.moveDialog.choosePlanFirst}
+                  </option>
                   {chosen?.columns.map((column) => (
                     <option key={column.id} value={column.id}>
                       {column.title}
@@ -209,7 +217,7 @@ export function MoveDialog({ subject, boardId, onCancel, onMove }: Props) {
 
         <div className="mt-5 flex justify-end gap-2">
           <button type="button" onClick={onCancel} className="btn btn-glass">
-            {empty ? "Tutup" : "Batal"}
+            {empty ? t.common.close : t.common.cancel}
           </button>
 
           {!empty && (
@@ -219,7 +227,7 @@ export function MoveDialog({ subject, boardId, onCancel, onMove }: Props) {
               disabled={!ready || busy}
               className="btn btn-primary"
             >
-              {busy ? "Memindahkan…" : "Pindahkan"}
+              {busy ? t.moveDialog.moving : t.moveDialog.move}
             </button>
           )}
         </div>

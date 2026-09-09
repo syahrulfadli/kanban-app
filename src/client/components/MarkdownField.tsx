@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Markdown } from "./Markdown";
+import { useT } from "../hooks/useLanguage";
 import { cn } from "../lib/cn";
 import type { ChannelStatus } from "../lib/realtime";
 
@@ -36,13 +37,14 @@ export function MarkdownField({
   placeholder,
   autoFocus,
   rows = 4,
-  saveLabel = "Simpan",
+  saveLabel,
   allowEmpty = false,
   status,
   onSave,
   onCancel,
   className,
 }: Props) {
+  const t = useT();
   const [draft, setDraft] = useState(value);
   const [mode, setMode] = useState<"write" | "preview">("write");
 
@@ -70,7 +72,7 @@ export function MarkdownField({
               mode === tab ? "bg-line-soft text-ink" : "text-faint hover:text-ink",
             )}
           >
-            {tab === "write" ? "Tulis" : "Pratinjau"}
+            {tab === "write" ? t.markdownField.write : t.markdownField.preview}
           </button>
         ))}
       </div>
@@ -97,17 +99,17 @@ export function MarkdownField({
       ) : trimmed ? (
         <Markdown source={draft} className="field min-h-24" />
       ) : (
-        <p className="field min-h-24 text-faint">Tidak ada yang ditulis.</p>
+        <p className="field min-h-24 text-faint">{t.markdownField.nothingWritten}</p>
       )}
 
       <div className="flex items-center gap-2">
         <button type="button" onClick={submit} disabled={!canSave} className="btn btn-primary">
-          {saveLabel}
+          {saveLabel ?? t.common.save}
         </button>
         <button type="button" onClick={onCancel} className="btn btn-ghost">
-          Batal
+          {t.common.cancel}
         </button>
-        {offline && <span className="text-xs text-faint">Menunggu jaringan…</span>}
+        {offline && <span className="text-xs text-faint">{t.markdownField.waitingForNetwork}</span>}
       </div>
     </div>
   );

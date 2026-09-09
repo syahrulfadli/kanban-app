@@ -5,6 +5,7 @@ import { AppHeader } from "./AppHeader";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { NameColorPopover } from "./NameColorPopover";
 import { useUndo } from "./UndoToasts";
+import { useT } from "../hooks/useLanguage";
 import { cn } from "../lib/cn";
 import { labelTint } from "../lib/people";
 import { insertAt } from "../lib/reorder";
@@ -12,9 +13,9 @@ import { navigate, paths } from "../lib/route";
 import { ListSkeleton } from "./Skeleton";
 import type { LabelColor, WorkspaceSummary } from "../../shared/types";
 
-const ROLE_LABEL = { owner: "Pemilik", admin: "Admin", member: "Anggota" } as const;
-
 export function WorkspacesPage() {
+  const t = useT();
+  const ROLE_LABEL = t.roles;
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<WorkspaceSummary | null>(null);
@@ -33,7 +34,7 @@ export function WorkspacesPage() {
       .listWorkspaces()
       .then(setWorkspaces)
       .catch((e: unknown) =>
-        setError(e instanceof Error ? e.message : "Gagal memuat workspace"),
+        setError(e instanceof Error ? e.message : t.workspacesPage.loadError),
       );
   }, []);
 
@@ -60,7 +61,7 @@ export function WorkspacesPage() {
       await api.updateWorkspace(workspace.id, patch);
     } catch (e: unknown) {
       setWorkspaces((prev) => prev?.map((w) => (w.id === workspace.id ? workspace : w)) ?? null);
-      setError(e instanceof Error ? e.message : "Gagal menyimpan workspace");
+      setError(e instanceof Error ? e.message : t.workspacesPage.saveError);
     }
   };
 
@@ -76,7 +77,7 @@ export function WorkspacesPage() {
     setWorkspaces((prev) => prev?.filter((w) => w.id !== workspace.id) ?? null);
 
     undo({
-      message: `Workspace “${workspace.name}” dihapus`,
+      message: t.workspacesPage.deletedToast(workspace.name),
       commit: (options) => api.deleteWorkspace(workspace.id, options),
       revert: () => setWorkspaces((prev) => (prev ? insertAt(prev, workspace, index) : prev)),
       onError: setError,
@@ -88,10 +89,8 @@ export function WorkspacesPage() {
       <AppHeader />
 
       <div className="mx-auto w-full max-w-2xl px-5 pb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Workspace</h1>
-        <p className="mt-1 text-sm text-muted">
-          Workspace adalah tempat board dibagikan. Undang rekan lewat menu Anggota.
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t.workspacesPage.title}</h1>
+        <p className="mt-1 text-sm text-muted">{t.workspacesPage.subtitle}</p>
 
         {error && <p className="mt-4 text-sm text-danger">{error}</p>}
 
@@ -99,7 +98,7 @@ export function WorkspacesPage() {
             ada workspace. Keduanya tidak boleh terlihat sama. */}
         {!workspaces && !error && (
           <div className="mt-6">
-            <ListSkeleton label="Memuat daftar workspace…" />
+            <ListSkeleton label={t.workspacesPage.loadingList} />
           </div>
         )}
 
@@ -140,8 +139,8 @@ export function WorkspacesPage() {
                   }
                   aria-haspopup="dialog"
                   aria-expanded={editingId === workspace.id}
-                  aria-label={`Ubah workspace ${workspace.name}`}
-                  title="Ubah nama & warna"
+                  aria-label={t.workspacesPage.editAria(workspace.name)}
+                  title={t.workspacesPage.editTitle}
                   className={cn(
                     "grid size-6 shrink-0 place-items-center rounded-full transition-colors hover:bg-accent-soft hover:text-accent-ink",
                     editingId === workspace.id ? "text-accent-ink" : "text-faint",
@@ -171,8 +170,8 @@ export function WorkspacesPage() {
               {workspace.role === "owner" && (
                 <button
                   onClick={() => setPending(workspace)}
-                  aria-label={`Hapus workspace ${workspace.name}`}
-                  title="Hapus workspace"
+                  aria-label={t.workspacesPage.deleteAria(workspace.name)}
+                  title={t.workspacesPage.deleteTitle}
                   className="grid size-6 shrink-0 place-items-center rounded-full text-faint transition-colors hover:bg-danger/10 hover:text-danger"
                 >
                   <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
@@ -185,15 +184,15 @@ export function WorkspacesPage() {
 
           {workspaces?.length === 0 && (
             <li className="rounded-2xl border border-dashed border-line px-4 py-8 text-center text-sm text-muted">
-              Belum ada workspace. Buat yang pertama di bawah.
+              {t.workspacesPage.empty}
             </li>
           )}
         </ul>
 
         <div className="mt-3">
           <AddItemForm
-            placeholder="Nama workspace…"
-            submitLabel="Workspace baru"
+            placeholder={t.workspacesPage.newWorkspacePlaceholder}
+            submitLabel={t.workspacesPage.newWorkspaceSubmit}
             onSubmit={create}
           />
         </div>
@@ -201,15 +200,9 @@ export function WorkspacesPage() {
 
       {pending && (
         <ConfirmDialog
-          title="Hapus workspace?"
-          body={
-            <>
-              “{pending.name}” akan dihapus bersama seluruh board, kolom, dan kartu di dalamnya,
-              dan anggotanya kehilangan aksesnya. Setelah jendela urung tutup, isinya tidak bisa
-              dipulihkan.
-            </>
-          }
-          confirmLabel="Hapus workspace"
+          title={t.workspacesPage.confirmDeleteTitle}
+          body={t.workspacesPage.confirmDeleteBody(pending.name)}
+          confirmLabel={t.workspacesPage.confirmDeleteConfirmLabel}
           onConfirm={() => remove(pending)}
           onCancel={() => setPending(null)}
         />

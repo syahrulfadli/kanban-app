@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { useT } from "../hooks/useLanguage";
 
 /** Lama jendela urung. Nilai yang sama dipakai timer JS dan bilah countdown CSS. */
 const UNDO_MS = 6000;
@@ -37,6 +38,7 @@ const UndoContext = createContext<((request: UndoRequest) => void) | null>(null)
  * dihapus sampai jendelanya tutup.
  */
 export function UndoProvider({ children }: { children: React.ReactNode }) {
+  const t = useT();
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   // Timer hidup di ref, bukan state: yang dirender cuma daftar toast-nya.
@@ -60,10 +62,10 @@ export function UndoProvider({ children }: { children: React.ReactNode }) {
 
       void toast.commit(options).catch((e: unknown) => {
         toast.revert();
-        toast.onError?.(e instanceof Error ? e.message : "Gagal menghapus");
+        toast.onError?.(e instanceof Error ? e.message : t.undoToasts.deleteError);
       });
     },
-    [take],
+    [take, t],
   );
 
   const cancel = useCallback(
@@ -116,7 +118,7 @@ export function UndoProvider({ children }: { children: React.ReactNode }) {
             <p className="min-w-0 flex-1 truncate text-sm text-ink-soft">{toast.message}</p>
 
             <button type="button" onClick={() => cancel(toast.id)} className="btn btn-glass shrink-0">
-              Urungkan
+              {t.undoToasts.undo}
             </button>
 
             {/* Bilah countdown: sisa waktu sebelum penghapusan benar-benar dikirim. */}

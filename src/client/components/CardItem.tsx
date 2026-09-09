@@ -12,6 +12,7 @@ import {
 import { AvatarStack } from "./Avatar";
 import { AttachmentIcon } from "./CardAttachments";
 import { EyeIcon } from "./WatchToggle";
+import { useLanguage, useT } from "../hooks/useLanguage";
 import { cn } from "../lib/cn";
 import { dueState, formatDateTime, formatDueShort } from "../lib/format";
 import { cardFaces, labelTint } from "../lib/people";
@@ -56,6 +57,8 @@ export function CardItem({
   onOpen,
   onDelete,
 }: Props) {
+  const t = useT();
+  const { language } = useLanguage();
   const ref = useRef<HTMLLIElement>(null);
   const plateRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -237,7 +240,7 @@ export function CardItem({
                 type="button"
                 onClick={toggleLabels}
                 aria-expanded={labelsOpen}
-                aria-label={`Label ${label.name}`}
+                aria-label={t.cardItem.labelAria(label.name)}
                 title={label.name}
                 className={cn(
                   "label-chip relative z-10 cursor-[inherit]",
@@ -268,7 +271,7 @@ export function CardItem({
         <button
           type="button"
           onClick={open}
-          aria-label={`Buka kartu ${card.title}`}
+          aria-label={t.cardItem.openCardAria(card.title)}
           className="stretch block w-full cursor-[inherit] pr-5 text-left text-sm leading-snug wrap-break-word whitespace-pre-wrap text-ink-soft outline-none"
         >
           {card.title}
@@ -311,8 +314,8 @@ export function CardItem({
                   )}
                   title={
                     card.dueDoneAt
-                      ? `Tenggat ${formatDateTime(card.dueAt)} — selesai`
-                      : `Tenggat ${formatDateTime(card.dueAt)}`
+                      ? t.cardItem.dueDoneTitle(formatDateTime(card.dueAt, language))
+                      : t.cardItem.dueTitle(formatDateTime(card.dueAt, language))
                   }
                 >
                   <svg
@@ -328,7 +331,7 @@ export function CardItem({
                     <path d="M8 3v3M16 3v3M4 9h16" />
                     <rect x="4" y="5" width="16" height="16" rx="2.5" />
                   </svg>
-                  {formatDueShort(card.dueAt)}
+                  {formatDueShort(card.dueAt, language)}
                 </span>
               )}
 
@@ -337,7 +340,7 @@ export function CardItem({
               {checklist.total > 0 && (
                 <span
                   className="flex items-center gap-1.5"
-                  title={`Checklist ${checklist.done} dari ${checklist.total}`}
+                  title={t.cardItem.checklistTitle(checklist.done, checklist.total)}
                 >
                   <span
                     className="progress card-progress"
@@ -345,7 +348,7 @@ export function CardItem({
                     aria-valuenow={percent}
                     aria-valuemin={0}
                     aria-valuemax={100}
-                    aria-label={`Checklist ${checklist.done} dari ${checklist.total}`}
+                    aria-label={t.cardItem.checklistTitle(checklist.done, checklist.total)}
                   >
                     <span
                       className="progress-bar"
@@ -372,7 +375,7 @@ export function CardItem({
                   stroke="currentColor"
                   strokeWidth="2"
                   strokeLinecap="round"
-                  aria-label="Punya deskripsi"
+                  aria-label={t.cardItem.hasDescription}
                   role="img"
                 >
                   <path d="M4 6h16M4 12h16M4 18h10" />
@@ -385,7 +388,7 @@ export function CardItem({
               {attachmentCount > 0 && (
                 <span
                   className="flex items-center gap-1 text-[0.6875rem] font-semibold tabular-nums"
-                  title={`${attachmentCount} lampiran`}
+                  title={t.cardItem.attachmentsTitle(attachmentCount)}
                 >
                   <AttachmentIcon />
                   {attachmentCount > 1 && attachmentCount}
@@ -395,7 +398,7 @@ export function CardItem({
               {commentCount > 0 && (
                 <span
                   className="flex items-center gap-1 text-[0.6875rem] font-semibold tabular-nums"
-                  title={`${commentCount} followup`}
+                  title={t.cardItem.commentsTitle(commentCount)}
                 >
                   <svg
                     viewBox="0 0 24 24"
@@ -420,8 +423,8 @@ export function CardItem({
                   mata ini akan tampak di hampir setiap kartu; sebagai penanda
                   mencolok ia akan berhenti berarti apa-apa. */}
               {watching && (
-                <span title="Kartu ini Anda awasi" className="flex">
-                  <EyeIcon watching className="size-3.5" label="Kartu ini Anda awasi" />
+                <span title={t.cardItem.watchedTitle} className="flex">
+                  <EyeIcon watching className="size-3.5" label={t.cardItem.watchedTitle} />
                 </span>
               )}
             </span>
@@ -430,7 +433,7 @@ export function CardItem({
 
         <button
           type="button"
-          aria-label={`Hapus kartu ${card.title}`}
+          aria-label={t.cardItem.deleteCardAria(card.title)}
           onClick={(e) => {
             e.stopPropagation();
             onDelete();

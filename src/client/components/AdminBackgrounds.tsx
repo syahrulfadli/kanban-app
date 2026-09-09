@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { ListSkeleton } from "./Skeleton";
 import { api, type BackgroundInput } from "../lib/api";
+import { useT } from "../hooks/useLanguage";
 import { thumbSrc } from "../lib/background";
 import { cn } from "../lib/cn";
 import { UNSPLASH_IMAGE_HOST, type AdminBackgroundImage } from "../../shared/types";
@@ -26,6 +27,7 @@ function ImageForm({
   onSubmit: (input: BackgroundInput) => Promise<void>;
   onCancel?: () => void;
 }) {
+  const t = useT();
   const [input, setInput] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +45,7 @@ function ImageForm({
       // ditempel; formulir sunting ditutup pemanggilnya.
       if (!onCancel) setInput(EMPTY);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal menyimpan");
+      setError(err instanceof Error ? err.message : t.adminBackgrounds.saveError);
     } finally {
       setBusy(false);
     }
@@ -56,7 +58,7 @@ function ImageForm({
           required
           value={input.name}
           onChange={(e) => set({ name: e.target.value })}
-          placeholder="Nama — “Kabut pegunungan”"
+          placeholder={t.adminBackgrounds.namePlaceholder}
           maxLength={80}
           className="field min-w-0 flex-1"
         />
@@ -64,7 +66,7 @@ function ImageForm({
           required
           value={input.photographer}
           onChange={(e) => set({ photographer: e.target.value })}
-          placeholder="Nama fotografer"
+          placeholder={t.adminBackgrounds.photographerPlaceholder}
           maxLength={80}
           className="field min-w-0 flex-1"
         />
@@ -74,14 +76,14 @@ function ImageForm({
         required
         value={input.url}
         onChange={(e) => set({ url: e.target.value })}
-        placeholder={`https://${UNSPLASH_IMAGE_HOST}/photo-…`}
+        placeholder={t.adminBackgrounds.urlPlaceholder(UNSPLASH_IMAGE_HOST)}
         className="field"
       />
 
       <input
         value={input.photographerUrl ?? ""}
         onChange={(e) => set({ photographerUrl: e.target.value })}
-        placeholder="Profil fotografer di Unsplash (opsional)"
+        placeholder={t.adminBackgrounds.photographerUrlPlaceholder}
         className="field"
       />
 
@@ -89,11 +91,11 @@ function ImageForm({
 
       <div className="flex items-center gap-2">
         <button type="submit" disabled={busy} className="btn btn-primary">
-          {busy ? "Menyimpan…" : submitLabel}
+          {busy ? t.common.saving : submitLabel}
         </button>
         {onCancel && (
           <button type="button" onClick={onCancel} className="btn btn-ghost">
-            Batal
+            {t.common.cancel}
           </button>
         )}
       </div>
@@ -105,6 +107,7 @@ function ImageForm({
 const ARROW = <path d="M12 19V5M6 11l6-6 6 6" />;
 
 export function AdminBackgrounds() {
+  const t = useT();
   const [images, setImages] = useState<AdminBackgroundImage[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
@@ -115,9 +118,9 @@ export function AdminBackgrounds() {
       setImages(await api.listAdminBackgrounds());
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Gagal memuat daftar gambar");
+      setError(e instanceof Error ? e.message : t.adminBackgrounds.loadListError);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
@@ -132,7 +135,7 @@ export function AdminBackgrounds() {
       await load();
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Aksi gagal");
+      setError(e instanceof Error ? e.message : t.adminUsers.actionError);
     }
   };
 
@@ -149,39 +152,37 @@ export function AdminBackgrounds() {
   return (
     <>
       <section className="glass glass-plate mt-4 rounded-2xl p-5">
-        <h2 className="text-sm font-semibold tracking-tight">Tambah gambar</h2>
+        <h2 className="text-sm font-semibold tracking-tight">{t.adminBackgrounds.addImageTitle}</h2>
         <p className="mt-1 text-xs leading-relaxed text-muted">
-          Buka fotonya di Unsplash, klik kanan gambarnya, lalu pilih “Salin alamat gambar” —
-          alamatnya harus dari {UNSPLASH_IMAGE_HOST}. Ukuran gambar diatur aplikasi, jadi
-          parameter apa pun di alamatnya akan dibuang.
+          {t.adminBackgrounds.addImageHint(UNSPLASH_IMAGE_HOST)}
         </p>
 
         <div className="mt-4">
-          <ImageForm initial={EMPTY} submitLabel="Tambah" onSubmit={(input) => act(() => api.createBackground(input))} />
+          <ImageForm
+            initial={EMPTY}
+            submitLabel={t.adminBackgrounds.addSubmit}
+            onSubmit={(input) => act(() => api.createBackground(input))}
+          />
         </div>
       </section>
 
       <h2 className="mt-8 text-sm font-semibold tracking-tight">
-        Daftar gambar
+        {t.adminBackgrounds.listTitle}
         {images && <span className="ml-1.5 font-normal text-faint">{images.length}</span>}
       </h2>
-      <p className="mt-1 text-xs leading-relaxed text-muted">
-        Urutannya menentukan urutan di pemilih latar. Yang dinonaktifkan hilang dari pemilih
-        tapi tetap terpasang di papan yang sudah memakainya.
-      </p>
+      <p className="mt-1 text-xs leading-relaxed text-muted">{t.adminBackgrounds.listHint}</p>
 
       {error && <p className="mt-3 text-sm text-danger">{error}</p>}
 
       {!images && !error && (
         <div className="mt-4">
-          <ListSkeleton rows={3} label="Memuat daftar gambar" />
+          <ListSkeleton rows={3} label={t.adminBackgrounds.loadingList} />
         </div>
       )}
 
       {images?.length === 0 && (
         <p className="mt-4 rounded-2xl border border-dashed border-line px-4 py-6 text-center text-sm text-muted">
-          Belum ada gambar. Yang ditambahkan di sini muncul sebagai pilihan latar di setiap
-          papan.
+          {t.adminBackgrounds.empty}
         </p>
       )}
 
@@ -201,11 +202,17 @@ export function AdminBackgrounds() {
 
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{image.name}</p>
-                <p className="truncate text-xs text-muted">Foto oleh {image.photographer}</p>
+                <p className="truncate text-xs text-muted">
+                  {t.adminBackgrounds.photoBy(image.photographer)}
+                </p>
                 <p className="mt-1 flex flex-wrap items-center gap-1.5">
-                  {!image.active && <span className="chip text-[11px]">Nonaktif</span>}
+                  {!image.active && (
+                    <span className="chip text-[11px]">{t.adminBackgrounds.inactive}</span>
+                  )}
                   <span className="chip text-[11px]">
-                    {image.usedBy === 0 ? "Belum dipakai" : `Dipakai ${image.usedBy} papan`}
+                    {image.usedBy === 0
+                      ? t.adminBackgrounds.notUsed
+                      : t.adminBackgrounds.usedByCount(image.usedBy)}
                   </span>
                 </p>
               </div>
@@ -215,10 +222,10 @@ export function AdminBackgrounds() {
                   untuk kenyamanan yang tidak terasa. */}
               <div className="flex shrink-0 flex-col">
                 {[
-                  { delta: -1, label: "Naikkan", disabled: i === 0, flip: false },
+                  { delta: -1, label: t.adminBackgrounds.moveUp, disabled: i === 0, flip: false },
                   {
                     delta: 1,
-                    label: "Turunkan",
+                    label: t.adminBackgrounds.moveDown,
                     disabled: i === images.length - 1,
                     flip: true,
                   },
@@ -254,19 +261,19 @@ export function AdminBackgrounds() {
                 onClick={() => setEditing(editing === image.id ? null : image.id)}
                 className="btn btn-ghost px-2.5 py-1 text-xs"
               >
-                {editing === image.id ? "Tutup" : "Sunting"}
+                {editing === image.id ? t.common.close : t.common.edit}
               </button>
               <button
                 onClick={() => void act(() => api.updateBackground(image.id, { active: !image.active }))}
                 className="btn btn-ghost px-2.5 py-1 text-xs"
               >
-                {image.active ? "Nonaktifkan" : "Aktifkan"}
+                {image.active ? t.adminBackgrounds.deactivate : t.adminBackgrounds.activate}
               </button>
               <button
                 onClick={() => setPending(image)}
                 className="btn btn-ghost px-2.5 py-1 text-xs hover:bg-danger/10 hover:text-danger"
               >
-                Hapus
+                {t.common.delete}
               </button>
             </div>
 
@@ -279,7 +286,7 @@ export function AdminBackgrounds() {
                     photographer: image.photographer,
                     photographerUrl: image.photographerUrl ?? "",
                   }}
-                  submitLabel="Simpan"
+                  submitLabel={t.common.save}
                   onCancel={() => setEditing(null)}
                   onSubmit={async (input) => {
                     await act(() => api.updateBackground(image.id, input));
@@ -294,19 +301,14 @@ export function AdminBackgrounds() {
 
       {pending && (
         <ConfirmDialog
-          title="Hapus gambar latar?"
+          title={t.adminBackgrounds.deleteImageTitle}
           body={
             <>
-              “{pending.name}” akan hilang dari pemilih latar.
-              {pending.usedBy > 0 && (
-                <>
-                  {" "}
-                  {pending.usedBy} papan yang memakainya akan kembali ke latar bawaan.
-                </>
-              )}
+              {t.adminBackgrounds.deleteImageBody(pending.name)}
+              {pending.usedBy > 0 && <> {t.adminBackgrounds.deleteImageUsedSuffix(pending.usedBy)}</>}
             </>
           }
-          confirmLabel="Hapus gambar"
+          confirmLabel={t.adminBackgrounds.deleteImageConfirm}
           onConfirm={() => {
             void act(() => api.deleteBackground(pending.id));
             setPending(null);

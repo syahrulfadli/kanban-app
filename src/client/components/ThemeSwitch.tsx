@@ -1,4 +1,5 @@
 import { useTheme, type ThemePref } from "../hooks/useTheme";
+import { useT } from "../hooks/useLanguage";
 import { cn } from "../lib/cn";
 
 const ICON = {
@@ -17,23 +18,25 @@ const ICON = {
   ),
 } satisfies Record<ThemePref, React.ReactNode>;
 
-const OPTIONS: { value: ThemePref; label: string }[] = [
-  { value: "light", label: "Terang" },
-  { value: "dark", label: "Gelap" },
-  { value: "system", label: "Sistem" },
-];
-
 /* Hanya ikon: sakelar ini tinggal di kapsul bawah, dan tiga label teks akan
    menjadikannya bagian terlebar di sana. Nama tiap pilihan tetap terbaca
    pembaca layar lewat aria-label, dan muncul sebagai tooltip di pointer. */
 export function ThemeSwitch() {
   const { theme, setTheme } = useTheme();
+  const t = useT();
+
+  const OPTIONS: { value: ThemePref; label: string }[] = [
+    { value: "light", label: t.themeSwitch.themeLight },
+    { value: "dark", label: t.themeSwitch.themeDark },
+    { value: "system", label: t.themeSwitch.themeSystem },
+  ];
+
   const index = OPTIONS.findIndex((o) => o.value === theme);
 
   return (
     <div
       role="radiogroup"
-      aria-label="Tema tampilan"
+      aria-label={t.themeSwitch.themeLabel}
       className="glass glass-quiet switch-track relative flex rounded-full p-1"
     >
       {/* Peluncur — satu elemen yang bergeser, bukan tiga latar yang

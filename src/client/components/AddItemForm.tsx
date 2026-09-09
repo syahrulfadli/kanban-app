@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useT } from "../hooks/useLanguage";
 
 interface Props {
   placeholder: string;
@@ -7,6 +8,7 @@ interface Props {
 }
 
 export function AddItemForm({ placeholder, submitLabel, onSubmit }: Props) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
@@ -75,10 +77,10 @@ export function AddItemForm({ placeholder, submitLabel, onSubmit }: Props) {
       />
       <div className="flex gap-1.5">
         <button type="submit" disabled={busy} className="btn btn-primary">
-          Tambah
+          {t.common.add}
         </button>
         <button type="button" onClick={() => setOpen(false)} className="btn btn-ghost">
-          Batal
+          {t.common.cancel}
         </button>
       </div>
     </form>

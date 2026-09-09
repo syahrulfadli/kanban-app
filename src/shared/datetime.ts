@@ -21,21 +21,26 @@ const toDate = (value: Stamp) => (value instanceof Date ? value : new Date(value
  */
 export const APP_TIME_ZONE = "Asia/Jakarta";
 
-/* Satu Intl.DateTimeFormat per zona, dibuat sekali. Merakitnya termasuk
+/* Satu Intl.DateTimeFormat per zona+locale, dibuat sekali. Merakitnya termasuk
    pekerjaan yang mahal, dan lini masa memanggil pemformat ini sekali per
-   baris. */
+   baris.
+
+   `locale` defaultnya "id-ID": server selalu menyusun kalimat notifikasi
+   dalam bahasa Indonesia (lihat describeNotification), jadi pemanggil di
+   sana tidak pernah perlu menyebutnya. Klien yang punya kamus bahasa aktif
+   yang mengirim locale-nya sendiri — lihat client/lib/format.ts. */
 const cache = new Map<string, Intl.DateTimeFormat>();
 
-function formatter(timeZone: string | undefined, options: Intl.DateTimeFormatOptions) {
-  const key = `${timeZone ?? "local"}|${options.hour ? "long" : "short"}`;
+function formatter(timeZone: string | undefined, locale: string, options: Intl.DateTimeFormatOptions) {
+  const key = `${locale}|${timeZone ?? "local"}|${options.hour ? "long" : "short"}`;
   let found = cache.get(key);
-  if (!found) cache.set(key, (found = new Intl.DateTimeFormat("id-ID", { ...options, timeZone })));
+  if (!found) cache.set(key, (found = new Intl.DateTimeFormat(locale, { ...options, timeZone })));
   return found;
 }
 
 /** "2 Sep 2026, 17.40" — bentuk panjang, dipakai tooltip dan kalimat kejadian. */
-export const formatStamp = (value: Stamp, timeZone?: string) =>
-  formatter(timeZone, {
+export const formatStamp = (value: Stamp, timeZone?: string, locale = "id-ID") =>
+  formatter(timeZone, locale, {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -44,5 +49,5 @@ export const formatStamp = (value: Stamp, timeZone?: string) =>
   }).format(toDate(value));
 
 /** "2 Sep" — bentuk pendek untuk tempat sesempit muka kartu. */
-export const formatDay = (value: Stamp, timeZone?: string) =>
-  formatter(timeZone, { day: "numeric", month: "short" }).format(toDate(value));
+export const formatDay = (value: Stamp, timeZone?: string, locale = "id-ID") =>
+  formatter(timeZone, locale, { day: "numeric", month: "short" }).format(toDate(value));

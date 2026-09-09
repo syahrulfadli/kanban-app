@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useT } from "../hooks/useLanguage";
 import { PROVIDER_LABEL, signIn, signUp } from "../lib/auth-client";
 import { api } from "../lib/api";
 
@@ -7,6 +8,7 @@ import { api } from "../lib/api";
    pengantar memakainya supaya "Mulai sekarang" mendarat di form daftar,
    bukan di form masuk yang harus ditukar sendiri. */
 export function AuthPage({ initialMode = "login" }: { initialMode?: "login" | "register" }) {
+  const t = useT();
   const [mode, setMode] = useState<"login" | "register">(initialMode);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -35,7 +37,7 @@ export function AuthPage({ initialMode = "login" }: { initialMode?: "login" | "r
     setBusy(false);
 
     if (result.error) {
-      setError(result.error.message ?? "Gagal masuk");
+      setError(result.error.message ?? t.auth.genericSignInError);
       return;
     }
 
@@ -46,12 +48,10 @@ export function AuthPage({ initialMode = "login" }: { initialMode?: "login" | "r
     <div className="flex flex-1 items-center justify-center p-6">
       <div className="glass glass-frost w-full max-w-sm rounded-3xl p-7">
         <h1 className="text-xl font-semibold tracking-tight">
-          {mode === "login" ? "Masuk" : "Buat akun"}
+          {mode === "login" ? t.auth.signInTitle : t.auth.signUpTitle}
         </h1>
         <p className="mt-1 text-sm text-muted">
-          {mode === "login"
-            ? "Masuk untuk mengakses workspace Anda."
-            : "Daftar untuk mulai membuat papan kanban."}
+          {mode === "login" ? t.auth.signInSubtitle : t.auth.signUpSubtitle}
         </p>
 
         <form onSubmit={submit} className="mt-6 flex flex-col gap-2.5">
@@ -60,7 +60,7 @@ export function AuthPage({ initialMode = "login" }: { initialMode?: "login" | "r
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Nama"
+              placeholder={t.auth.namePlaceholder}
               autoComplete="name"
               className="field"
             />
@@ -71,7 +71,7 @@ export function AuthPage({ initialMode = "login" }: { initialMode?: "login" | "r
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="Email"
+            placeholder={t.auth.emailPlaceholder}
             autoComplete="email"
             className="field"
           />
@@ -82,7 +82,7 @@ export function AuthPage({ initialMode = "login" }: { initialMode?: "login" | "r
             minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="Kata sandi (min. 8 karakter)"
+            placeholder={t.auth.passwordPlaceholder}
             autoComplete={mode === "login" ? "current-password" : "new-password"}
             className="field"
           />
@@ -90,7 +90,7 @@ export function AuthPage({ initialMode = "login" }: { initialMode?: "login" | "r
           {error && <p className="text-sm text-danger">{error}</p>}
 
           <button type="submit" disabled={busy} className="btn btn-primary mt-1 py-2.5">
-            {busy ? "Memproses…" : mode === "login" ? "Masuk" : "Daftar"}
+            {busy ? t.common.processing : mode === "login" ? t.auth.signIn : t.auth.signUp}
           </button>
         </form>
 
@@ -98,7 +98,7 @@ export function AuthPage({ initialMode = "login" }: { initialMode?: "login" | "r
           <div className="mt-4 flex flex-col gap-2">
             <div className="flex items-center gap-3 text-xs text-faint">
               <span className="h-px flex-1 bg-line" />
-              atau
+              {t.auth.or}
               <span className="h-px flex-1 bg-line" />
             </div>
 
@@ -109,7 +109,7 @@ export function AuthPage({ initialMode = "login" }: { initialMode?: "login" | "r
                 onClick={() => void signIn.social({ provider })}
                 className="btn btn-glass py-2.5"
               >
-                Lanjutkan dengan {PROVIDER_LABEL[provider] ?? provider}
+                {t.auth.continueWith(PROVIDER_LABEL[provider] ?? provider)}
               </button>
             ))}
           </div>
@@ -123,7 +123,7 @@ export function AuthPage({ initialMode = "login" }: { initialMode?: "login" | "r
           }}
           className="mt-6 text-sm text-accent-ink hover:underline"
         >
-          {mode === "login" ? "Belum punya akun? Daftar" : "Sudah punya akun? Masuk"}
+          {mode === "login" ? t.auth.toggleToRegister : t.auth.toggleToLogin}
         </button>
       </div>
     </div>

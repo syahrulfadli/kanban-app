@@ -1,3 +1,4 @@
+import { useT } from "../hooks/useLanguage";
 import { labelTint } from "../lib/people";
 import { LABEL_COLORS, type LabelColor } from "../../shared/types";
 
@@ -19,15 +20,18 @@ interface Props {
  * bentuk — palet yang sama yang digambar dua kali cepat atau lambat akan
  * menyimpang di salah satunya.
  */
-export function ColorSwatches({ value, onChange, clearable, clearLabel = "Tanpa warna" }: Props) {
+export function ColorSwatches({ value, onChange, clearable, clearLabel }: Props) {
+  const t = useT();
+  const clear = clearLabel ?? t.colorSwatches.noColor;
+
   return (
     <div className="flex flex-wrap gap-1.5">
       {clearable && (
         <button
           type="button"
-          aria-label={clearLabel}
+          aria-label={clear}
           aria-pressed={value === null}
-          title={clearLabel}
+          title={clear}
           onClick={() => onChange(null)}
           className="grid size-6 place-items-center rounded-full transition-transform hover:scale-110"
         >
@@ -41,7 +45,7 @@ export function ColorSwatches({ value, onChange, clearable, clearLabel = "Tanpa 
         <button
           key={color}
           type="button"
-          aria-label={`Warna ${color}`}
+          aria-label={t.colorSwatches.colorName(color)}
           aria-pressed={color === value}
           onClick={() => onChange(color)}
           style={labelTint(color)}

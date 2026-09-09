@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Avatar } from "./Avatar";
 import { useCardSearch } from "../hooks/useCardSearch";
 import { useDismiss } from "../hooks/useDismiss";
+import { useT } from "../hooks/useLanguage";
 import { useSession } from "../lib/auth-client";
 import { cn } from "../lib/cn";
 import { labelTint } from "../lib/people";
@@ -65,6 +66,7 @@ function Hit({
   active: boolean;
   onOpen: () => void;
 }) {
+  const t = useT();
   const matchedLabels = new Set(hit.matchedLabelIds);
   const matchedPeople = new Set(hit.matchedUserIds);
 
@@ -101,7 +103,7 @@ function Hit({
         {hit.archived && (
           <span className="chip mt-0.5 shrink-0">
             <ArchiveIcon className="size-3" />
-            Diarsipkan
+            {t.cardModal.archivedLabel}
           </span>
         )}
       </span>
@@ -155,7 +157,7 @@ function Hit({
 
       <span
         className="w-full truncate text-[0.6875rem] text-faint"
-        title={`${hit.workspaceName} · ${hit.boardTitle} · ${hit.columnTitle}`}
+        title={t.cardSearch.crumbTitle(hit.workspaceName, hit.boardTitle, hit.columnTitle)}
       >
         {hit.boardTitle} · {hit.columnTitle}
       </span>
@@ -172,6 +174,7 @@ function Hit({
  * kartu yang ia tidak ingat ada di papan mana.
  */
 export function CardSearch() {
+  const t = useT();
   const { data: session } = useSession();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -231,8 +234,8 @@ export function CardSearch() {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label="Cari kartu"
-        title="Cari kartu"
+        aria-label={t.cardSearch.searchAria}
+        title={t.cardSearch.searchTitle}
         className={cn(
           "grid size-7 place-items-center rounded-full transition-colors",
           open ? "text-accent-ink" : "text-muted hover:text-ink-soft",
@@ -263,7 +266,7 @@ export function CardSearch() {
           <div
             ref={panelRef}
             role="dialog"
-            aria-label="Cari kartu"
+            aria-label={t.cardSearch.searchAria}
             className="sheet sheet-frost fixed bottom-24 left-1/2 z-45 w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl p-1.5"
           >
             <div className="p-1.5">
@@ -273,8 +276,8 @@ export function CardSearch() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={onKeyDown}
-                placeholder="Cari judul, deskripsi, label, atau orang…"
-                aria-label="Kata kunci pencarian kartu"
+                placeholder={t.cardSearch.placeholder}
+                aria-label={t.cardSearch.inputAria}
                 className="field"
               />
             </div>
@@ -291,7 +294,7 @@ export function CardSearch() {
             >
               {!ready ? (
                 <p className="px-1 py-2 text-xs text-faint">
-                  Ketik minimal {MIN_QUERY_LENGTH} huruf.
+                  {t.cardSearch.minChars(MIN_QUERY_LENGTH)}
                 </p>
               ) : error ? (
                 <p className="px-1 py-2 text-xs text-danger">{error}</p>
@@ -309,7 +312,7 @@ export function CardSearch() {
                 </div>
               ) : (
                 <p className="px-1 py-2 text-xs text-faint">
-                  {loading ? "Mencari…" : `Tidak ada kartu yang cocok dengan “${term}”.`}
+                  {loading ? t.cardSearch.searching : t.cardSearch.noMatches(term)}
                 </p>
               )}
             </div>

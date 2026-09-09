@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Avatar } from "./Avatar";
 import { useDismiss } from "../hooks/useDismiss";
+import { useLanguage, useT } from "../hooks/useLanguage";
 import { useNotifications } from "../hooks/useNotifications";
 import { useSession } from "../lib/auth-client";
 import { formatDateTime, formatRelative } from "../lib/format";
@@ -49,6 +50,8 @@ function Row({
   item: NotificationItem;
   onOpen: (item: NotificationItem) => void;
 }) {
+  const t = useT();
+  const { language } = useLanguage();
   const unread = item.readAt === null;
 
   return (
@@ -86,7 +89,9 @@ function Row({
 
         <span className="mt-1 block truncate text-[0.6875rem] text-faint">
           {item.boardTitle} ·{" "}
-          <span title={formatDateTime(item.createdAt)}>{formatRelative(item.createdAt)}</span>
+          <span title={formatDateTime(item.createdAt, language)}>
+            {formatRelative(item.createdAt, language, t)}
+          </span>
         </span>
       </span>
     </button>
@@ -102,6 +107,7 @@ function Row({
  */
 export function NotificationBell() {
   const { data: session } = useSession();
+  const t = useT();
   const inbox = useNotifications(Boolean(session));
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -137,7 +143,9 @@ export function NotificationBell() {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label={inbox.unread > 0 ? `Notifikasi, ${inbox.unread} belum dibaca` : "Notifikasi"}
+        aria-label={
+          inbox.unread > 0 ? t.notificationBell.unreadLabel(inbox.unread) : t.notificationBell.label
+        }
         className={cn(
           "relative grid size-7 place-items-center rounded-full transition-colors",
           open ? "text-accent-ink" : "text-muted hover:text-ink-soft",
@@ -177,18 +185,18 @@ export function NotificationBell() {
           <div
             ref={panelRef}
             role="dialog"
-            aria-label="Kotak masuk notifikasi"
+            aria-label={t.notificationBell.inboxLabel}
             className="sheet sheet-frost fixed bottom-24 left-1/2 z-45 w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl"
           >
             <div className="flex items-center gap-2 px-3 pt-3 pb-2">
-              <h2 className="text-sm font-semibold tracking-tight">Notifikasi</h2>
+              <h2 className="text-sm font-semibold tracking-tight">{t.notificationBell.title}</h2>
               {inbox.unread > 0 && (
                 <button
                   type="button"
                   onClick={() => void inbox.markAllRead()}
                   className="ml-auto text-xs text-muted transition-colors hover:text-accent-ink"
                 >
-                  Tandai terbaca
+                  {t.notificationBell.markAllRead}
                 </button>
               )}
             </div>
@@ -198,14 +206,14 @@ export function NotificationBell() {
             {scopes.length > 0 && (
               <div className="flex gap-2 px-3 pb-2">
                 <select
-                  aria-label="Saring menurut workspace"
+                  aria-label={t.notificationBell.filterWorkspaceLabel}
                   value={filter.workspaceId ?? ""}
                   onChange={(e) =>
                     inbox.applyFilter(e.target.value ? { workspaceId: e.target.value } : {})
                   }
                   className="field min-w-0 flex-1 py-1.5 text-xs"
                 >
-                  <option value="">Semua workspace</option>
+                  <option value="">{t.notificationBell.allWorkspaces}</option>
                   {scopes.map((scope) => (
                     <option key={scope.workspaceId} value={scope.workspaceId}>
                       {scope.workspaceName}
@@ -215,7 +223,7 @@ export function NotificationBell() {
                 </select>
 
                 <select
-                  aria-label="Saring menurut papan"
+                  aria-label={t.notificationBell.filterBoardLabel}
                   value={filter.boardId ?? ""}
                   onChange={(e) => {
                     const boardId = e.target.value;
@@ -234,7 +242,7 @@ export function NotificationBell() {
                   }}
                   className="field min-w-0 flex-1 py-1.5 text-xs"
                 >
-                  <option value="">Semua papan</option>
+                  <option value="">{t.notificationBell.allBoards}</option>
                   {boardOptions.map((scope) => (
                     <optgroup key={scope.workspaceId} label={scope.workspaceName}>
                       {scope.boards.map((board) => (
@@ -261,8 +269,8 @@ export function NotificationBell() {
               ) : inbox.items.length === 0 ? (
                 <p className="px-2 py-6 text-center text-xs leading-relaxed text-muted">
                   {filter.workspaceId || filter.boardId
-                    ? "Tidak ada notifikasi di penyaring ini."
-                    : "Belum ada notifikasi. Kabar dari kartu yang Anda ikuti akan muncul di sini."}
+                    ? t.notificationBell.emptyFiltered
+                    : t.notificationBell.emptyAll}
                 </p>
               ) : (
                 <>
@@ -283,7 +291,7 @@ export function NotificationBell() {
                       disabled={inbox.loadingMore}
                       className="mt-1 w-full rounded-xl px-2 py-2 text-xs text-muted transition-colors hover:bg-line-soft hover:text-ink-soft disabled:opacity-50"
                     >
-                      Muat lebih banyak
+                      {t.notificationBell.loadMore}
                     </button>
                   )}
                 </>

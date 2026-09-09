@@ -1,6 +1,8 @@
 import { useId, useRef, useState } from "react";
+import { useT } from "../hooks/useLanguage";
 import { api } from "../lib/api";
 import { prepareAvatar } from "../lib/avatar";
+import { MediaError } from "../lib/imageCodec";
 import {
   PROVIDER_LABEL,
   authClient,
@@ -31,6 +33,7 @@ export function ProfileSettings({
   user: SessionUser;
   accounts: LinkedAccount[] | null;
 }) {
+  const t = useT();
   const nameId = useId();
   const emailId = useId();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -53,7 +56,7 @@ export function ProfileSettings({
     try {
       setNotice(await action());
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Perubahan gagal disimpan");
+      setError(e instanceof Error ? e.message : t.profileSettings.saveError);
     } finally {
       setBusy(false);
     }
@@ -69,14 +72,16 @@ export function ProfileSettings({
 
   const pickPhoto = (file: File) =>
     run(async () => {
-      const upload = await prepareAvatar(file);
+      const upload = await prepareAvatar(file).catch((e: unknown) => {
+        throw e instanceof MediaError ? new Error(t.mediaErrors[e.reason]) : e;
+      });
       const { image } = await api.uploadAvatar(upload);
 
       const result = await updateUser({ image });
-      if (result.error) throw new Error(result.error.message ?? "Foto gagal dipasang");
+      if (result.error) throw new Error(result.error.message ?? t.profileSettings.photoFailedSet);
 
       setPreview(upload.preview);
-      return "Foto profil diperbarui.";
+      return t.profileSettings.photoUpdated;
     });
 
   const removePhoto = () =>
@@ -84,19 +89,19 @@ export function ProfileSettings({
       // Tautannya dilepas dulu: baris yang terhapus sementara masih ditunjuk
       // `user.image` cuma akan menghasilkan avatar yang gagal dimuat.
       const result = await updateUser({ image: null });
-      if (result.error) throw new Error(result.error.message ?? "Foto gagal dihapus");
+      if (result.error) throw new Error(result.error.message ?? t.profileSettings.photoFailedRemove);
 
       await api.deleteAvatar();
       setPreview(null);
-      return "Foto profil dihapus.";
+      return t.profileSettings.photoRemoved;
     });
 
   const saveName = (e: React.FormEvent) => {
     e.preventDefault();
     void run(async () => {
       const result = await updateUser({ name: name.trim() });
-      if (result.error) throw new Error(result.error.message ?? "Nama gagal disimpan");
-      return "Nama diperbarui.";
+      if (result.error) throw new Error(result.error.message ?? t.profileSettings.nameFailedSave);
+      return t.profileSettings.nameUpdated;
     });
   };
 
@@ -106,7 +111,7 @@ export function ProfileSettings({
 
     void run(async () => {
       const result = await changeEmail({ newEmail: target });
-      if (result.error) throw new Error(result.error.message ?? "Email gagal disimpan");
+      if (result.error) throw new Error(result.error.message ?? t.profileSettings.emailFailedSave);
 
       /* Email yang sudah dipakai orang lain juga dijawab "berhasil" — itu
          disengaja Better Auth, supaya tidak ada yang bisa menebak email siapa
@@ -115,10 +120,10 @@ export function ProfileSettings({
       const after = await authClient.getSession({ query: { disableCookieCache: true } });
       if (after.data?.user.email !== target) {
         setEmail(user.email);
-        throw new Error("Email itu tidak bisa dipakai — kemungkinan sudah terdaftar.");
+        throw new Error(t.profileSettings.emailInUse);
       }
 
-      return "Email diperbarui.";
+      return t.profileSettings.emailUpdated;
     });
   };
 
@@ -140,7 +145,7 @@ export function ProfileSettings({
               disabled={busy}
               className="btn btn-glass"
             >
-              {photo ? "Ganti foto" : "Unggah foto"}
+              {photo ? t.profileSettings.changePhoto : t.profileSettings.uploadPhoto}
             </button>
 
             {photo && (
@@ -150,14 +155,12 @@ export function ProfileSettings({
                 disabled={busy}
                 className="btn btn-ghost"
               >
-                Hapus
+                {t.common.delete}
               </button>
             )}
           </div>
 
-          <p className="text-xs leading-relaxed text-muted">
-            Dipangkas dari tengah menjadi persegi 256 piksel di perangkat Anda sebelum diunggah.
-          </p>
+          <p className="text-xs leading-relaxed text-muted">{t.profileSettings.photoHint}</p>
         </div>
 
         <input
@@ -177,7 +180,7 @@ export function ProfileSettings({
 
       <form onSubmit={saveName} className="mt-5 flex flex-col gap-1.5">
         <label htmlFor={nameId} className="text-xs font-medium text-muted">
-          Nama
+          {t.profileSettings.nameLabel}
         </label>
         <div className="flex items-start gap-2">
           <input
@@ -194,14 +197,14 @@ export function ProfileSettings({
             disabled={busy || !name.trim() || name.trim() === user.name}
             className="btn btn-primary"
           >
-            Simpan
+            {t.common.save}
           </button>
         </div>
       </form>
 
       <form onSubmit={saveEmail} className="mt-4 flex flex-col gap-1.5">
         <label htmlFor={emailId} className="text-xs font-medium text-muted">
-          Email
+          {t.profileSettings.emailLabel}
         </label>
         <div className="flex items-start gap-2">
           <input
@@ -232,8 +235,8 @@ export function ProfileSettings({
           (accounts ? (
             <p className="text-xs leading-relaxed text-muted">
               {provider
-                ? `Email ini mengikuti akun ${PROVIDER_LABEL[provider] ?? provider} Anda dan hanya bisa diubah di sana.`
-                : "Email yang sudah terverifikasi tidak bisa diubah dari halaman ini."}
+                ? t.profileSettings.emailLockedByProvider(PROVIDER_LABEL[provider] ?? provider)
+                : t.profileSettings.emailLockedGeneric}
             </p>
           ) : (
             <SkeletonLine className="my-1 w-full max-w-sm" />

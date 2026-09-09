@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Avatar } from "./Avatar";
 import { useDismiss } from "../hooks/useDismiss";
+import { useT } from "../hooks/useLanguage";
 import { cn } from "../lib/cn";
 import { labelTint } from "../lib/people";
 import {
@@ -10,12 +11,6 @@ import {
   type DueFilter,
 } from "../lib/boardFilter";
 import type { Label, UserBrief } from "../../shared/types";
-
-const DUE_OPTIONS: { value: DueFilter; label: string }[] = [
-  { value: "overdue", label: "Terlambat" },
-  { value: "week", label: "Minggu ini" },
-  { value: "none", label: "Tanpa tanggal" },
-];
 
 /** Corong — bentuk yang sudah biasa dibaca sebagai "saring". */
 function FilterIcon() {
@@ -60,6 +55,12 @@ interface Props {
  * skala huruf yang kebetulan bertetangga.
  */
 export function BoardFilter({ labels, people, creators, filter, onChange }: Props) {
+  const t = useT();
+  const DUE_OPTIONS: { value: DueFilter; label: string }[] = [
+    { value: "overdue", label: t.boardFilter.dueOverdue },
+    { value: "week", label: t.boardFilter.dueWeek },
+    { value: "none", label: t.boardFilter.dueNone },
+  ];
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -105,12 +106,12 @@ export function BoardFilter({ labels, people, creators, filter, onChange }: Prop
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label={active ? `Filter, ${count} aktif` : "Filter"}
-        title="Filter kartu"
+        aria-label={active ? t.boardFilter.filterActiveAria(count) : t.boardFilter.filterAria}
+        title={t.boardFilter.filterTitle}
         className="chip cursor-pointer transition-colors hover:bg-line-soft"
       >
         <FilterIcon />
-        <span className="hidden sm:inline">Filter</span>
+        <span className="hidden sm:inline">{t.boardFilter.filterButton}</span>
         {active && (
           <span className="grid size-4 place-items-center rounded-full bg-accent text-[0.625rem] leading-none font-semibold text-accent-on tabular-nums">
             {count}
@@ -122,13 +123,13 @@ export function BoardFilter({ labels, people, creators, filter, onChange }: Prop
         <div
           ref={panelRef}
           role="dialog"
-          aria-label="Filter kartu"
+          aria-label={t.boardFilter.dialogLabel}
           className="sheet sheet-frost absolute top-full right-0 z-30 mt-2 w-72 rounded-2xl p-3"
         >
           <div className="flex max-h-[min(70vh,32rem)] flex-col gap-3 overflow-y-auto">
             {labels.length > 0 && (
               <div>
-                <SectionTitle>Label</SectionTitle>
+                <SectionTitle>{t.boardFilter.sectionLabel}</SectionTitle>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {labels.map((label) => {
                     const checked = filter.labelIds.has(label.id);
@@ -155,7 +156,7 @@ export function BoardFilter({ labels, people, creators, filter, onChange }: Prop
 
             {people.length > 0 && (
               <div>
-                <SectionTitle>Orang</SectionTitle>
+                <SectionTitle>{t.boardFilter.sectionPeople}</SectionTitle>
                 <div className="mt-1.5 flex flex-col gap-0.5">
                   {people.map((person) => {
                     const checked = filter.memberIds.has(person.id);
@@ -180,7 +181,7 @@ export function BoardFilter({ labels, people, creators, filter, onChange }: Prop
 
             {creators.length > 0 && (
               <div>
-                <SectionTitle>Dibuat oleh</SectionTitle>
+                <SectionTitle>{t.boardFilter.sectionCreatedBy}</SectionTitle>
                 <div className="mt-1.5 flex flex-col gap-0.5">
                   {creators.map((person) => {
                     const checked = filter.createdByIds.has(person.id);
@@ -204,7 +205,7 @@ export function BoardFilter({ labels, people, creators, filter, onChange }: Prop
             )}
 
             <div>
-              <SectionTitle>Jatuh tempo</SectionTitle>
+              <SectionTitle>{t.boardFilter.sectionDue}</SectionTitle>
               <div className="mt-1.5 flex flex-col gap-0.5">
                 {DUE_OPTIONS.map((option) => {
                   const checked = filter.due.has(option.value);
@@ -227,7 +228,7 @@ export function BoardFilter({ labels, people, creators, filter, onChange }: Prop
 
             {labels.length === 0 && people.length === 0 && (
               <p className="px-1 text-[11px] leading-relaxed text-muted">
-                Papan ini belum punya label atau orang untuk disaring.
+                {t.boardFilter.noOptions}
               </p>
             )}
           </div>
@@ -238,7 +239,7 @@ export function BoardFilter({ labels, people, creators, filter, onChange }: Prop
               onClick={() => onChange(emptyBoardFilter())}
               className="mt-2 w-full cursor-pointer rounded-xl px-2 py-1.5 text-center text-xs text-muted transition-colors hover:bg-line-soft hover:text-accent-ink"
             >
-              Bersihkan filter
+              {t.boardFilter.clearFilters}
             </button>
           )}
         </div>

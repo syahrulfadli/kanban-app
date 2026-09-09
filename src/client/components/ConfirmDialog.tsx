@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef } from "react";
+import { useT } from "../hooks/useLanguage";
 
 interface Props {
   title: string;
@@ -18,6 +19,7 @@ export function ConfirmDialog({ title, body, confirmLabel, onConfirm, onCancel }
   const confirmRef = useRef<HTMLButtonElement>(null);
   const labelId = useId();
   const bodyId = useId();
+  const t = useT();
 
   useEffect(() => {
     confirmRef.current?.focus();
@@ -49,7 +51,7 @@ export function ConfirmDialog({ title, body, confirmLabel, onConfirm, onCancel }
 
         <div className="mt-5 flex justify-end gap-2">
           <button type="button" onClick={onCancel} className="btn btn-glass">
-            Batal
+            {t.confirmDialog.cancel}
           </button>
           <button ref={confirmRef} type="button" onClick={onConfirm} className="btn btn-danger">
             {confirmLabel}

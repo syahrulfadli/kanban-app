@@ -1,3 +1,4 @@
+import { useT } from "../hooks/useLanguage";
 import { cn } from "../lib/cn";
 import { AppHeader } from "./AppHeader";
 
@@ -124,8 +125,9 @@ const BOARD_SHAPE = [3, 2, 4];
  * selagi sesinya diperiksa — di kedua saat itu yang akan muncul adalah papan.
  */
 export function BoardSkeleton() {
+  const t = useT();
   return (
-    <SkeletonScreen label="Memuat papan…" className="flex min-h-0 flex-1 flex-col">
+    <SkeletonScreen label={t.skeleton.loadingBoard} className="flex min-h-0 flex-1 flex-col">
       <AppHeader>
         <span className="text-faint">/</span>
         <SkeletonLine className="w-14" />
@@ -171,8 +173,9 @@ export function ListSkeleton({ rows = 3, label }: { rows?: number; label: string
 
 /** Anggota workspace: nama di atas, email di bawah, peran di ujung. */
 export function MembersSkeleton({ rows = 3 }: { rows?: number }) {
+  const t = useT();
   return (
-    <SkeletonScreen label="Memuat anggota…" className="flex flex-col gap-2">
+    <SkeletonScreen label={t.skeleton.loadingMembers} className="flex flex-col gap-2">
       {Array.from({ length: rows }, (_, i) => (
         <div
           key={i}
@@ -203,6 +206,7 @@ export function ListPageSkeleton({
   crumb?: boolean;
   rows?: number;
 }) {
+  const t = useT();
   return (
     <>
       <AppHeader>
@@ -219,7 +223,7 @@ export function ListPageSkeleton({
         <SkeletonLine className="mt-3 w-full max-w-md" />
 
         <div className="mt-6">
-          <ListSkeleton rows={rows} label="Memuat halaman…" />
+          <ListSkeleton rows={rows} label={t.skeleton.loadingPage} />
         </div>
       </div>
     </>
@@ -250,8 +254,12 @@ export function FormSkeleton({ fields = 2, label }: { fields?: number; label: st
 
 /** Baris sakelar: judul dan penjelasannya di kiri, sakelarnya di kanan. */
 export function ToggleListSkeleton({ rows = 3 }: { rows?: number }) {
+  const t = useT();
   return (
-    <SkeletonScreen label="Memuat pengaturan notifikasi…" className="flex flex-col gap-4">
+    <SkeletonScreen
+      label={t.skeleton.loadingNotificationSettings}
+      className="flex flex-col gap-4"
+    >
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
@@ -267,6 +275,7 @@ export function ToggleListSkeleton({ rows = 3 }: { rows?: number }) {
 
 /** Halaman pengaturan utuh — dipakai App sebelum sesinya pasti. */
 export function SettingsPageSkeleton() {
+  const t = useT();
   return (
     <>
       <AppHeader>
@@ -282,7 +291,7 @@ export function SettingsPageSkeleton() {
             <SkeletonLine className="w-24" />
             <SkeletonLine className="my-1 w-full max-w-sm" />
             <div className="mt-4">
-              <FormSkeleton fields={fields} label="Memuat pengaturan…" />
+              <FormSkeleton fields={fields} label={t.skeleton.loadingSettings} />
             </div>
           </section>
         ))}
@@ -297,8 +306,9 @@ export function SettingsPageSkeleton() {
 
 /** Baris kabar di panel lonceng — cerminan Row di NotificationBell. */
 export function InboxSkeleton({ rows = 4 }: { rows?: number }) {
+  const t = useT();
   return (
-    <SkeletonScreen label="Memuat notifikasi…" className="flex flex-col">
+    <SkeletonScreen label={t.skeleton.loadingNotifications} className="flex flex-col">
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="flex gap-2.5 px-2 py-2">
           <Skeleton className="skeleton-round size-6 shrink-0" />
@@ -324,8 +334,9 @@ export function InboxSkeleton({ rows = 4 }: { rows?: number }) {
  * sama: label, deskripsi, dan checklist di kiri; lini masa di kanan.
  */
 export function CardDetailSkeleton() {
+  const t = useT();
   return (
-    <SkeletonScreen label="Memuat kartu…" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <SkeletonScreen label={t.skeleton.loadingCard} className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <div className="flex flex-col gap-5 px-5 pb-5 md:min-h-0 md:flex-1">
           <div className="flex flex-col gap-2">
@@ -391,9 +402,10 @@ export function CardDetailSkeleton() {
 
 /** Kartu undangan yang sedang diperiksa ke server. */
 export function InviteSkeleton() {
+  const t = useT();
   return (
     <SkeletonScreen
-      label="Memuat undangan…"
+      label={t.skeleton.loadingInvite}
       className="flex flex-1 items-center justify-center p-6"
     >
       <div className="glass glass-frost w-full max-w-sm rounded-3xl p-7">

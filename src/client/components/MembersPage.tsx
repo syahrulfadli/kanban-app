@@ -3,18 +3,15 @@ import { api } from "../lib/api";
 import { AppHeader } from "./AppHeader";
 import { Avatar } from "./Avatar";
 import { useOpenProfile } from "./ProfilePopover";
+import { useT } from "../hooks/useLanguage";
 import { navigate, paths } from "../lib/route";
 import { useSession } from "../lib/auth-client";
 import { MembersSkeleton, SkeletonLine } from "./Skeleton";
 import type { Invitation, MemberSummary, Role, WorkspaceSummary } from "../../shared/types";
 
-const ROLE_LABEL: Record<Role, string> = {
-  owner: "Pemilik",
-  admin: "Admin",
-  member: "Anggota",
-};
-
 export function MembersPage({ workspaceId }: { workspaceId: string }) {
+  const t = useT();
+  const ROLE_LABEL: Record<Role, string> = t.roles;
   const { data: session } = useSession();
   const openProfile = useOpenProfile();
   const [workspace, setWorkspace] = useState<WorkspaceSummary | null>(null);
@@ -47,7 +44,7 @@ export function MembersPage({ workspaceId }: { workspaceId: string }) {
       );
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Gagal memuat anggota");
+      setError(e instanceof Error ? e.message : t.membersPage.loadError);
     }
   }, [workspaceId]);
 
@@ -65,7 +62,7 @@ export function MembersPage({ workspaceId }: { workspaceId: string }) {
       setCopied(created.url);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal mengirim undangan");
+      setError(err instanceof Error ? err.message : t.membersPage.inviteError);
     }
   };
 
@@ -76,7 +73,7 @@ export function MembersPage({ workspaceId }: { workspaceId: string }) {
       await fn();
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Aksi gagal");
+      setError(e instanceof Error ? e.message : t.membersPage.actionError);
     }
   };
 
@@ -93,7 +90,7 @@ export function MembersPage({ workspaceId }: { workspaceId: string }) {
       </AppHeader>
 
       <div className="mx-auto w-full max-w-2xl px-5 pb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Anggota</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{t.membersPage.title}</h1>
         {error && <p className="mt-3 text-sm text-danger">{error}</p>}
 
         {!members && !error && (
@@ -125,7 +122,7 @@ export function MembersPage({ workspaceId }: { workspaceId: string }) {
                   <Avatar person={{ id: member.userId, name: member.name, email: member.email, image: member.image }} />
                   <span className="min-w-0">
                     <p className="truncate text-sm font-medium">
-                      {member.name} {isSelf && <span className="text-faint">(Anda)</span>}
+                      {member.name} {isSelf && <span className="text-faint">{t.membersPage.you}</span>}
                     </p>
                     <p className="truncate text-xs text-muted">{member.email}</p>
                   </span>
@@ -158,7 +155,7 @@ export function MembersPage({ workspaceId }: { workspaceId: string }) {
                     }
                     className="btn btn-ghost px-2.5 py-1 text-xs hover:bg-danger/10 hover:text-danger"
                   >
-                    {isSelf ? "Keluar" : "Keluarkan"}
+                    {isSelf ? t.membersPage.leave : t.membersPage.kick}
                   </button>
                 )}
               </li>
@@ -168,11 +165,8 @@ export function MembersPage({ workspaceId }: { workspaceId: string }) {
 
         {canManage && (
           <>
-            <h2 className="mt-8 text-sm font-semibold">Undang anggota</h2>
-            <p className="mt-1 text-xs text-muted">
-              Belum ada layanan email — tautan undangan disalin ke clipboard, kirim sendiri
-              lewat chat.
-            </p>
+            <h2 className="mt-8 text-sm font-semibold">{t.membersPage.inviteHeading}</h2>
+            <p className="mt-1 text-xs text-muted">{t.membersPage.inviteHint}</p>
 
             <form onSubmit={invite} className="mt-3 flex gap-2">
               <input
@@ -180,7 +174,7 @@ export function MembersPage({ workspaceId }: { workspaceId: string }) {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="email@rekan.com"
+                placeholder={t.membersPage.emailPlaceholder}
                 className="field min-w-0 flex-1"
               />
               <select
@@ -188,20 +182,20 @@ export function MembersPage({ workspaceId }: { workspaceId: string }) {
                 onChange={(e) => setRole(e.target.value as Role)}
                 className="field w-auto"
               >
-                <option value="member">Anggota</option>
-                <option value="admin">Admin</option>
+                <option value="member">{t.roles.member}</option>
+                <option value="admin">{t.roles.admin}</option>
               </select>
               <button
                 type="submit"
                 className="btn btn-primary"
               >
-                Undang
+                {t.membersPage.inviteSubmit}
               </button>
             </form>
 
             {copied && (
               <p className="mt-2 rounded-xl bg-ok/10 px-3 py-2 text-xs break-all text-ok">
-                Tautan disalin: {copied}
+                {t.membersPage.linkCopied(copied)}
               </p>
             )}
 
@@ -217,7 +211,7 @@ export function MembersPage({ workspaceId }: { workspaceId: string }) {
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm">{invitation.email}</p>
                         <p className="text-xs text-muted">
-                          {ROLE_LABEL[invitation.role]} · menunggu diterima
+                          {t.membersPage.pendingLabel(ROLE_LABEL[invitation.role])}
                         </p>
                       </div>
 
@@ -229,13 +223,13 @@ export function MembersPage({ workspaceId }: { workspaceId: string }) {
                         }
                         className="btn btn-ghost px-2.5 py-1 text-xs text-accent-ink hover:text-accent"
                       >
-                        Salin tautan
+                        {t.membersPage.copyLink}
                       </button>
                       <button
                         onClick={() => void act(() => api.revokeInvitation(invitation.id))}
                         className="btn btn-ghost px-2.5 py-1 text-xs hover:bg-danger/10 hover:text-danger"
                       >
-                        Batalkan
+                        {t.membersPage.cancelInvite}
                       </button>
                     </li>
                   ))}

@@ -1,3 +1,4 @@
+import { useT } from "../hooks/useLanguage";
 import { cn } from "../lib/cn";
 import { navigate, paths } from "../lib/route";
 
@@ -15,6 +16,8 @@ export function AppHeader({
      lain tidak mengirim apa pun dan tetap memakai tinta tema. */
   className?: string;
 }) {
+  const t = useT();
+
   return (
     <header className={cn("flex shrink-0 items-center gap-2 px-5 pt-5 pb-3", className)}>
       <button
@@ -27,7 +30,7 @@ export function AppHeader({
           <rect x="9.5" y="4" width="5" height="11" rx="1.5" fill="currentColor" opacity="0.6" />
           <rect x="16.5" y="4" width="5" height="7" rx="1.5" fill="currentColor" opacity="0.35" />
         </svg>
-        Kanban
+        {t.appHeader.appName}
       </button>
 
       {children}

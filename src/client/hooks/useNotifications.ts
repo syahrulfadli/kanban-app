@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type NotificationFilter } from "../lib/api";
 import { isSoundEnabled, playNotificationSound } from "./useSound";
+import { useT } from "./useLanguage";
 import type { NotificationFeed, NotificationItem, NotificationScope } from "../../shared/types";
 
 /**
@@ -26,6 +27,7 @@ const EMPTY_FEED: NotificationFeed = { items: [], unread: 0, scopes: [], nextCur
  *   tidak ada satu pun permintaan yang perlu berangkat.
  */
 export function useNotifications(enabled: boolean) {
+  const t = useT();
   const [unread, setUnread] = useState(0);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [scopes, setScopes] = useState<NotificationScope[]>([]);
@@ -101,7 +103,7 @@ export function useNotifications(enabled: boolean) {
         absorb(await api.getNotifications(next as NotificationFilter));
       } catch (e) {
         if (alive.current) {
-          setError(e instanceof Error ? e.message : "Gagal memuat notifikasi");
+          setError(e instanceof Error ? e.message : t.notificationBell.loadError);
           absorb(EMPTY_FEED);
           /* Nol di sini bukan kabar yang habis dibaca, melainkan daftar yang
              gagal dimuat. Kalau ia dibiarkan jadi pembanding, tarikan berikutnya
@@ -113,7 +115,7 @@ export function useNotifications(enabled: boolean) {
         if (alive.current) setLoading(false);
       }
     },
-    [absorb, enabled],
+    [absorb, enabled, t],
   );
 
   const loadMore = useCallback(async () => {
@@ -129,11 +131,11 @@ export function useNotifications(enabled: boolean) {
       setCursor(feed.nextCursor);
       noteUnread(feed.unread);
     } catch (e) {
-      if (alive.current) setError(e instanceof Error ? e.message : "Gagal memuat notifikasi");
+      if (alive.current) setError(e instanceof Error ? e.message : t.notificationBell.loadError);
     } finally {
       if (alive.current) setLoadingMore(false);
     }
-  }, [cursor, filter, loadingMore, noteUnread]);
+  }, [cursor, filter, loadingMore, noteUnread, t]);
 
   const applyFilter = useCallback(
     (next: InboxFilter) => {
@@ -179,9 +181,9 @@ export function useNotifications(enabled: boolean) {
       const { unread: fresh } = await api.markAllNotificationsRead(filter as NotificationFilter);
       noteUnread(fresh);
     } catch (e) {
-      if (alive.current) setError(e instanceof Error ? e.message : "Gagal menandai terbaca");
+      if (alive.current) setError(e instanceof Error ? e.message : t.notificationBell.markAllReadError);
     }
-  }, [filter, noteUnread]);
+  }, [filter, noteUnread, t]);
 
   /* Angka lencana: sekali saat dibuka, lalu berkala — dan segera saat tabnya
      kembali dilihat, karena tab yang tersembunyi bisa saja ketinggalan. */

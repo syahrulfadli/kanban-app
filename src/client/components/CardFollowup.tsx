@@ -5,6 +5,7 @@ import { MarkdownField } from "./MarkdownField";
 import { PencilIcon, TrashIcon } from "./icons";
 import { useOpenProfile } from "./ProfilePopover";
 import { useStoredFlag } from "../hooks/useStoredFlag";
+import { useLanguage, useT } from "../hooks/useLanguage";
 import { describeActivity } from "../lib/activity";
 import { cn } from "../lib/cn";
 import { labelTint } from "../lib/people";
@@ -57,9 +58,11 @@ function weave(comments: CardCommentDetail[], activities: CardActivityDetail[]):
 
 /** Waktu kejadian: relatif di layar, persis di tooltip. */
 function When({ at, className }: { at: Date | string; className?: string }) {
+  const t = useT();
+  const { language } = useLanguage();
   return (
-    <span className={className} title={formatDateTime(at)}>
-      {formatRelative(at)}
+    <span className={className} title={formatDateTime(at, language)}>
+      {formatRelative(at, language, t)}
     </span>
   );
 }
@@ -69,7 +72,8 @@ function When({ at, className }: { at: Date | string; className?: string }) {
  * followup yang ditulis orang: ia latar, bukan percakapan.
  */
 function ActivityRow({ activity, workspaceId }: { activity: CardActivityDetail; workspaceId: string }) {
-  const { verb, subject, color } = describeActivity(activity.kind, activity.detail);
+  const t = useT();
+  const { verb, subject, color } = describeActivity(activity.kind, activity.detail, t.activity);
   const openProfile = useOpenProfile();
   const actor = activity.actor;
 
@@ -97,7 +101,7 @@ function ActivityRow({ activity, workspaceId }: { activity: CardActivityDetail; 
             {actor.name}
           </button>
         ) : (
-          <span className="font-semibold text-muted">Seseorang</span>
+          <span className="font-semibold text-muted">{t.common.someone}</span>
         )}{" "}
         {verb}
         {subject &&
@@ -131,6 +135,7 @@ export function CardFollowup({
   const [editing, setEditing] = useState<string | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const openProfile = useOpenProfile();
+  const t = useT();
 
   /**
    * Lini masa lengkap, atau percakapannya saja.
@@ -173,7 +178,7 @@ export function CardFollowup({
   return (
     <section className="flex min-h-0 flex-1 flex-col">
       <div className="section-label px-5 pt-4 pb-2 md:px-4 md:pt-0">
-        <span>Followup</span>
+        <span>{t.cardFollowup.heading}</span>
         {comments.length > 0 && (
           <span className="tabular-nums normal-case text-muted">{comments.length}</span>
         )}
@@ -185,26 +190,20 @@ export function CardFollowup({
           type="button"
           aria-pressed={details}
           onClick={toggleDetails}
-          title={
-            details
-              ? "Sembunyikan jejak perubahan kartu"
-              : "Tampilkan jejak perubahan kartu"
-          }
+          title={details ? t.cardFollowup.hideDetailTitle : t.cardFollowup.showDetailTitle}
           className={cn(
             "ml-auto rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold tracking-normal normal-case transition-colors",
             details ? "bg-line-soft text-ink" : "text-faint hover:text-ink",
           )}
         >
-          Detail
+          {t.cardFollowup.detailToggle}
         </button>
       </div>
 
       <div ref={scroller} className="min-h-0 px-5 pb-2 md:flex-1 md:overflow-y-auto md:px-4">
         {entries.length === 0 ? (
           <p className="text-xs text-faint">
-            {details
-              ? "Belum ada jejak apa pun pada kartu ini."
-              : "Belum ada followup. Tekan Detail untuk melihat perubahan kartu."}
+            {details ? t.cardFollowup.emptyDetails : t.cardFollowup.emptyComments}
           </p>
         ) : (
           <ol className="timeline">
@@ -243,7 +242,7 @@ export function CardFollowup({
                       </button>
                       <span className="text-[0.6875rem] text-faint">
                         <When at={comment.createdAt} />
-                        {edited(comment) && " · disunting"}
+                        {edited(comment) && ` · ${t.cardFollowup.edited}`}
                       </span>
 
                       
@@ -254,7 +253,7 @@ export function CardFollowup({
                         autoFocus
                         rows={3}
                         value={comment.body}
-                        saveLabel="Simpan"
+                        saveLabel={t.common.save}
                         status={networkStatus}
                         onSave={(body) => commitEdit(comment, body)}
                         onCancel={() => setEditing(null)}
@@ -272,7 +271,7 @@ export function CardFollowup({
                             className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.6875rem] font-semibold text-faint transition-colors hover:bg-(--card-plate-hi) hover:text-ink"
                           >
                             <PencilIcon className="size-3" />
-                            Edit
+                            {t.cardFollowup.editLabel}
                           </button>
                           <button
                             type="button"
@@ -280,7 +279,7 @@ export function CardFollowup({
                             className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.6875rem] font-semibold text-faint transition-colors hover:bg-danger/10 hover:text-danger"
                           >
                             <TrashIcon className="size-3" />
-                            Hapus
+                            {t.cardFollowup.deleteLabel}
                           </button>
                         </span>
                       )}
@@ -299,8 +298,8 @@ export function CardFollowup({
           key={composerKey}
           value=""
           rows={2}
-          placeholder="Tulis followup… (Mendukung format Markdown)"
-          saveLabel="Kirim"
+          placeholder={t.cardFollowup.composerPlaceholder}
+          saveLabel={t.common.send}
           status={networkStatus}
           onSave={submitNew}
           onCancel={resetComposer}

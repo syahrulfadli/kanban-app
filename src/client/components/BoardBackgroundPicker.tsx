@@ -1,15 +1,14 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useDismiss } from "../hooks/useDismiss";
+import { useT } from "../hooks/useLanguage";
 import { api, type BoardBackgroundPatch } from "../lib/api";
 import { thumbSrc } from "../lib/background";
 import { cn } from "../lib/cn";
 import { Toggle } from "./Toggle";
 import {
-  BOARD_BLUR_LABELS,
   BOARD_BLUR_LEVELS,
   BOARD_GRADIENTS,
-  BOARD_GRADIENT_LABELS,
   type BackgroundImageBrief,
   type BoardBackground,
   type BoardBlur,
@@ -101,6 +100,7 @@ function ImageOptions({
   onOverlay: (next: boolean) => void;
   onBlur: (next: BoardBlur) => void;
 }) {
+  const t = useT();
   const overlayId = useId();
 
   return (
@@ -108,19 +108,16 @@ function ImageOptions({
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <p id={overlayId} className="text-xs font-medium">
-            <i>Overlay</i>
+            <i>{t.boardBackgroundPicker.overlayTitle}</i>
           </p>
           <p className="mt-0.5 text-[11px] leading-relaxed text-muted">
-            Menjaga tulisan tetap terbaca. Dimatikan, fotonya tampil utuh dan warna
-            teks mengikuti terang-gelap fotonya.
+            {t.boardBackgroundPicker.overlayHint}
           </p>
         </div>
         <Toggle checked={overlay} onChange={onOverlay} labelledBy={overlayId} size="sm" />
       </div>
 
-      <p className="mt-3 text-xs font-medium">
-        Efek <i>blur</i>
-      </p>
+      <p className="mt-3 text-xs font-medium">{t.boardBackgroundPicker.blurEffectTitle}</p>
       <div className="mt-1.5 flex items-center gap-1">
         {BOARD_BLUR_LEVELS.map((level) => (
           <button
@@ -135,7 +132,7 @@ function ImageOptions({
                 : "text-muted hover:bg-line-soft",
             )}
           >
-            {BOARD_BLUR_LABELS[level]}
+            {t.boardBackgroundPicker.blurLabels[level]}
           </button>
         ))}
       </div>
@@ -162,6 +159,7 @@ interface Props {
  * latarnya, dan gambar Unsplash bukan payload yang layak dibayar di muka.
  */
 export function BoardBackgroundPicker({ boardId, background, onChanged }: Props) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [images, setImages] = useState<BackgroundImageBrief[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -179,7 +177,7 @@ export function BoardBackgroundPicker({ boardId, background, onChanged }: Props)
       .listBackgrounds()
       .then(setImages)
       .catch((e: unknown) =>
-        setError(e instanceof Error ? e.message : "Gagal memuat daftar gambar"),
+        setError(e instanceof Error ? e.message : t.boardBackgroundPicker.loadListError),
       );
   }, [open, images]);
 
@@ -210,7 +208,7 @@ export function BoardBackgroundPicker({ boardId, background, onChanged }: Props)
       setError(null);
       onChanged();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Gagal mengganti latar");
+      setError(e instanceof Error ? e.message : t.boardBackgroundPicker.changeError);
     } finally {
       setSaving(false);
     }
@@ -232,8 +230,8 @@ export function BoardBackgroundPicker({ boardId, background, onChanged }: Props)
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label="Ganti latar papan"
-        title="Ganti latar papan"
+        aria-label={t.boardBackgroundPicker.changeBackgroundAria}
+        title={t.boardBackgroundPicker.changeBackgroundTitle}
         className="chip cursor-pointer transition-colors hover:bg-line-soft"
       >
         <svg
@@ -248,7 +246,7 @@ export function BoardBackgroundPicker({ boardId, background, onChanged }: Props)
         >
           {SCENERY}
         </svg>
-        <span className="hidden sm:inline">Latar</span>
+        <span className="hidden sm:inline">{t.boardBackgroundPicker.backgroundButton}</span>
       </button>
 
       {open &&
@@ -257,13 +255,15 @@ export function BoardBackgroundPicker({ boardId, background, onChanged }: Props)
           <div
             ref={panelRef}
             role="dialog"
-            aria-label="Latar papan"
+            aria-label={t.boardBackgroundPicker.dialogLabel}
             style={{ top: anchor.top, right: anchor.right }}
             className="sheet sheet-frost fixed z-45 max-h-[70vh] w-80 max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-2xl p-3"
           >
-            <p className="text-xs font-semibold tracking-tight">Latar papan</p>
+            <p className="text-xs font-semibold tracking-tight">
+              {t.boardBackgroundPicker.panelTitle}
+            </p>
             <p className="mt-0.5 text-[11px] leading-relaxed text-muted">
-              Berlaku untuk semua anggota papan ini.
+              {t.boardBackgroundPicker.panelHint}
             </p>
 
             {error && <p className="mt-2 text-[11px] text-danger">{error}</p>}
@@ -276,7 +276,7 @@ export function BoardBackgroundPicker({ boardId, background, onChanged }: Props)
             >
               <div className="grid grid-cols-3 gap-2">
                 <Swatch
-                  label="Bawaan"
+                  label={t.boardBackgroundPicker.defaultLabel}
                   selected={background.kind === "default"}
                   onClick={() => void choose({ kind: "default" })}
                 >
@@ -286,7 +286,7 @@ export function BoardBackgroundPicker({ boardId, background, onChanged }: Props)
                 {BOARD_GRADIENTS.map((gradient) => (
                   <Swatch
                     key={gradient}
-                    label={BOARD_GRADIENT_LABELS[gradient]}
+                    label={t.boardBackgroundPicker.gradientLabels[gradient]}
                     selected={selectedGradient === gradient}
                     onClick={() => void choose({ kind: "gradient", value: gradient })}
                   >
@@ -295,16 +295,19 @@ export function BoardBackgroundPicker({ boardId, background, onChanged }: Props)
                 ))}
               </div>
 
-              <p className="mt-4 text-xs font-semibold tracking-tight">Gambar</p>
+              <p className="mt-4 text-xs font-semibold tracking-tight">
+                {t.boardBackgroundPicker.imagesTitle}
+              </p>
 
               {images === null && !error && (
-                <p className="mt-2 text-[11px] text-muted">Memuat…</p>
+                <p className="mt-2 text-[11px] text-muted">
+                  {t.boardBackgroundPicker.loadingImages}
+                </p>
               )}
 
               {images?.length === 0 && (
                 <p className="mt-2 text-[11px] leading-relaxed text-muted">
-                  Belum ada gambar yang dikurasi. Admin aplikasi bisa menambahkannya lewat
-                  panel admin.
+                  {t.boardBackgroundPicker.noImages}
                 </p>
               )}
 
@@ -357,6 +360,7 @@ export function BoardBackgroundPicker({ boardId, background, onChanged }: Props)
  * gambar yang sedang terpasang, bukan gambar yang sedang dipilih.
  */
 export function PhotoCredit({ image }: { image: BackgroundImageBrief }) {
+  const t = useT();
   const name = image.photographerUrl ? (
     <a
       href={image.photographerUrl}
@@ -372,7 +376,7 @@ export function PhotoCredit({ image }: { image: BackgroundImageBrief }) {
 
   return (
     <p className="photo-credit pointer-events-auto">
-      Foto oleh {name} di{" "}
+      {t.boardBackgroundPicker.photoCreditPrefix} {name} {t.boardBackgroundPicker.photoCreditOn}{" "}
       <a
         href="https://unsplash.com"
         target="_blank"
