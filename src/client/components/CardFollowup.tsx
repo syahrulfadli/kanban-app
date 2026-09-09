@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "./Avatar";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { Markdown } from "./Markdown";
 import { MarkdownField } from "./MarkdownField";
 import { PencilIcon, TrashIcon } from "./icons";
@@ -133,6 +134,7 @@ export function CardFollowup({
   onDelete,
 }: Props) {
   const [editing, setEditing] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<CardCommentDetail | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const openProfile = useOpenProfile();
   const t = useT();
@@ -275,7 +277,7 @@ export function CardFollowup({
                           </button>
                           <button
                             type="button"
-                            onClick={() => onDelete(comment)}
+                            onClick={() => setPendingDelete(comment)}
                             className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.6875rem] font-semibold text-faint transition-colors hover:bg-danger/10 hover:text-danger"
                           >
                             <TrashIcon className="size-3" />
@@ -305,6 +307,27 @@ export function CardFollowup({
           onCancel={resetComposer}
         />
       </div>
+
+      {/* Beda dari pemakaian `ConfirmDialog` lain di aplikasi ini (selalu
+          bertetangga dengan dialog induknya, bukan anaknya): di sini ia lahir
+          di dalam `CardModal`, yang punya penjaga Escape sendiri. Tanpa
+          `stopPropagation`, Escape yang membatalkan konfirmasi ini akan terus
+          menembus ke atas dan ikut menutup seluruh kartu — persis alasan yang
+          sama dengan `Lightbox`. */}
+      {pendingDelete && (
+        <div onKeyDown={(e) => e.key === "Escape" && e.stopPropagation()}>
+          <ConfirmDialog
+            title={t.cardFollowup.deleteConfirmTitle}
+            body={t.cardFollowup.deleteConfirmBody}
+            confirmLabel={t.cardFollowup.deleteConfirmLabel}
+            onConfirm={() => {
+              onDelete(pendingDelete);
+              setPendingDelete(null);
+            }}
+            onCancel={() => setPendingDelete(null)}
+          />
+        </div>
+      )}
     </section>
   );
 }

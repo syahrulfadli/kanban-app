@@ -147,6 +147,10 @@ export const en = {
     editLabel: "Edit",
     deleteLabel: "Delete",
     composerPlaceholder: "Write a comment… (Markdown is supported)",
+    deleteConfirmTitle: "Delete this comment?",
+    deleteConfirmBody: "A deleted comment can't be recovered once the undo window closes.",
+    deleteConfirmLabel: "Delete comment",
+    deletedToast: "Comment deleted",
   },
 
   cardModal: {

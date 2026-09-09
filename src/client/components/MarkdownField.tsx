@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Markdown } from "./Markdown";
 import { useT } from "../hooks/useLanguage";
 import { cn } from "../lib/cn";
@@ -14,6 +14,9 @@ interface Props {
   saveLabel?: string;
   /** Draf kosong boleh disimpan (mengosongkan deskripsi) atau tidak (followup). */
   allowEmpty?: boolean;
+  /** Tinggi mengikuti isi alih-alih dijerat gagang seret — dipakai deskripsi,
+   *  yang naskahnya sering jauh lebih panjang daripada `rows` awalnya. */
+  autoGrow?: boolean;
   status: ChannelStatus;
   onSave: (value: string) => void;
   onCancel: () => void;
@@ -39,6 +42,7 @@ export function MarkdownField({
   rows = 4,
   saveLabel,
   allowEmpty = false,
+  autoGrow = false,
   status,
   onSave,
   onCancel,
@@ -47,6 +51,7 @@ export function MarkdownField({
   const t = useT();
   const [draft, setDraft] = useState(value);
   const [mode, setMode] = useState<"write" | "preview">("write");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const offline = status !== "live";
   const trimmed = draft.trim();
@@ -57,6 +62,17 @@ export function MarkdownField({
     if (!canSave) return;
     onSave(trimmed);
   };
+
+  // Tinggi dihitung ulang dari kontennya sendiri tiap ketikan — dilepas ke
+  // "auto" dulu supaya scrollHeight tidak ikut terjebak di tinggi lama saat
+  // teksnya justru menyusut (mis. baris dihapus).
+  useEffect(() => {
+    if (!autoGrow) return;
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [autoGrow, draft, mode]);
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>
@@ -79,6 +95,7 @@ export function MarkdownField({
 
       {mode === "write" ? (
         <textarea
+          ref={textareaRef}
           autoFocus={autoFocus}
           rows={rows}
           value={draft}
@@ -94,7 +111,7 @@ export function MarkdownField({
               onCancel();
             }
           }}
-          className="field resize-y"
+          className={cn("field", autoGrow ? "resize-none overflow-hidden" : "resize-y")}
         />
       ) : trimmed ? (
         <Markdown source={draft} className="field min-h-24" />

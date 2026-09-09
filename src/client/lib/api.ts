@@ -251,7 +251,8 @@ export const api = {
     send<CardCommentDetail>(`/cards/${cardId}/comments`, "POST", { body }),
   updateComment: (id: string, body: string) =>
     send<CardCommentDetail>(`/cards/comments/${id}`, "PATCH", { body }),
-  deleteComment: (id: string) => send<void>(`/cards/comments/${id}`, "DELETE"),
+  deleteComment: (id: string, options?: SendOptions) =>
+    send<void>(`/cards/comments/${id}`, "DELETE", undefined, options),
 
   /* kotak masuk notifikasi */
   getNotifications: (filter: NotificationFilter = {}) =>

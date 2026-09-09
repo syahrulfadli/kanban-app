@@ -150,6 +150,11 @@ export const id = {
     editLabel: "Edit",
     deleteLabel: "Hapus",
     composerPlaceholder: "Tulis komentar… (bisa pakai format Markdown)",
+    deleteConfirmTitle: "Hapus komentar ini?",
+    deleteConfirmBody:
+      "Komentar yang terhapus tidak bisa dipulihkan setelah jendela urung tutup.",
+    deleteConfirmLabel: "Hapus komentar",
+    deletedToast: "Komentar dihapus",
   },
 
   cardModal: {

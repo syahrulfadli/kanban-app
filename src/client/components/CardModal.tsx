@@ -16,12 +16,14 @@ import { useDismiss } from "../hooks/useDismiss";
 import { useStoredFlag } from "../hooks/useStoredFlag";
 import { useLanguage, useT } from "../hooks/useLanguage";
 import { useOpenProfile } from "./ProfilePopover";
+import { useUndo } from "./UndoToasts";
 import { api, ApiError } from "../lib/api";
 import { optimisticActivity, type ActivityNote } from "../lib/activity";
 import { prepareAttachment } from "../lib/attachment";
 import { MediaError } from "../lib/imageCodec";
 import { cn } from "../lib/cn";
 import { formatDateTime, formatRelative } from "../lib/format";
+import { insertAt } from "../lib/reorder";
 import type { ChannelStatus } from "../lib/realtime";
 import type {
   CardAttachmentDetail,
@@ -219,6 +221,7 @@ export function CardModal({
 }: Props) {
   const t = useT();
   const { language } = useLanguage();
+  const undo = useUndo();
   const [detail, setDetail] = useState<CardDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -654,12 +657,59 @@ export function CardModal({
       () => api.updateComment(comment.id, body),
     );
 
-  const deleteComment = (comment: CardCommentDetail) =>
-    void run(
-      (card) => ({ ...card, comments: card.comments.filter((c) => c.id !== comment.id) }),
-      () => api.deleteComment(comment.id),
-      { kind: "comment_deleted" },
+  /* Hapus komentar: hilang dari layar sekarang, dikirim ke server setelah
+     jendela urung habis — pola yang sama dengan hapus kartu/kolom di
+     useBoard.ts, hanya di sini menyunting `detail` satu kartu alih-alih
+     board. Konfirmasinya sendiri ditanyakan CardFollowup lewat ConfirmDialog
+     sebelum fungsi ini dipanggil. */
+  const deleteComment = (comment: CardCommentDetail) => {
+    if (!detail) return;
+    const index = detail.comments.findIndex((c) => c.id === comment.id);
+    if (index < 0) return;
+
+    const before = {
+      activities: detail.activities,
+      updatedAt: detail.updatedAt,
+      updatedBy: detail.updatedBy,
+      updatedByUser: detail.updatedByUser,
+      participants: detail.participants,
+    };
+    const note = optimisticActivity(cardId, currentUser, { kind: "comment_deleted" });
+
+    setDetail((prev) =>
+      prev
+        ? {
+            ...prev,
+            comments: prev.comments.filter((c) => c.id !== comment.id),
+            activities: [...prev.activities, note],
+            updatedAt: new Date(),
+            updatedBy: currentUser.id,
+            updatedByUser: currentUser,
+            participants: prev.participants.some((p) => p.id === currentUser.id)
+              ? prev.participants
+              : [...prev.participants, currentUser],
+          }
+        : prev,
     );
+
+    undo({
+      message: t.cardFollowup.deletedToast,
+      /* `onBoardChange` menunggu di sini, bukan langsung di atas: muka kartu
+         di papan menghitung followup dari data server, dan selama jendela
+         urung masih terbuka DELETE-nya belum benar-benar terkirim — menarik
+         ulang board sekarang cuma akan membaca angka lama. */
+      commit: async (options) => {
+        await api.deleteComment(comment.id, options);
+        onBoardChange();
+      },
+      revert: () => {
+        setDetail((prev) =>
+          prev ? { ...prev, comments: insertAt(prev.comments, comment, index), ...before } : prev,
+        );
+      },
+      onError: setError,
+    });
+  };
 
   return (
     /* Pembungkus sengaja tidak menggulir: kalau ia menggulir, kelam di
@@ -954,7 +1004,8 @@ export function CardModal({
                   {editingDescription ? (
                     <MarkdownField
                       autoFocus
-                      rows={4}
+                      rows={8}
+                      autoGrow
                       value={detail.description ?? ""}
                       placeholder={t.cardModal.descriptionPlaceholder}
                       allowEmpty
