@@ -1,8 +1,84 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Markdown } from "./Markdown";
+import { HelpIcon } from "./icons";
+import { useDismiss } from "../hooks/useDismiss";
 import { useT } from "../hooks/useLanguage";
 import { cn } from "../lib/cn";
 import type { ChannelStatus } from "../lib/realtime";
+
+/**
+ * Tanda tanya kecil di samping tab Tulis/Pratinjau — buka lembar ringkas
+ * berisi sintaks markdown yang dipakai (tebal, miring, daftar, dst). Dipakai
+ * bersama oleh deskripsi kartu dan followup lewat `MarkdownField`, jadi
+ * cukup ditaruh sekali di sini, bukan di masing-masing pemanggilnya.
+ */
+function MarkdownTipsButton() {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const [openUpward, setOpenUpward] = useState(false);
+  const anchorRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useDismiss(open, () => setOpen(false), [anchorRef, panelRef]);
+
+  /* Arahnya menyesuaikan ruang yang ada, bukan dipatok satu arah: tombol ini
+     dipakai di deskripsi (dekat puncak panel kartu, ruang di bawahnya luas)
+     maupun di followup (dekat dasar panel, ruang di bawahnya nyaris tidak
+     ada). Dipatok ke bawah saja lembar ini terpotong tepi panel di
+     followup; dipatok ke atas saja ia terpotong tepi panel di deskripsi.
+     Diukur lewat `useLayoutEffect` supaya baris salah tidak sempat kelihatan
+     sebelum browser menggambar bingkai berikutnya. */
+  useLayoutEffect(() => {
+    if (!open) return;
+    const anchor = anchorRef.current;
+    const panel = panelRef.current;
+    if (!anchor || !panel) return;
+    const anchorRect = anchor.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - anchorRect.bottom;
+    const spaceAbove = anchorRect.top;
+    setOpenUpward(spaceBelow < panel.offsetHeight + 12 && spaceAbove > spaceBelow);
+  }, [open]);
+
+  return (
+    <div className="relative ml-auto">
+      <button
+        ref={anchorRef}
+        type="button"
+        aria-label={t.markdownTips.triggerAria}
+        aria-pressed={open}
+        onClick={() => setOpen((v) => !v)}
+        className="grid size-5 place-items-center rounded-full text-faint transition-colors hover:bg-line-soft hover:text-ink"
+      >
+        <HelpIcon className="size-3.5" />
+      </button>
+
+      {open && (
+        <div
+          ref={panelRef}
+          role="dialog"
+          aria-label={t.markdownTips.title}
+          className={cn(
+            "sheet absolute right-0 z-30 w-60 rounded-2xl p-3 text-left",
+            openUpward ? "bottom-full mb-1.5" : "top-full mt-1.5",
+          )}
+        >
+          <p className="mb-2 text-xs font-semibold tracking-tight">{t.markdownTips.title}</p>
+          <div className="space-y-1">
+            {t.markdownTips.rows.map((row) => (
+              <div key={row.markup} className="flex items-center justify-between gap-3 text-xs">
+                <code className="rounded bg-line-soft px-1 py-0.5 font-mono text-[0.6875rem]">
+                  {row.markup}
+                </code>
+                <span className="text-muted">{row.result}</span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2.5 text-[0.6875rem] text-faint">{t.markdownTips.newline}</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface Props {
   /** Nilai tersimpan saat ini — dipakai sebagai draf awal dan pembanding "berubah". */
@@ -91,6 +167,7 @@ export function MarkdownField({
             {tab === "write" ? t.markdownField.write : t.markdownField.preview}
           </button>
         ))}
+        <MarkdownTipsButton />
       </div>
 
       {mode === "write" ? (

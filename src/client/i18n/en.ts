@@ -554,6 +554,23 @@ export const en = {
     waitingForNetwork: "Waiting for network…",
   },
 
+  markdownTips: {
+    triggerAria: "How to write markdown formatting",
+    title: "Formatting tips",
+    rows: [
+      { markup: "**bold**", result: "bold" },
+      { markup: "*italic*", result: "italic" },
+      { markup: "~~strike~~", result: "strike" },
+      { markup: "# Heading", result: "Big heading" },
+      { markup: "- item", result: "Bulleted list" },
+      { markup: "1. item", result: "Numbered list" },
+      { markup: "> quote", result: "Quote" },
+      { markup: "`code`", result: "Inline code" },
+      { markup: "[link](url)", result: "Link" },
+    ],
+    newline: "A single Enter is already a line break — no blank line needed between them.",
+  },
+
   cardSearch: {
     crumbTitle: (workspace: string, board: string, column: string) =>
       `${workspace} · ${board} · ${column}`,

@@ -560,6 +560,23 @@ export const id = {
     waitingForNetwork: "Menunggu jaringan…",
   },
 
+  markdownTips: {
+    triggerAria: "Cara menulis format markdown",
+    title: "Format penulisan",
+    rows: [
+      { markup: "**tebal**", result: "tebal" },
+      { markup: "*miring*", result: "miring" },
+      { markup: "~~coret~~", result: "coret" },
+      { markup: "# Judul", result: "Judul besar" },
+      { markup: "- daftar", result: "Daftar bertitik" },
+      { markup: "1. daftar", result: "Daftar bernomor" },
+      { markup: "> kutipan", result: "Kutipan" },
+      { markup: "`kode`", result: "Kode sebaris" },
+      { markup: "[tautan](url)", result: "Tautan" },
+    ],
+    newline: "Enter tunggal langsung jadi baris baru — tidak perlu baris kosong di antaranya.",
+  },
+
   cardSearch: {
     crumbTitle: (workspace: string, board: string, column: string) =>
       `${workspace} · ${board} · ${column}`,
