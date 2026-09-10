@@ -415,27 +415,23 @@ body {
     backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
   }
 
-  /* Kaca cair — kapsul navigasi.
-     Peta refraksinya ada di index.html (#glassLiquidNav) — bibir tegak
-     lurus, datar di tengah, dibengkokkan jauh, karena di sini efeknya
-     adalah tampilan kapsul itu sendiri, bukan cuma sentuhan di tepi dialog.
-
-     Peta ini datar di tengah dan cuma menekuk dekat tepi — di kapsul yang
-     pendek (~48px) itu berarti tepi atas-bawahnya kurang ikut melengkung
-     kalau diperiksa sangat dekat. Sempat diganti feTurbulence (menggeser
-     seluruh permukaan) supaya sampai ke semua pinggiran, lalu dikembalikan
-     ke sini atas permintaan — rupa peta bibir inilah yang dimaksud "efek
-     liquid glass sebelumnya", dan keterbatasannya di tepi pendek diterima
-     sebagai harga rupa itu.
+  /* Kaca cair — kapsul navigasi, dan tombol kepala papan berbentuk serupa
+     (pil pendek melebar: Filter/Arsip/Latar/jumlah terhubung, lewat
+     .chip-glass). Peta refraksinya ada di index.html (#glassLiquidNav) —
+     skalanya SAMA dengan dialog (14.61/16.23/17.85), TAPI pita tekukan
+     sumbu-Y-nya menekuk berangsur hampir di seluruh tinggi elemen, bukan
+     cuma dekat tepi seperti punya dialog — lihat catatan panjang di
+     index.html untuk kenapa: menaikkan SKALA alih-alih melebarkan pita
+     pernah dicoba dan hasilnya membengkokkan tampak terbalik pada elemen
+     sependek ini.
 
      Dua angka yang diminta punya arti berbeda dan sengaja tidak saling
      mengganti: BLUR mengaburkan apa yang tembus, REFRAKSI membengkokkannya.
      Menaikkan blur untuk membuat sesuatu "terlihat kaca" hanya menghasilkan
      jendela buram — kaca sungguhan tetap tajam, yang melengkung adalah
      bentuk benda di baliknya. Karena itu blur-nya sengaja ditahan sangat
-     rendah (5% dari rentang wajar 0–20px ≈ 1px, sekadar melembutkan jahitan
-     piksel) sementara bengkoknya besar (65% dari rentang 0–100 pada
-     feDisplacementMap).
+     rendah (cuma 1px, sekadar melembutkan jahitan piksel) sementara
+     bengkoknya yang membawa kesan "kaca cair"-nya.
 
      Isiannya juga ditipiskan di sini, bukan di token --glass-fill global:
      kolom dan dialog masih perlu isian yang cukup tebal untuk kartu di
