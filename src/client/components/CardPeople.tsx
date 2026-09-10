@@ -161,13 +161,13 @@ export function CardPeople({ members, workspaceId, onAdd, onRemove }: Props) {
               {error && <p className="px-2 py-3 text-center text-xs text-danger">{error}</p>}
 
               {!people && !error && (
-                <p className="px-2 py-3 text-center text-xs text-faint">
+                <p className="px-2 py-3 text-center text-xs text-muted">
                   {t.cardPeople.loadingMembers}
                 </p>
               )}
 
               {people && shown.length === 0 && !error && (
-                <p className="px-2 py-3 text-center text-xs text-faint">
+                <p className="px-2 py-3 text-center text-xs text-muted">
                   {needle ? t.cardPeople.noMatches : t.cardPeople.noOtherMembers}
                 </p>
               )}
@@ -193,7 +193,7 @@ export function CardPeople({ members, workspaceId, onAdd, onRemove }: Props) {
 
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm">{person.name}</span>
-                    <span className="block truncate text-[0.6875rem] text-faint">
+                    <span className="block truncate text-[0.6875rem] text-muted">
                       {person.email}
                     </span>
                   </span>

@@ -56,7 +56,7 @@ function Swatch({
       </span>
       <span
         className={cn(
-          "truncate text-[11px] leading-tight",
+          "truncate text-xs leading-tight",
           selected ? "text-accent-ink" : "text-muted",
         )}
       >
@@ -110,7 +110,7 @@ function ImageOptions({
           <p id={overlayId} className="text-xs font-medium">
             <i>{t.boardBackgroundPicker.overlayTitle}</i>
           </p>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-muted">
+          <p className="mt-0.5 text-xs leading-relaxed text-muted">
             {t.boardBackgroundPicker.overlayHint}
           </p>
         </div>
@@ -126,7 +126,7 @@ function ImageOptions({
             onClick={() => onBlur(level)}
             aria-pressed={blur === level}
             className={cn(
-              "flex-1 rounded-full px-2 py-1 text-[11px] transition-colors",
+              "flex-1 rounded-full px-2 py-1 text-xs transition-colors",
               blur === level
                 ? "bg-accent-soft text-accent-ink"
                 : "text-muted hover:bg-line-soft",
@@ -262,11 +262,11 @@ export function BoardBackgroundPicker({ boardId, background, onChanged }: Props)
             <p className="text-xs font-semibold tracking-tight">
               {t.boardBackgroundPicker.panelTitle}
             </p>
-            <p className="mt-0.5 text-[11px] leading-relaxed text-muted">
+            <p className="mt-0.5 text-xs leading-relaxed text-muted">
               {t.boardBackgroundPicker.panelHint}
             </p>
 
-            {error && <p className="mt-2 text-[11px] text-danger">{error}</p>}
+            {error && <p className="mt-2 text-xs text-danger">{error}</p>}
 
             <div
               className={cn(
@@ -300,13 +300,13 @@ export function BoardBackgroundPicker({ boardId, background, onChanged }: Props)
               </p>
 
               {images === null && !error && (
-                <p className="mt-2 text-[11px] text-muted">
+                <p className="mt-2 text-xs text-muted">
                   {t.boardBackgroundPicker.loadingImages}
                 </p>
               )}
 
               {images?.length === 0 && (
-                <p className="mt-2 text-[11px] leading-relaxed text-muted">
+                <p className="mt-2 text-xs leading-relaxed text-muted">
                   {t.boardBackgroundPicker.noImages}
                 </p>
               )}

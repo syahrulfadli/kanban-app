@@ -885,3 +885,211 @@ tenggat ditandai selesai → diabaikan diam-diam, tanpa catatan palsu di
 lini masa; (7) `dueAt` + `dueDone` dalam satu permintaan → langsung
 selesai, `due_done` tercatat; (8) payload `GET /boards/:id` membawa
 `dueDoneAt` (yang dibaca muka kartu untuk ronanya).
+
+## 8. Readabilitas: penekanan (emphasis) dan ukuran teks di seluruh papan — **selesai**
+
+Diimplementasikan persis rencana di bawah, lewat perubahan warna/ukuran
+saja — tidak ada tata letak yang berubah:
+
+- `.section-label` ([index.css:1414](src/client/index.css#L1414)):
+  `--color-faint` → `--color-muted`, `uppercase`+`tracking` dipertahankan
+  (efeknya menjalar otomatis ke tujuh titik pakainya: `CardModal`,
+  `CardChecklist`, `CardLabels`, `CardPeople`, `CardDue`).
+- `CardItem`: judul kartu `text-ink-soft` → `text-ink`; baris meta
+  (tenggat/checklist/lampiran/komentar) `text-[0.6875rem]` → `text-xs`,
+  dan wrapper-nya `text-faint` → `text-muted` (termasuk fraksi checklist
+  yang belum selesai, `item.done ? ... : "text-faint"` →  `"text-muted"`).
+- `BoardFilter`/`BoardBackgroundPicker`: baris isi yang dibaca sungguhan
+  (nama orang, label due, deskripsi latar, label swatch gambar, pesan
+  galat) naik dari `text-[11px]` ke `text-xs`; badge angka murni
+  dibiarkan di ukuran lamanya.
+- `LiveIndicator`: label "Anda" `text-faint` → `text-muted`.
+- Disapu ulang seluruh `text-faint` yang menempel pada teks yang memang
+  dibaca (bukan ikon tombol dekoratif) di `CardModal` (jejak "Dibuat
+  oleh…"/"Diubah oleh…", naik juga ke `text-xs`), `CardFollowup` (baris
+  aktivitas linimasa, timestamp & tombol Edit/Hapus komentar),
+  `CardPeople` (email di baris orang, pesan kosong), `CardLabels` (pesan
+  kosong), `CardAttachments` (ukuran berkas, keterangan "maks 500 KB"),
+  dan `MarkdownField` (tip baris baru) — semuanya `text-faint` →
+  `text-muted`, ukuran dipertahankan kecuali disebut naik di atas.
+  Ikon tombol dekoratif (hapus/silang) sengaja **tidak** disentuh —
+  presedennya sudah ada di `CardModal.tsx:153` (komentar yang
+  membedakan teks-yang-dibaca dari afordansi ikon), jadi diikuti, bukan
+  ditemukan ulang.
+- `.markdown-body` (`index.css:844`) diperiksa dan **tidak diubah** —
+  sudah `line-height: 1.625` (setara `leading-relaxed`), poin #6 di
+  rencana ternyata sudah terpenuhi sebelum rencana ini ditulis.
+
+`npx tsc --noEmit` bersih. Diuji langsung di browser (Playwright headless,
+akun baru, kedua tema — skrip mendaftar, bikin workspace, board dengan
+kolom bawaan, tiga kartu, lalu pada satu kartu menambah label, checklist,
+dan komentar): judul kartu di muka papan tampil putih penuh (bukan lagi
+abu-abu redup) di kedua tema; label bagian di dalam `CardModal`
+("LABEL"/"ORANG"/"DESKRIPSI"/"BATAS WAKTU"/"CHECKLIST"/"LAMPIRAN"/
+"KOMENTAR") terbaca jelas sebagai abu-abu sedang, bukan lagi nyaris
+tak-kelihatan; baris "Dibuat oleh Rani Pratama · baru saja" di kaki
+dialog dan baris komentar (nama, waktu, tombol Edit/Hapus) semuanya
+terbaca; panel Filter (checklist Label/Orang/Dibuat oleh/Batas waktu) dan
+panel Latar (label tiap swatch gambar, keterangan "Berlaku untuk semua
+anggota papan ini") terbaca jelas di kedua tema tanpa terasa penuh-sesak;
+panel Arsip (tak tersentuh perubahan ini) tetap seperti semula sebagai
+pembanding. Tidak ada error konsol React di sepanjang pengujian, tidak
+ada tata letak yang pecah/terpotong akibat ukuran font yang naik.
+
+**Belum sempat diuji visual** (perubahan warna sejenis, pola sama dengan
+yang sudah diverifikasi di atas, risiko rendah): status "selesai"
+checklist bercoret (`text-muted line-through`), tenggat terlambat
+(warna status tetap menang atas perubahan ini, tidak disentuh), dan
+label "Anda" di daftar penampil `LiveIndicator` (butuh dua sesi
+sekaligus di board yang sama untuk memunculkannya).
+
+---
+
+**Masalah:** diminta perbaikan keterbacaan dan kenyamanan baca di tampilan
+papan secara umum — bukan bug fungsional, tapi banyak teks di sana memang
+kecil dan pudar sekaligus. Disurvei langsung ke kode sebelum menulis
+rencana ini, bukan dikira-kira:
+
+- `.section-label` ([index.css:1414](src/client/index.css#L1414)) — kelas
+  bersama untuk judul tiap bagian di dalam `CardModal` (Deskripsi, Label,
+  Orang, Tenggat, Checklist, dan seterusnya — dipakai di tujuh titik:
+  `CardModal`, `CardChecklist`, `CardLabels`, `CardPeople`, `CardDue`, dst).
+  11px, `uppercase`, `letter-spacing` lebar, tebal (700), tapi warnanya
+  `--color-faint` — tingkat kontras terendah di tangga tinta, yang sudah
+  didokumentasikan di catatan Arsip di atas gagal AA untuk teks kecil di
+  kedua tema. Kapital-kecil-tipis itu kombinasi yang dikenal lebih lambat
+  dipindai dibanding judul bagian biasa.
+- Judul kartu di muka papan (`CardItem.tsx:275`) memakai `text-ink-soft`,
+  bukan `text-ink` — padahal itu satu-satunya teks yang paling ingin dibaca
+  orang saat memindai kolom, dan judul yang sama di dalam `CardModal`
+  ([CardModal.tsx:783](src/client/components/CardModal.tsx#L783)) sudah
+  `text-ink` penuh. Baris meta di bawahnya (tenggat/checklist/komentar,
+  `CardItem.tsx:308,361,390,400`) 11px `font-semibold`, mewarisi
+  `text-faint` dari wrapper-nya (baris 299) — angka yang justru ingin
+  dilirik cepat (berapa lama lagi tenggat, berapa checklist tersisa) malah
+  kecil dan pudar sekaligus.
+- Panel kecil di kepala papan — `BoardFilter`, `ArchivePanel`,
+  `BoardBackgroundPicker` — semuanya punya baris isi 11px
+  (`text-[11px]`/`text-[0.6875rem]`) untuk konten yang *sungguh dibaca*
+  (nama orang di checklist filter, label, deskripsi latar), bukan sekadar
+  badge angka dekoratif.
+- `LiveIndicator` (informasi koneksi/jumlah terhubung,
+  [BoardView.tsx:39](src/client/components/BoardView.tsx#L39)) memakai
+  `.chip` 11px untuk status & badge jumlah — konsisten dengan chip lain di
+  app, kemungkinan tidak perlu diubah; tapi label "Anda" di daftar penampil
+  (`BoardView.tsx:149`) `text-xs text-faint` sementara nama di baris yang
+  sama sudah `text-sm` tanpa warna pudar — dua baris yang berdekatan dengan
+  bobot berbeda tanpa alasan jelas.
+- Judul kolom (`ColumnView.tsx:406,489`) sudah `text-sm font-semibold`
+  (14px) — relatif sehat; badge jumlah kartu (`ColumnView.tsx:510`) 11px
+  lewat `.chip-plain`, murni angka, kemungkinan tidak perlu diubah.
+
+**Cakupan:**
+- `CardModal` dan sub-komponennya (`CardLabels`, `CardPeople`, `CardDue`,
+  `CardChecklist`, `CardAttachments`, `CardFollowup`) — terutama kelas
+  bersama `.section-label`, dan warna/ukuran baris isi di masing-masing.
+- Muka kartu di papan (`CardItem`) — judul kartu dan baris meta
+  (tenggat/checklist/komentar/lampiran).
+- Kepala kolom (`ColumnView`) — ditinjau, kemungkinan perubahan kecil saja.
+- Panel kecil di kepala papan: `BoardFilter`, `ArchivePanel`,
+  `BoardBackgroundPicker`, `LiveIndicator`.
+- Di luar cakupan (kecuali diminta menyusul): halaman di luar tampilan
+  papan itu sendiri (`WorkspacesPage`, `MembersPage`, `AdminPage`, dst) —
+  permintaan eksplisit berbunyi "kanban board itu sendiri secara
+  keseluruhan", jadi difokuskan ke pengalaman papan.
+
+**Pertimbangan:**
+- Tegangan dengan [[desain-halus-bukan-mencolok]] — solusinya harus tetap
+  tenang: menaikkan kontras/ukuran secukupnya untuk nyaman dibaca, bukan
+  membuat semuanya besar dan tebal sekaligus. Prioritas: perbaiki kontras
+  warna dulu (faint → muted untuk apa pun yang merupakan ISI, bukan
+  dekorasi), baru naikkan ukuran satu tingkat kalau kontras saja belum
+  cukup — bukan lompat besar dari 11px ke 14px sekaligus.
+- `.section-label` itu satu kelas bersama dipakai di banyak tempat —
+  mengubahnya sekali menaikkan seluruh dialog kartu sekaligus (efisien,
+  konsisten), tapi berarti perlu diuji ulang di semua titik pakainya
+  (tujuh komponen), bukan cuma satu.
+- `--color-faint` dipakai luas juga di luar cakupan ini (placeholder
+  input, hint yang memang tersier) — perubahan harus dibedakan per kasus:
+  tetap pakai `faint` untuk yang benar-benar dekoratif/tersier, naikkan ke
+  `muted` untuk apa pun yang merupakan isi yang mesti terbaca (nama orang,
+  judul bagian, angka meta kartu).
+- Menaikkan ukuran font baris meta di muka kartu menambah tinggi tiap
+  kartu — mengurangi jumlah kartu yang muat sekali pandang per kolom.
+  Trade-off yang harus disadari; condong ke satu tingkat naik saja
+  (11px→12px) bukan lompatan besar, supaya kepadatan papan tidak berubah
+  drastis.
+- Perubahan dikerjakan bertahap per area (bukan satu commit raksasa),
+  supaya tiap langkah gampang diuji visual di kedua tema (terang/gelap)
+  sebelum lanjut — pola yang sama seperti batch-batch sebelumnya di
+  berkas ini.
+
+**Saran UI/UX (rencana konkret, urutan diusulkan):**
+1. `.section-label`: warna `--color-faint` → `--color-muted`; `uppercase`
+   dan `letter-spacing` **dipertahankan** — lihat "Keputusan atas
+   pertanyaan terbuka" di bawah, dua-duanya sudah dijawab lewat riset,
+   bukan ditebak.
+2. Judul kartu di `CardItem`: `text-ink-soft` → `text-ink`, menyamakan
+   dengan judul di `CardModal` yang sudah penuh — judul adalah target
+   baca utama saat memindai kolom.
+3. Baris meta kartu (tenggat/checklist/komentar) di `CardItem`: naikkan
+   dari 11px ke `text-xs` (12px) **dan** warnanya dari `text-faint` ke
+   `text-muted` — bukan salah satu saja, lihat "Keputusan" di bawah; meta
+   yang memang harus menonjol (mis. tenggat terlambat) sudah menang lewat
+   warna status (`text-danger`/`text-ok`), jadi kombinasi ukuran+kontras
+   ini hanya berlaku untuk meta yang netral.
+4. `BoardFilter`, `ArchivePanel`, `BoardBackgroundPicker`: baris isi yang
+   dibaca sungguhan (nama orang, label filter, deskripsi latar) naik dari
+   11px ke `text-xs`/`text-sm` sesuai konteks; badge angka murni (jumlah
+   filter aktif, jumlah arsip) boleh tetap 11px karena itu dilirik, bukan
+   dibaca kata per kata.
+5. `LiveIndicator`: kemungkinan dibiarkan (chip 11px konsisten dengan
+   chip lain di app) — cukup samakan label "Anda" dari `text-faint` ke
+   `text-muted` supaya sederajat dengan nama di baris yang sama.
+6. Deskripsi kartu & followup (`Markdown` body, `text-sm`): cek
+   `line-height`-nya untuk paragraf panjang — mungkin perlu
+   `leading-relaxed`, bukan default, supaya nyaman dibaca bukan cuma
+   cukup besar.
+7. Kerjakan satu per satu, diuji langsung di browser tiap area (kedua
+   tema) sebelum lanjut ke area berikutnya.
+
+**Keputusan atas pertanyaan terbuka — digali dari literatur
+typography/UX, bukan ditebak (diminta eksplisit oleh pengguna: "gali dari
+pendapat ilmu para ahli typography desain web"):**
+
+- **`.section-label` tetap `uppercase` + `letter-spacing` lebar — cuma
+  warnanya yang naik.** Riset word-shape klasik (dirujuk di
+  [Stanford Accessibility](https://uit.stanford.edu/accessibility/learn-about/typography/all-caps),
+  [UX Movement](https://uxmovement.com/content/all-caps-hard-for-users-to-read/))
+  memang menunjukkan huruf kapital menghilangkan kontur naik-turun
+  (ascender/descender) yang dipakai otak mengenali *bentuk kata* — tapi
+  efek itu berlaku untuk **kalimat/paragraf panjang**. Untuk label pendek
+  (1–2 kata: "Deskripsi", "Checklist", "Orang") yang tidak dibaca kata per
+  kata tapi dipindai sebagai satu potongan, [Butterick's Practical
+  Typography](https://practicaltypography.com/all-caps.html) secara
+  eksplisit menyebut caps cocok untuk "headings shorter than one line,
+  headers, footers, captions, atau label lain" — persis kategori
+  `.section-label`. Letter-spacing 0.06em (6%) yang sudah dipakai juga
+  sudah benar menurut kaidah yang sama: Butterick merekomendasikan tambah
+  5–12% letterspacing tiap kali huruf kapital dipakai berderet, karena
+  jarak antar-huruf kapital yang dirancang untuk berdampingan dengan huruf
+  kecil (awal kalimat) terasa terlalu rapat kalau dipakai berturut-turut
+  sendirian. Jadi `uppercase`+`tracking` **bukan** sumber masalahnya —
+  warna `--color-faint`-lah yang gagal AA di ukuran 11px (ambang "large
+  text" WCAG yang cuma butuh 3:1 adalah 18.66px-tebal ke atas — jauh di
+  atas 11px kita), itu satu-satunya yang perlu diperbaiki di kelas ini.
+- **Baris meta muka kartu (`CardItem`) naik ukuran DAN kontras, bukan
+  kontras saja.** [NN/g — "Typography for Glanceable Reading: Bigger Is
+  Better"](https://www.nngroup.com/articles/glanceable-fonts/) meneliti
+  persis skenario ini — teks yang dibaca sekilas/dipindai cepat (dasbor,
+  metadata kartu — bukan dibaca kata per kata) dan menyimpulkan **ukuran
+  lebih berpengaruh daripada yang diduga** untuk kenyamanan baca sekilas,
+  bukan cuma kontras. Ini juga konsisten dengan panduan
+  [Refactoring UI](https://www.refactoringui.com/) (Wathan & Schoger) yang
+  dipakai sebagai rujukan poin lain di rencana ini: jangan andalkan **satu**
+  pengungkit hierarki saja (cuma ukuran, atau cuma warna) — kombinasikan
+  ukuran, bobot, dan warna secukupnya. Karena trade-off kepadatan kolom
+  yang disebut di "Pertimbangan" tetap nyata, kenaikan ukurannya dibatasi
+  satu tingkat (11px→12px, bukan lompat ke 14px) — cukup untuk memenuhi
+  saran "bigger is better" tanpa mengorbankan berapa banyak kartu yang
+  muat sekali pandang.

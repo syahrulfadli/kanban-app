@@ -193,7 +193,7 @@ function Trace({ verb, who, at }: { verb: string; who: UserBrief | null; at: Dat
   const t = useT();
   const { language } = useLanguage();
   return (
-    <p className="text-[0.6875rem] text-faint">
+    <p className="text-xs text-muted">
       {verb}
       {who && (
         <>
@@ -993,7 +993,7 @@ export function CardModal({
                       <button
                         type="button"
                         onClick={() => setEditingDescription(true)}
-                        className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.6875rem] font-semibold text-faint transition-colors hover:bg-(--card-plate-hi) hover:text-ink"
+                        className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.6875rem] font-semibold text-muted transition-colors hover:bg-(--card-plate-hi) hover:text-ink"
                       >
                         <PencilIcon className="size-3" />
                         {t.common.edit}

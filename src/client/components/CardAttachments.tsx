@@ -57,7 +57,7 @@ function AttachmentRow({
   const label = (
     <span className="min-w-0 flex-1 truncate text-left text-sm leading-snug text-ink-soft">
       {attachment.filename}
-      <span className="ml-1.5 text-xs text-faint">{formatBytes(attachment.size)}</span>
+      <span className="ml-1.5 text-xs text-muted">{formatBytes(attachment.size)}</span>
     </span>
   );
 
@@ -129,7 +129,7 @@ export function CardAttachments({ attachments, uploading, onAdd, onDelete }: Pro
           <AttachmentIcon />
           {uploading ? t.common.processing : t.cardAttachments.addAttachment}
         </button>
-        <span className="text-xs text-faint">
+        <span className="text-xs text-muted">
           {t.cardAttachments.maxSize(Math.round(MAX_ATTACHMENT_BASE64 / 1000))}
         </span>
       </div>

@@ -50,9 +50,11 @@ interface Props {
  * `BoardBackgroundPicker`: tombol chip, panel `.sheet` yang mengambang di
  * bawahnya, tanpa portal karena kepala papan sendiri bukan pane ber-frost.
  * Ukuran tekstualnya sengaja menyamai panel `BoardBackgroundPicker` (judul
- * `text-xs font-semibold`, baris isi `text-[11px]`) — dua panel yang sama-sama
- * hidup di kepala papan seharusnya terbaca sebagai satu keluarga, bukan dua
- * skala huruf yang kebetulan bertetangga.
+ * `text-xs font-semibold`, baris isi `text-xs` — dulu `text-[11px]`, dinaikkan
+ * bersamaan lewat rencana #8 di plans.md karena baris isi di sini memang
+ * dibaca, bukan sekadar dilirik seperti badge angka) — dua panel yang
+ * sama-sama hidup di kepala papan seharusnya terbaca sebagai satu keluarga,
+ * bukan dua skala huruf yang kebetulan bertetangga.
  */
 export function BoardFilter({ labels, people, creators, filter, onChange }: Props) {
   const t = useT();
@@ -170,7 +172,7 @@ export function BoardFilter({ labels, people, creators, filter, onChange }: Prop
                         className="flex min-w-0 cursor-pointer items-center gap-2 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-line-soft"
                       >
                         <Avatar person={person} size="sm" />
-                        <span className="min-w-0 flex-1 truncate text-[11px]">{person.name}</span>
+                        <span className="min-w-0 flex-1 truncate text-xs">{person.name}</span>
                         {checked && <CheckIcon />}
                       </button>
                     );
@@ -195,7 +197,7 @@ export function BoardFilter({ labels, people, creators, filter, onChange }: Prop
                         className="flex min-w-0 cursor-pointer items-center gap-2 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-line-soft"
                       >
                         <Avatar person={person} size="sm" />
-                        <span className="min-w-0 flex-1 truncate text-[11px]">{person.name}</span>
+                        <span className="min-w-0 flex-1 truncate text-xs">{person.name}</span>
                         {checked && <CheckIcon />}
                       </button>
                     );
@@ -216,7 +218,7 @@ export function BoardFilter({ labels, people, creators, filter, onChange }: Prop
                       role="switch"
                       aria-checked={checked}
                       onClick={() => toggleDue(option.value)}
-                      className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-1.5 text-left text-[11px] transition-colors hover:bg-line-soft"
+                      className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-1.5 text-left text-xs transition-colors hover:bg-line-soft"
                     >
                       <span className="min-w-0 flex-1 truncate">{option.label}</span>
                       {checked && <CheckIcon />}
@@ -227,7 +229,7 @@ export function BoardFilter({ labels, people, creators, filter, onChange }: Prop
             </div>
 
             {labels.length === 0 && people.length === 0 && (
-              <p className="px-1 text-[11px] leading-relaxed text-muted">
+              <p className="px-1 text-xs leading-relaxed text-muted">
                 {t.boardFilter.noOptions}
               </p>
             )}

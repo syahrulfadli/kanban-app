@@ -272,7 +272,7 @@ export function CardItem({
           type="button"
           onClick={open}
           aria-label={t.cardItem.openCardAria(card.title)}
-          className="stretch block w-full cursor-[inherit] pr-5 text-left text-sm leading-snug wrap-break-word whitespace-pre-wrap text-ink-soft outline-none"
+          className="stretch block w-full cursor-[inherit] pr-5 text-left text-sm leading-snug wrap-break-word whitespace-pre-wrap text-ink outline-none"
         >
           {card.title}
         </button>
@@ -296,7 +296,7 @@ export function CardItem({
                 siapa yang menyentuhnya. */}
             <AvatarStack people={faces} />
 
-            <span className="ml-auto flex items-center gap-2 text-faint">
+            <span className="ml-auto flex items-center gap-2 text-muted">
               {/* Tenggat berdiri paling depan di antara angka-angka ini: ia
                   satu-satunya yang berubah arti tanpa ada yang menyentuh
                   kartunya. Ronanya hanya muncul saat waktunya menuntut sesuatu —
@@ -305,7 +305,7 @@ export function CardItem({
               {card.dueAt && (
                 <span
                   className={cn(
-                    "flex items-center gap-1 text-[0.6875rem] font-semibold tabular-nums",
+                    "flex items-center gap-1 text-xs font-semibold tabular-nums",
                     /* Hijau berarti tanggalnya sudah dijawab — dan karena itu
                        ia menang atas merah, walau tanggalnya sendiri lewat. */
                     due === "done" && "text-ok",
@@ -358,8 +358,8 @@ export function CardItem({
                   </span>
                   <span
                     className={cn(
-                      "shrink-0 text-[0.6875rem] font-semibold tabular-nums",
-                      complete ? "text-ok" : "text-faint",
+                      "shrink-0 text-xs font-semibold tabular-nums",
+                      complete ? "text-ok" : "text-muted",
                     )}
                   >
                     {checklist.done}/{checklist.total}
@@ -387,7 +387,7 @@ export function CardItem({
                   followup di sebelahnya. */}
               {attachmentCount > 0 && (
                 <span
-                  className="flex items-center gap-1 text-[0.6875rem] font-semibold tabular-nums"
+                  className="flex items-center gap-1 text-xs font-semibold tabular-nums"
                   title={t.cardItem.attachmentsTitle(attachmentCount)}
                 >
                   <AttachmentIcon />
@@ -397,7 +397,7 @@ export function CardItem({
 
               {commentCount > 0 && (
                 <span
-                  className="flex items-center gap-1 text-[0.6875rem] font-semibold tabular-nums"
+                  className="flex items-center gap-1 text-xs font-semibold tabular-nums"
                   title={t.cardItem.commentsTitle(commentCount)}
                 >
                   <svg

@@ -146,7 +146,7 @@ function LiveIndicator({
                 <Avatar person={viewer} size="sm" />
                 <span className="min-w-0 flex-1 truncate text-sm">{viewer.name}</span>
                 {viewer.id === meId && (
-                  <span className="shrink-0 text-xs text-faint">{t.boardView.you}</span>
+                  <span className="shrink-0 text-xs text-muted">{t.boardView.you}</span>
                 )}
               </li>
             ))}

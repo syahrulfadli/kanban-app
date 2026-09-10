@@ -92,7 +92,7 @@ function ActivityRow({ activity, workspaceId }: { activity: CardActivityDetail; 
         <span className="timeline-dot" aria-hidden />
       )}
 
-      <p className="text-[0.6875rem] leading-relaxed text-faint">
+      <p className="text-[0.6875rem] leading-relaxed text-muted">
         {actor ? (
           <button
             type="button"
@@ -116,7 +116,7 @@ function ActivityRow({ activity, workspaceId }: { activity: CardActivityDetail; 
           ) : (
             <> <span className="font-medium text-muted">{subject}</span></>
           ))}
-        <span className="text-faint"> · </span>
+        <span className="text-muted"> · </span>
         <When at={activity.createdAt} />
       </p>
     </li>
@@ -242,7 +242,7 @@ export function CardFollowup({
                       >
                         {comment.author.name}
                       </button>
-                      <span className="text-[0.6875rem] text-faint">
+                      <span className="text-[0.6875rem] text-muted">
                         <When at={comment.createdAt} />
                         {edited(comment) && ` · ${t.cardFollowup.edited}`}
                       </span>
@@ -270,7 +270,7 @@ export function CardFollowup({
                           <button
                             type="button"
                             onClick={() => setEditing(comment.id)}
-                            className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.6875rem] font-semibold text-faint transition-colors hover:bg-(--card-plate-hi) hover:text-ink"
+                            className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.6875rem] font-semibold text-muted transition-colors hover:bg-(--card-plate-hi) hover:text-ink"
                           >
                             <PencilIcon className="size-3" />
                             {t.cardFollowup.editLabel}
@@ -278,7 +278,7 @@ export function CardFollowup({
                           <button
                             type="button"
                             onClick={() => setPendingDelete(comment)}
-                            className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.6875rem] font-semibold text-faint transition-colors hover:bg-danger/10 hover:text-danger"
+                            className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.6875rem] font-semibold text-muted transition-colors hover:bg-danger/10 hover:text-danger"
                           >
                             <TrashIcon className="size-3" />
                             {t.cardFollowup.deleteLabel}

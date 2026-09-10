@@ -106,7 +106,7 @@ export function CardLabels({
           >
             <div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto">
               {boardLabels.length === 0 && (
-                <p className="px-2 py-3 text-center text-xs text-faint">
+                <p className="px-2 py-3 text-center text-xs text-muted">
                   {t.cardLabels.noLabels}
                 </p>
               )}

@@ -73,7 +73,7 @@ function MarkdownTipsButton() {
               </div>
             ))}
           </div>
-          <p className="mt-2.5 text-[0.6875rem] text-faint">{t.markdownTips.newline}</p>
+          <p className="mt-2.5 text-[0.6875rem] text-muted">{t.markdownTips.newline}</p>
         </div>
       )}
     </div>

@@ -118,7 +118,7 @@ export function CardChecklist({ items, onToggle, onRename, onDelete, onAdd }: Pr
                    utuh sebagai catatan, tapi mata langsung jatuh ke sisanya. */
                 className={cn(
                   "flex-1 text-left text-sm leading-snug wrap-break-word transition-colors",
-                  item.done ? "text-faint line-through" : "text-ink-soft",
+                  item.done ? "text-muted line-through" : "text-ink-soft",
                 )}
               >
                 {item.text}
