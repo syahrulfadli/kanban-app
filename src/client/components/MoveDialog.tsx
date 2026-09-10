@@ -111,7 +111,7 @@ export function MoveDialog({ subject, boardId, onCancel, onMove }: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelId}
-        className="glass glass-lens card-dialog relative w-full max-w-sm p-5 outline-none"
+        className="glass glass-frost card-dialog relative w-full max-w-sm p-5 outline-none"
       >
         <h2 id={labelId} className="text-base font-semibold tracking-tight">
           {subject.kind === "column" ? t.moveDialog.moveColumnTitle : t.moveDialog.moveCardTitle}

@@ -844,7 +844,7 @@ export function CardModal({
                         ? { right: menuAnchor.right, top: menuAnchor.top }
                         : { left: "50%", top: menuAnchor.top, transform: "translateX(-50%)" }
                     }
-                    className="sheet sheet-frost glass-lens fixed z-55 w-52 max-w-[calc(100vw-2rem)] rounded-2xl p-1.5"
+                    className="sheet sheet-frost fixed z-55 w-52 max-w-[calc(100vw-2rem)] rounded-2xl p-1.5"
                   >
                     <MenuItem
                       icon={<EyeIcon watching={detail.watching} className="size-4 shrink-0" />}

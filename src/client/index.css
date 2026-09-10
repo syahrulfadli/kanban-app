@@ -80,6 +80,7 @@
   /* Isian kapsul navigasi — jauh lebih tipis dari --glass-fill: lihat
      catatan .glass-liquid tentang kenapa ia tidak memakai token yang sama. */
   --glass-liquid-fill: rgb(255 255 255 / 0.14);
+  --glass-liquid-fill-hi: rgb(255 255 255 / 0.24);
   /* Isian pil sakelar tema — bersarang di dalam kapsul cair itu sendiri, jadi
      --glass-fill biasa (0.42) berdiri terlalu putih di sampingnya di tema
      terang. Di tema gelap --glass-fill sudah cukup tipis (0.05), jadi di sana
@@ -224,6 +225,7 @@
   --glass-blur: 14px;
   --glass-sat: 130%;
   --glass-liquid-fill: rgb(255 255 255 / 0.03);
+  --glass-liquid-fill-hi: rgb(255 255 255 / 0.08);
   --switch-track-fill: var(--glass-fill);
 
   --glass-depth: 0 1px 2px rgb(0 0 0 / 0.25),
@@ -413,36 +415,10 @@ body {
     backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
   }
 
-  /* Lensa tepi — kaca yang MEMBENGKOKKAN apa yang lewat di bawah bibirnya,
-     bukan sekadar mengaburkannya: sebuah kartu yang melintas di tepi dialog
-     tampak melengkung dan pecah warnanya, persis seperti tepi kaca sungguhan.
-     Petanya ada di index.html (#glassLens).
-
-     Deklarasi polos ditulis lebih dulu dengan sengaja: mesin yang tidak
-     mengerti bentuk url() di backdrop-filter membuang baris kedua dan tetap
-     mendapat frost, bukan kehilangan materialnya sama sekali.
-
-     Blur-nya kecil. Frost dan refraksi saling meniadakan — blur merata-ratakan
-     justru detail yang sedang dibengkokkan lensa — jadi yang tersisa hanya
-     secukupnya untuk melembutkan jahitan di tepi pane. Hanya dialog yang
-     memakainya: filter ini jauh lebih mahal daripada blur, dan cuma ada
-     gunanya di atas isi halaman yang tajam. */
-  .glass-lens {
-    backdrop-filter: blur(5px) saturate(140%);
-  }
-
-  /* Aturan terpisah, dan sengaja lebih spesifik: ditulis sebagai dua
-     deklarasi di dalam satu blok, minifier akan membuang yang pertama —
-     dan cadangannya ikut hilang. */
-  .glass.glass-lens {
-    backdrop-filter: url(#glassLens) blur(5px) saturate(140%);
-  }
-
   /* Kaca cair — kapsul navigasi.
-     Peta refraksinya ada di index.html (#glassLiquidNav): peta yang sama
-     dengan #glassLens (bibir tegak lurus, datar di tengah), hanya
-     dibengkokkan lebih jauh, karena di sini efeknya adalah tampilan kapsul
-     itu sendiri, bukan cuma sentuhan di tepi dialog.
+     Peta refraksinya ada di index.html (#glassLiquidNav) — bibir tegak
+     lurus, datar di tengah, dibengkokkan jauh, karena di sini efeknya
+     adalah tampilan kapsul itu sendiri, bukan cuma sentuhan di tepi dialog.
 
      Peta ini datar di tengah dan cuma menekuk dekat tepi — di kapsul yang
      pendek (~48px) itu berarti tepi atas-bawahnya kurang ikut melengkung
@@ -459,8 +435,7 @@ body {
      bentuk benda di baliknya. Karena itu blur-nya sengaja ditahan sangat
      rendah (5% dari rentang wajar 0–20px ≈ 1px, sekadar melembutkan jahitan
      piksel) sementara bengkoknya besar (65% dari rentang 0–100 pada
-     feDisplacementMap, jauh di atas 14–18 milik #glassLens yang cuma
-     menyentuh tepi).
+     feDisplacementMap).
 
      Isiannya juga ditipiskan di sini, bukan di token --glass-fill global:
      kolom dan dialog masih perlu isian yang cukup tebal untuk kartu di
@@ -472,6 +447,32 @@ body {
   }
   .glass.glass-liquid {
     backdrop-filter: url(#glassLiquidNav) blur(1px) saturate(160%);
+  }
+
+  /* Tombol kepala papan (Filter, Arsip, Latar, jumlah terhubung) — kembaran
+     kapsul navigasi, dipakai sendiri-sendiri bukan sebagai satu kapsul
+     bersama. Diberi bentuk & ukuran di sini (bukan lewat .chip, yang isian
+     pekatnya akan menimpa --glass-liquid-fill di atas); pasangannya di
+     markup selalu `glass glass-liquid chip-glass`. Ukurannya sengaja
+     lebih besar dari .chip biasa (dipatok mendekati .btn) — inilah yang
+     dimaksud "lebih emphasis": tombol yang membuka sesuatu di kepala papan,
+     bukan sekadar keterangan pasif. */
+  .chip-glass {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 9999px;
+    padding: 0.5rem 0.875rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--color-ink-soft);
+  }
+  /* Sengaja tidak lewat `.glass-liquid:hover` — kapsul navigasi juga
+     memakai `.glass-liquid`, dan hover di situ berarti kursor sedang lewat
+     di atas kapsulnya sendiri (bukan salah satu tombol di dalamnya), yang
+     tidak diminta berubah. */
+  .chip-glass:hover {
+    background-color: var(--glass-liquid-fill-hi);
   }
 
   /* Permukaan di dalam gelas: benda yang mengambang, bukan jendela.
@@ -550,16 +551,6 @@ body {
   .sheet-frost {
     background-color: var(--sheet-frost-fill);
     backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
-  }
-
-  /* Lensa tepi untuk lembar pop-up (menu profil, menu kolom) yang sudah
-     dipindah keluar dari sarangnya lewat portal — sama seperti
-     .glass.glass-lens pada dialog, peta refraksinya di index.html
-     (#glassLens). Aturan terpisah dengan alasan yang sama: mesin yang tidak
-     mengerti url() di backdrop-filter membuang baris ini dan tetap mendapat
-     frost polos dari .sheet-frost. */
-  .sheet-frost.glass-lens {
-    backdrop-filter: url(#glassLens) blur(5px) saturate(140%);
   }
 
   /* Kenop sakelar tema. Butuh isian sendiri, bukan .glass-plate: dengan bevel

@@ -40,7 +40,7 @@ export function ConfirmDialog({ title, body, confirmLabel, onConfirm, onCancel }
         aria-modal="true"
         aria-labelledby={labelId}
         aria-describedby={bodyId}
-        className="glass glass-lens card-dialog relative w-full max-w-sm p-5 outline-none"
+        className="glass glass-frost card-dialog relative w-full max-w-sm p-5 outline-none"
       >
         <h2 id={labelId} className="text-base font-semibold tracking-tight">
           {title}

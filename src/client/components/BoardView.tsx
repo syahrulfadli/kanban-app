@@ -102,7 +102,7 @@ function LiveIndicator({
 
   if (!shared) {
     return (
-      <span className="chip shrink-0" title={label}>
+      <span className="glass glass-liquid chip-glass shrink-0" title={label}>
         {dot}
         <span className="hidden sm:inline">{label}</span>
       </span>
@@ -126,7 +126,7 @@ function LiveIndicator({
         aria-expanded={open}
         aria-label={t.boardView.seeWhoSuffix(label)}
         title={label}
-        className="chip cursor-pointer transition-colors hover:bg-line-soft"
+        className="glass glass-liquid chip-glass cursor-pointer transition-colors"
       >
         {dot}
         <span className="hidden sm:inline">{label}</span>

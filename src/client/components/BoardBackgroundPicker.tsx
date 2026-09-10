@@ -232,11 +232,11 @@ export function BoardBackgroundPicker({ boardId, background, onChanged }: Props)
         aria-expanded={open}
         aria-label={t.boardBackgroundPicker.changeBackgroundAria}
         title={t.boardBackgroundPicker.changeBackgroundTitle}
-        className="chip cursor-pointer transition-colors hover:bg-line-soft"
+        className="glass glass-liquid chip-glass cursor-pointer transition-colors"
       >
         <svg
           viewBox="0 0 24 24"
-          className="size-3.5 shrink-0"
+          className="size-4 shrink-0"
           fill="none"
           stroke="currentColor"
           strokeWidth="1.7"

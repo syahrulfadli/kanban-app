@@ -116,12 +116,12 @@ export function ArchivePanel({ boardId, count, onChanged }: Props) {
         aria-expanded={open}
         aria-label={count > 0 ? t.archivePanel.archiveAria(count) : t.archivePanel.archiveButton}
         title={t.archivePanel.archiveTitle}
-        className="chip shrink-0 cursor-pointer transition-colors hover:bg-line-soft"
+        className="glass glass-liquid chip-glass shrink-0 cursor-pointer transition-colors"
       >
-        <ArchiveIcon className="size-3.5" />
+        <ArchiveIcon className="size-4" />
         <span className="hidden sm:inline">{t.archivePanel.archiveButton}</span>
         {count > 0 && (
-          <span className="grid size-4 place-items-center rounded-full bg-accent text-[0.625rem] leading-none font-semibold text-accent-on tabular-nums">
+          <span className="grid size-5 place-items-center rounded-full bg-accent text-xs leading-none font-semibold text-accent-on tabular-nums">
             {count}
           </span>
         )}
@@ -136,12 +136,12 @@ export function ArchivePanel({ boardId, count, onChanged }: Props) {
         >
           <div className="scrim scrim-dim" onClick={() => setOpen(false)} aria-hidden />
 
-          {/* `.card-plain`, bukan `.glass.glass-lens` — pelat pekat yang
-              sama dengan `CardModal`, bukan kaca yang direfraksi. Daftar ini
-              dibaca, bukan sekilas-lalu-tutup seperti `ConfirmDialog`, dan
-              kaca di atas latar papan yang warna-warni (terutama di tema
-              gelap) membuat teksnya kalah kontras dengan apa pun yang
-              kebetulan ada di baliknya. */}
+          {/* `.card-plain`, bukan `.glass` — pelat pekat yang sama dengan
+              `CardModal`, bukan kaca tembus pandang. Daftar ini dibaca,
+              bukan sekilas-lalu-tutup seperti `ConfirmDialog`, dan kaca di
+              atas latar papan yang warna-warni (terutama di tema gelap)
+              membuat teksnya kalah kontras dengan apa pun yang kebetulan
+              ada di baliknya. */}
           <div
             ref={dialogRef}
             role="dialog"

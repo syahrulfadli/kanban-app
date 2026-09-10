@@ -15,7 +15,7 @@ import type { Label, UserBrief } from "../../shared/types";
 /** Corong — bentuk yang sudah biasa dibaca sebagai "saring". */
 function FilterIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M4 5h16l-6 7.5V19l-4 2v-8.5L4 5Z" />
     </svg>
   );
@@ -110,12 +110,12 @@ export function BoardFilter({ labels, people, creators, filter, onChange }: Prop
         aria-expanded={open}
         aria-label={active ? t.boardFilter.filterActiveAria(count) : t.boardFilter.filterAria}
         title={t.boardFilter.filterTitle}
-        className="chip cursor-pointer transition-colors hover:bg-line-soft"
+        className="glass glass-liquid chip-glass cursor-pointer transition-colors"
       >
         <FilterIcon />
         <span className="hidden sm:inline">{t.boardFilter.filterButton}</span>
         {active && (
-          <span className="grid size-4 place-items-center rounded-full bg-accent text-[0.625rem] leading-none font-semibold text-accent-on tabular-nums">
+          <span className="grid size-5 place-items-center rounded-full bg-accent text-xs leading-none font-semibold text-accent-on tabular-nums">
             {count}
           </span>
         )}
@@ -132,7 +132,7 @@ export function BoardFilter({ labels, people, creators, filter, onChange }: Prop
             {labels.length > 0 && (
               <div>
                 <SectionTitle>{t.boardFilter.sectionLabel}</SectionTitle>
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                <div className="mt-1.5 flex flex-wrap gap-1.5 mx-1">
                   {labels.map((label) => {
                     const checked = filter.labelIds.has(label.id);
                     return (

@@ -560,7 +560,7 @@ export function ColumnView({
                     /* Lebarnya dipatok supaya sepuluh titik warna melipat jadi dua
                        baris. Selebar isinya, deretan itu lebih lebar daripada
                        kolomnya sendiri dan menjulur keluar papan. */
-                    className="sheet sheet-frost glass-lens fixed z-45 w-52 max-w-[calc(100vw-2rem)] rounded-2xl p-1.5"
+                    className="sheet sheet-frost fixed z-45 w-52 max-w-[calc(100vw-2rem)] rounded-2xl p-1.5"
                   >
                     <MenuItem
                       icon={<EyeIcon watching={column.watching} className="size-4 shrink-0" />}
