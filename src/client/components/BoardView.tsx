@@ -519,6 +519,7 @@ export function BoardView({ boardId, openCardId }: BoardProps) {
           <AddItemForm
             placeholder={t.boardView.newColumnPlaceholder}
             submitLabel={t.boardView.newColumnSubmit}
+            emphasis
             onSubmit={async (title) => {
               await actions.addColumn(title);
               /* Kolom baru selalu lahir paling kanan — gulir ke sana, sama

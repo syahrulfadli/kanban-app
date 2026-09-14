@@ -5,9 +5,14 @@ interface Props {
   placeholder: string;
   submitLabel: string;
   onSubmit: (value: string) => Promise<void> | void;
+  /** Tombol kolom baru: bukan perabot kolom yang menunggu disentuh, tapi
+      ajakan di ujung papan. Memakai pasangan --color-accent /
+      --color-accent-on yang sama seperti .btn-primary, supaya tulisannya
+      tetap terbaca di kedua tema tanpa aturan warna sendiri. */
+  emphasis?: boolean;
 }
 
-export function AddItemForm({ placeholder, submitLabel, onSubmit }: Props) {
+export function AddItemForm({ placeholder, submitLabel, onSubmit, emphasis = false }: Props) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
@@ -18,9 +23,14 @@ export function AddItemForm({ placeholder, submitLabel, onSubmit }: Props) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        /* .add-item mengambil rona dari kolomnya (--col). Tanpa rona ia jatuh
-           ke nada netral yang sama seperti sebelumnya — lihat index.css. */
-        className="add-item flex w-full items-center gap-1.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors"
+        className={
+          emphasis
+            ? "btn btn-primary w-full py-2.5 text-sm"
+            /* .add-item mengambil rona dari kolomnya (--col). Tanpa rona ia
+               jatuh ke nada netral yang sama seperti sebelumnya — lihat
+               index.css. */
+            : "add-item flex w-full items-center gap-1.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors"
+        }
       >
         <svg
           viewBox="0 0 24 24"
