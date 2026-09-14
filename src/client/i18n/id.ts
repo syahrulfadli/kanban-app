@@ -34,6 +34,8 @@ export const id = {
     copied: "Tersalin",
     copyLink: "Salin tautan",
     retry: "Coba lagi",
+    showPassword: "Tampilkan kata sandi",
+    hidePassword: "Sembunyikan kata sandi",
   },
 
   roles: {

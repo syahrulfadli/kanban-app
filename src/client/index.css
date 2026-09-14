@@ -331,7 +331,11 @@ body {
   color: var(--color-accent-on);
 }
 
-:focus-visible {
+/* `.field` mengecualikan diri: ia memasang cincin fokusnya sendiri di
+   dalam @layer components, dan aturan tak berlapis di sini akan selalu
+   menang lawan itu berapa pun spesifisitasnya — bukan soal urutan atau
+   selektor, itu aturan cascade layer. */
+:focus-visible:not(.field) {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
   border-radius: 6px;
@@ -773,30 +777,44 @@ body {
     background-color: var(--color-line-soft);
   }
 
-  /* Input. Cekung, bukan cembung: cincin dalamnya gelap di atas supaya
-     terbaca sebagai lubang di permukaan kaca. */
+  /* Input, textarea, dan select — satu kelas, satu bahasa desain, dipakai
+     apa adanya di mana pun formulir muncul.
+
+     Tepinya sungguhan, bukan bayangan yang menirukan tepi: `border`,
+     bukan box-shadow. Satu properti kurang berarti satu lapis kurang
+     untuk dipikirkan tiap kali kadarnya perlu diubah.
+
+     Tiga keadaan, tiap satu menjawab pertanyaan berbeda: diam (adakah kolom
+     di sini — garisnya harus tetap terbaca di atas kaca yang ikut
+     memburamkan segalanya di baliknya), disentuh kursor (bisakah ini
+     diklik?), dan fokus (di mana ketikan saya akan mendarat?). Cincin fokus
+     memakai `outline`, bukan cahaya box-shadow yang melebar — offsetnya
+     kecil supaya cincinnya menempel rapat ke tepi, bukan mengambang. */
   .field {
     width: 100%;
-    border-radius: 0.625rem;
-    padding: 0.5rem 0.75rem;
+    border-radius: 0.75rem;
+    padding: 0.5625rem 0.875rem;
     font-size: 0.875rem;
+    line-height: 1.45;
     color: var(--color-ink);
     background-color: var(--plate-fill);
-    box-shadow: inset 0 1px 2px rgb(15 23 42 / 0.10),
-                inset 0 0 0 1px var(--color-line);
-    outline: none;
-    transition: box-shadow .2s ease, background-color .2s ease;
-  }
-  [data-theme="dark"] .field {
-    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.35),
-                inset 0 0 0 1px var(--color-line);
+    border: 1px solid var(--color-line);
+    outline: 2px solid transparent;
+    outline-offset: 1px;
+    transition: border-color .15s ease, outline-color .15s ease, background-color .15s ease;
   }
   .field::placeholder { color: var(--color-faint); }
+  .field:hover:not(:focus) {
+    background-color: var(--plate-fill-hi);
+  }
   .field:focus {
     background-color: var(--plate-fill-hi);
-    box-shadow: inset 0 1px 2px rgb(15 23 42 / 0.08),
-                inset 0 0 0 1px var(--color-accent),
-                0 0 0 3px var(--color-accent-soft);
+    border-color: var(--color-accent);
+    outline-color: var(--color-accent-soft);
+  }
+  .field:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
   }
 
   .chip {

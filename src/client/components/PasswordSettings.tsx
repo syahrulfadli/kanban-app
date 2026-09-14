@@ -2,6 +2,7 @@ import { useId, useState } from "react";
 import { useT } from "../hooks/useLanguage";
 import { api } from "../lib/api";
 import { changePassword } from "../lib/auth-client";
+import { PasswordField } from "./PasswordField";
 import type { LinkedAccount } from "./ProfileSettings";
 import { FormSkeleton } from "./Skeleton";
 
@@ -81,14 +82,12 @@ export function PasswordSettings({ accounts }: { accounts: LinkedAccount[] | nul
           <label htmlFor={currentId} className="text-xs font-medium text-muted">
             {t.passwordSettings.currentPasswordLabel}
           </label>
-          <input
+          <PasswordField
             id={currentId}
             required
-            type="password"
             value={current}
-            onChange={(e) => setCurrent(e.target.value)}
+            onChange={setCurrent}
             autoComplete="current-password"
-            className="field"
           />
         </div>
       )}
@@ -97,16 +96,14 @@ export function PasswordSettings({ accounts }: { accounts: LinkedAccount[] | nul
         <label htmlFor={nextId} className="text-xs font-medium text-muted">
           {t.passwordSettings.newPasswordLabel}
         </label>
-        <input
+        <PasswordField
           id={nextId}
           required
-          type="password"
           minLength={8}
           value={next}
-          onChange={(e) => setNext(e.target.value)}
+          onChange={setNext}
           placeholder={t.passwordSettings.minCharsPlaceholder}
           autoComplete="new-password"
-          className="field"
         />
       </div>
 

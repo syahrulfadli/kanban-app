@@ -31,6 +31,8 @@ export const en = {
     copied: "Copied",
     copyLink: "Copy link",
     retry: "Try again",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
   },
 
   roles: {

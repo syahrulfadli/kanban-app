@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useT } from "../hooks/useLanguage";
 import { PROVIDER_LABEL, signIn, signUp } from "../lib/auth-client";
 import { api } from "../lib/api";
+import { PasswordField } from "./PasswordField";
 
 /* `initialMode` hanya menentukan tampilan pertama — sesudahnya sakelar di
    bawah form yang memegang kendali, tanpa menyentuh alamat. Halaman
@@ -76,15 +77,13 @@ export function AuthPage({ initialMode = "login" }: { initialMode?: "login" | "r
             className="field"
           />
 
-          <input
+          <PasswordField
             required
-            type="password"
             minLength={8}
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={setPassword}
             placeholder={t.auth.passwordPlaceholder}
             autoComplete={mode === "login" ? "current-password" : "new-password"}
-            className="field"
           />
 
           {error && <p className="text-sm text-danger">{error}</p>}
