@@ -365,7 +365,7 @@ export const cardComments = sqliteTable(
  * komentar harus tetap terbaca sepintas, bukan berubah jadi galeri emoji
  * bebas yang panjangnya tak terduga.
  */
-export const REACTION_EMOJIS = ["👍", "❤️", "😂", "🎉", "👀", "🙏"] as const;
+export const REACTION_EMOJIS = ["👍", "❤️", "😂", "🎉", "👀", "🙏", "📝"] as const;
 export type ReactionEmoji = (typeof REACTION_EMOJIS)[number];
 
 /**

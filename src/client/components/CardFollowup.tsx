@@ -253,9 +253,10 @@ function ReactionBar({
             aria-expanded={pickerOpen}
             aria-label={t.cardFollowup.reactAria}
             title={t.cardFollowup.reactAria}
-            className="grid size-6 cursor-pointer place-items-center rounded-full text-sm transition-colors hover:bg-line-soft"
+            className="chip group/react cursor-pointer transition-colors hover:bg-line-soft"
           >
-            😊
+            <span aria-hidden>😊</span>
+            <span className="hidden group-hover/react:inline">{t.cardFollowup.reactButtonLabel}</span>
           </button>
 
           {pickerOpen && (
@@ -412,7 +413,26 @@ export function CardFollowup({
                         {edited(comment) && ` · ${t.cardFollowup.edited}`}
                       </span>
 
-                      
+                      {mine && editing !== comment.id && (
+                        <span className="ml-auto flex gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setEditing(comment.id)}
+                            className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.6875rem] font-semibold text-muted transition-colors hover:bg-(--card-plate-hi) hover:text-ink"
+                          >
+                            <PencilIcon className="size-3" />
+                            {t.cardFollowup.editLabel}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPendingDelete(comment)}
+                            className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.6875rem] font-semibold text-muted transition-colors hover:bg-danger/10 hover:text-danger"
+                          >
+                            <TrashIcon className="size-3" />
+                            {t.cardFollowup.deleteLabel}
+                          </button>
+                        </span>
+                      )}
                     </div>
 
                     {editing === comment.id ? (
@@ -438,27 +458,6 @@ export function CardFollowup({
                         onReact={onReact}
                       />
                     )}
-
-                    {mine && editing !== comment.id && (
-                        <span className="mt-1 flex gap-3">
-                          <button
-                            type="button"
-                            onClick={() => setEditing(comment.id)}
-                            className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.6875rem] font-semibold text-muted transition-colors hover:bg-(--card-plate-hi) hover:text-ink"
-                          >
-                            <PencilIcon className="size-3" />
-                            {t.cardFollowup.editLabel}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setPendingDelete(comment)}
-                            className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.6875rem] font-semibold text-muted transition-colors hover:bg-danger/10 hover:text-danger"
-                          >
-                            <TrashIcon className="size-3" />
-                            {t.cardFollowup.deleteLabel}
-                          </button>
-                        </span>
-                      )}
                   </div>
                 </li>
               );

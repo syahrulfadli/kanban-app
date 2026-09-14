@@ -156,6 +156,7 @@ export const id = {
     deleteConfirmLabel: "Hapus komentar",
     deletedToast: "Komentar dihapus",
     reactAria: "Beri reaksi",
+    reactButtonLabel: "Tambahkan reaksi",
     reactionsListAria: (count: number) => `${count} reaksi`,
     removeReaction: "Hapus reaksi",
   },

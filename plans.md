@@ -1104,9 +1104,10 @@ Skema: tabel baru `comment_reactions` (migrasi
 `0015_striped_silver_centurion.sql`, kuncinya diperbaiki lagi di
 `0016_mushy_martin_li.sql` — lihat catatan susulan di bawah), satu baris
 per orang per komentar, meniru pola `card_labels`/`card_watches`. Emoji
-dibatasi himpunan tetap enam butir (`REACTION_EMOJIS` di `schema.ts`: 👍
-❤️ 😂 🎉 👀 🙏), sama seperti `LABEL_COLORS` — baris reaksi harus tetap
-terbaca sepintas, bukan berubah jadi galeri emoji bebas.
+dibatasi himpunan tetap (`REACTION_EMOJIS` di `schema.ts`, awalnya enam
+butir — 👍 ❤️ 😂 🎉 👀 🙏, lalu 📝 ditambahkan susulan — lihat catatan di
+bawah), sama seperti `LABEL_COLORS` — baris reaksi harus tetap terbaca
+sepintas, bukan berubah jadi galeri emoji bebas.
 
 Server: satu endpoint, `POST /cards/comments/:commentId/reactions` dengan
 body `{ emoji }` — **sakelar**, bukan tambah/hapus terpisah: menekan emoji
@@ -1217,3 +1218,32 @@ tombol 😊 di DOM sesudahnya; keping penghitung menampilkan cincin aksen;
 daftar terbuka menampilkan avatar+nama+tombol "Hapus reaksi"; menekannya
 mengosongkan reaksi dan memunculkan kembali tepat satu tombol 😊.
 `npx tsc --noEmit` bersih, `vite build` sukses.
+
+**Susulan ketiga — tambah 📝 ke himpunan emoji.** Cuma menambah satu
+elemen ke `REACTION_EMOJIS` di `schema.ts`. Tidak perlu migrasi: kolom
+`emoji` di `comment_reactions` cuma `text NOT NULL`, enum-nya murni
+pemeriksaan tipe TypeScript/Zod (`z.enum(REACTION_EMOJIS)`), bukan `CHECK`
+di basis data — dikonfirmasi lewat `drizzle-kit generate` yang menjawab
+"No schema changes, nothing to migrate". Dikonfirmasi lewat DOM: panel
+pemilih sekarang menampilkan tujuh tombol (`👍 ❤️ 😂 🎉 👀 🙏 📝`).
+
+**Susulan keempat — teks pada tombol tambah (muncul saat hover saja),
+Edit/Hapus pindah ke baris tanggal.** Tombol tambah reaksi berhenti jadi
+ikon bulat kosong, kini memakai kelas `.chip` yang sama dengan keping
+penghitung di sebelahnya: emoji 😊 selalu terlihat, teksnya ("Tambahkan
+reaksi" / "Add reaction +", kunci baru `reactButtonLabel`) baru muncul
+saat kursor bertahan di tombolnya — `hidden group-hover/react:inline`,
+dengan `group/react` bernama (bukan `group` polos) supaya hover di baris
+komentar (`<li>`-nya sudah lebih dulu memakai `group` polos untuk hal
+lain) tidak ikut memunculkan teks ini. `aria-label` dipertahankan
+(`reactAria`, tanpa "+" yang janggal dibaca pembaca layar) karena teks
+visualnya sengaja disembunyikan `display:none` saat tidak dihover — tanpa
+itu nama aksesibel tombolnya cuma tinggal emoji. Edit dan Hapus pindah
+dari baris sendiri di bawah isi komentar ke baris nama+tanggal
+(`flex-wrap items-baseline gap-x-2` yang sudah ada), didorong `ml-auto`
+ke kanan — konsisten dengan pola "kendali menempel ke kanan" yang sudah
+dipakai di seluruh `ReactionBar`. Diuji lewat Playwright: teks tombol
+tidak terlihat dalam keadaan diam, muncul begitu di-hover, dan hilang
+lagi begitu kursor menjauh; tombol Edit terlihat sebaris dengan "baru
+saja" (dikonfirmasi lewat screenshot). `npx tsc --noEmit` bersih,
+`vite build` sukses.

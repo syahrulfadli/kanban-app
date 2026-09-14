@@ -152,6 +152,7 @@ export const en = {
     deleteConfirmLabel: "Delete comment",
     deletedToast: "Comment deleted",
     reactAria: "Add reaction",
+    reactButtonLabel: "Add reaction +",
     reactionsListAria: (count: number) => `${count} reactions`,
     removeReaction: "Remove reaction",
   },
