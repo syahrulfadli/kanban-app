@@ -243,55 +243,55 @@ export const id = {
   },
 
   landing: {
-    kicker: "Papan kanban kolaboratif",
-    heroTitle: "Lihat pekerjaan Anda bergerak.",
+    kicker: "Papan kanban buat kerja bareng",
+    heroTitle: "Lihat kerjaan Anda bergerak.",
     heroBody:
-      "Tulis tiap pekerjaan sebagai satu kartu, letakkan di kolom yang sesuai, lalu geser saat kartunya maju. Semua orang di papan melihat perubahan yang sama, saat itu juga.",
+      "Tiap kerjaan jadi satu kartu. Taruh di kolom yang pas, lalu geser kalau sudah maju. Semua orang di papan langsung lihat perubahannya, saat itu juga.",
     openMyWorkspace: "Buka workspace saya",
     getStarted: "Mulai sekarang",
     alreadyHaveAccount: "Sudah punya akun",
 
     whatIsKanbanTitle: "Apa itu kanban?",
     whatIsKanbanBody:
-      "— “papan penanda” dalam bahasa Jepang — berasal dari lini produksi Toyota: sebuah kartu ikut berjalan bersama pekerjaan, supaya siapa pun bisa melihat apa yang sedang dikerjakan tanpa perlu bertanya. Prinsipnya tidak berubah saat papannya pindah ke layar.",
+      "artinya “papan penanda” dalam bahasa Jepang, dan awalnya dipakai di pabrik Toyota. Idenya sederhana: barang yang lagi dikerjakan ditempeli kartu, jadi semua orang bisa lihat progresnya tanpa perlu tanya-tanya. Sekarang papannya pindah ke layar, tapi caranya tetap sama.",
 
-    step1Title: "Pekerjaan dibuat terlihat",
+    step1Title: "Semua kerjaan kelihatan",
     step1Body:
-      "Satu kartu untuk satu pekerjaan, semuanya di satu papan. Yang tidak tertulis di papan tidak sedang dikerjakan.",
-    step2Title: "Kolom adalah tahapnya",
+      "Satu kartu buat satu kerjaan, semuanya kumpul di satu papan. Kalau belum ada di papan, ya belum dikerjakan.",
+    step2Title: "Kolom itu tahapannya",
     step2Body:
-      "Beri nama kolom sesuai alur kerja Anda — rencana, dikerjakan, selesai — lalu biarkan kartunya bergerak dari kiri ke kanan.",
-    step3Title: "Batasi yang berjalan",
+      "Kasih nama kolom sesuai alur kerja Anda, misalnya rencana, dikerjakan, selesai. Nanti kartunya tinggal digeser dari kiri ke kanan.",
+    step3Title: "Jangan kerjakan kebanyakan sekaligus",
     step3Body:
-      "Kolom “dikerjakan” yang menumpuk adalah tanda untuk menyelesaikan, bukan untuk menambah. Menyelesaikan lebih berguna daripada memulai.",
+      "Kalau kolom “dikerjakan” makin penuh, itu tanda buat fokus menyelesaikan, bukan nambah kerjaan baru. Menyelesaikan lebih penting daripada memulai.",
 
-    whatThisAppDoesTitle: "Yang dikerjakan aplikasi ini",
+    whatThisAppDoesTitle: "Aplikasi ini buat apa",
     whatThisAppDoesBody:
-      "Papan kanban untuk tim kecil: satu tempat bersama untuk pekerjaan, dengan kabar yang menyusul ke perangkat Anda saat ada yang berubah.",
+      "Papan kanban buat tim kecil. Semua kerjaan kumpul di satu tempat, dan Anda dapat kabar ke perangkat setiap kali ada yang berubah.",
 
     featureRealtimeTitle: "Berubah di semua layar",
     featureRealtimeBody:
-      "Kartu yang digeser seseorang langsung pindah di layar rekan-rekannya. Tidak ada tombol segarkan.",
-    featureCardTitle: "Kartu yang cukup dalam",
+      "Begitu ada yang menggeser kartu, layar rekan-rekan yang lain langsung ikut berubah. Nggak perlu refresh.",
+    featureCardTitle: "Kartu yang lengkap isinya",
     featureCardBody:
-      "Label berwarna, checklist dengan progres, utas komentar, dan riwayat siapa membuat serta mengubahnya.",
-    featureBellTitle: "Kabar yang menyusul",
+      "Ada label warna-warni, checklist dengan progres, kolom komentar, sampai riwayat siapa yang bikin dan mengubahnya.",
+    featureBellTitle: "Kabar langsung nyampe",
     featureBellBody:
-      "Peserta sebuah kartu dikabari lewat notifikasi meski aplikasinya tertutup. Kabar yang sama menumpuk di kotak masuk di dalam aplikasi.",
+      "Orang-orang yang terlibat di satu kartu dapat notifikasi walau aplikasinya lagi tertutup. Kabar yang sama juga tersimpan di kotak masuk dalam aplikasi.",
     featurePeopleTitle: "Workspace dan anggota",
     featurePeopleBody:
-      "Kelompokkan papan per workspace, undang rekan lewat tautan, dan atur siapa boleh mengubah apa.",
+      "Papan bisa dikelompokkan per workspace, undang rekan tinggal kirim tautan, dan Anda bisa atur siapa boleh ubah apa.",
     featureInstallTitle: "Bisa dipasang",
     featureInstallBody:
-      "Pasang sebagai aplikasi di ponsel atau komputer, lengkap dengan ikon sendiri dan tema terang/gelap.",
+      "Pasang jadi aplikasi di ponsel atau komputer, lengkap dengan ikon sendiri dan tema terang/gelap.",
     featureFreeTitle: "Gratis, sungguhan",
     featureFreeBody:
-      "Berjalan penuh di free tier Cloudflare — tidak ada server yang perlu dibayar, tidak ada masa coba yang habis.",
+      "Jalan sepenuhnya di free tier Cloudflare. Nggak ada server yang harus dibayar, nggak ada masa coba yang bakal habis.",
 
     closingSignedInTitle: "Kembali ke papan Anda",
     closingSignedOutTitle: "Buat papan pertama Anda",
     closingSignedInBody:
-      "Halaman ini tetap di tempatnya — buka lagi kapan pun ada yang perlu dibaca ulang.",
+      "Halaman ini nggak kemana-mana, kok — buka lagi kapan aja kalau ada yang perlu dibaca ulang.",
     closingSignedOutBody: "Cukup email dan kata sandi — papan kosong siap dalam satu menit.",
     openWorkspace: "Buka workspace",
 
