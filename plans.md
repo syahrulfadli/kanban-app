@@ -1093,3 +1093,127 @@ pendapat ilmu para ahli typography desain web"):**
   satu tingkat (11px→12px, bukan lompat ke 14px) — cukup untuk memenuhi
   saran "bigger is better" tanpa mengorbankan berapa banyak kartu yang
   muat sekali pandang.
+
+## 9. Reaksi emoji pada komentar — **selesai**
+
+Diminta langsung: "buat fitur reaksi pada comment". Pola GitHub/Slack —
+satu baris emoji kecil di bawah tiap komentar, ditekan siapa saja (bukan
+cuma penulisnya) untuk memasang atau melepas.
+
+Skema: tabel baru `comment_reactions` (migrasi
+`0015_striped_silver_centurion.sql`, kuncinya diperbaiki lagi di
+`0016_mushy_martin_li.sql` — lihat catatan susulan di bawah), satu baris
+per orang per komentar, meniru pola `card_labels`/`card_watches`. Emoji
+dibatasi himpunan tetap enam butir (`REACTION_EMOJIS` di `schema.ts`: 👍
+❤️ 😂 🎉 👀 🙏), sama seperti `LABEL_COLORS` — baris reaksi harus tetap
+terbaca sepintas, bukan berubah jadi galeri emoji bebas.
+
+Server: satu endpoint, `POST /cards/comments/:commentId/reactions` dengan
+body `{ emoji }` — **sakelar**, bukan tambah/hapus terpisah: menekan emoji
+yang sama lagi menghapus barisnya. `requireComment` (dipakai juga oleh
+sunting/hapus komentar) sudah menjawab siapa yang boleh — bedanya di sini
+**tidak ada** `assertAuthor`: siapa pun anggota workspace boleh bereaksi,
+bukan cuma penulis komentarnya. Jawabannya deretan lengkap reaksi komentar
+itu (bukan cuma baris yang berubah), supaya klien menimpa alih-alih
+mereka-reka sakelarnya sendiri. Sengaja **tidak** lewat `markCardActivity`:
+bereaksi bukan suntingan kartu (pola yang sama dengan Awasi di
+`setWatching`, `CardModal.tsx`) — tidak menandai peserta baru, tidak
+menyentuh `updatedAt`/`updatedBy` kartu, tidak menulis apa pun ke lini
+masa. `GET /cards/:id` (`buildCardDetail`) ditambah satu query paralel:
+seluruh reaksi kartu itu ditarik sekali lewat join ke `card_comments`,
+dikelompokkan di JS per `commentId` — tetap tujuh(+1) query tetap, tidak
+peduli berapa komentar atau reaksinya.
+
+Klien: `toggleReaction` di `CardModal.tsx` menebak dulu di layar (baris
+muncul/hilang seketika saat ditekan) lalu menimpa dengan jawaban server
+begitu datang — bukan karena tebakannya diragukan, tapi supaya dua orang
+yang menekan emoji yang sama nyaris bersamaan berakhir di deretan yang
+sama persis. `ReactionBar` (baru, di `CardFollowup.tsx`) mengelompokkan
+`comment.reactions` per emoji jadi keping `.chip` kecil (emoji + jumlah),
+cincin aksen menandai emoji yang sudah dipasang orang yang sedang
+melihat — pola yang sama dengan keping label tersaring di `BoardFilter`.
+Tombol tambahnya (wajah tersenyum, `SmileyIcon` baru di `icons.tsx`)
+membuka `.sheet` kecil berisi keenam emoji, pola dropdown yang sama dengan
+`CardDue`/`CardLabels`.
+
+Diuji langsung di browser (Playwright headless, akun baru, satu kartu satu
+komentar): memasang 👍 memunculkan keping beserta cincin aksen dan hitungan
+"1" seketika; menekannya lagi melepasnya bersih — keping hilang, tombol
+tambah kembali sendirian; memasang 🎉 setelahnya berjalan tanpa gangguan
+dari state sebelumnya. Keenam tombol emoji di panel pemilih dikonfirmasi
+lewat DOM (`👍 ❤️ 😂 🎉 👀 🙏` — lengkap dan berurutan sesuai
+`REACTION_EMOJIS`; renderan visualnya sendiri tak bisa diperiksa dari
+screenshot karena kontainer ujinya tidak punya font emoji terpasang sama
+sekali, bukan soal kode). `npx tsc --noEmit` bersih.
+
+**Susulan — satu orang dibatasi satu reaksi per komentar.** Rancangan
+pertama mengikutkan `emoji` ke kunci gabungannya
+`(comment_id, user_id, emoji)`, yang diam-diam mengizinkan satu orang
+memasang 👍 **dan** ❤️ sekaligus di komentar yang sama — diminta
+diperbaiki: "pastikan satu user hanya bisa memberi 1 reaksi untuk 1
+comments". Kuncinya dipersempit jadi `(comment_id, user_id)` — migrasi
+`0016_mushy_martin_li.sql`, dan karena SQLite tidak bisa mengubah kunci
+utama di tempat, migrasinya membangun ulang tabelnya (bikin tabel baru,
+salin baris, buang yang lama) — dicek dulu tidak ada `(comment_id,
+user_id)` dobel di data lokal sebelum diterapkan, supaya penyalinannya
+tidak gagal kena bentrok kunci. Indeks `comment_reactions_comment_idx`
+juga dibuang: kunci gabungan yang baru sudah menjadi indeks dengan
+`comment_id` sebagai kolom terdepan, jadi query "seluruh reaksi satu
+komentar" tetap kena indeks tanpa perlu indeks kedua yang isinya sama.
+
+Endpoint reaksinya (`POST .../reactions`) berubah dari sakelar dua-keadaan
+(ada/tiada) jadi sakelar tiga-cabang: emoji yang sama ditekan lagi →
+dihapus; emoji lain ditekan → barisnya di-UPDATE (menimpa, bukan
+menambah baris kedua); belum ada baris sama sekali → INSERT. Tebakan
+optimistik di `toggleReaction` (`CardModal.tsx`) ikut disesuaikan:
+sebelum menambahkan tebakan reaksi baru, reaksi milik user yang sedang
+login disaring keluar dulu dari deretannya (`withoutMine`), supaya
+layar tidak sempat menampilkan dua keping reaksi dari satu orang yang
+sama sebelum jawaban server datang.
+
+Diuji lewat Playwright (skenario yang sama, ditambah satu langkah):
+memasang 👍, lalu tanpa melepasnya lebih dulu langsung menekan 🎉 —
+kepingnya **berganti** jadi "🎉 1" tunggal (bukan dua keping berdampingan),
+dikonfirmasi lewat `[aria-pressed="true"]` yang selalu berjumlah tepat
+satu di sepanjang skenario. Ditutup dengan melepas reaksi yang aktif —
+kepingnya hilang bersih. Diperiksa juga langsung ke D1 lokal (`wrangler d1
+execute`) untuk memastikan tidak ada dua baris `(comment_id, user_id)`
+yang sama tersisa. `npx tsc --noEmit` bersih.
+
+**Susulan kedua — tombol 😊 literal, posisi kanan, dan daftar reaksi.**
+Tiga permintaan berurutan: (1) ganti ikon SVG dengan emoji 😊 sungguhan
+sebagai tombol tambah, taruh di kanan (bukan kiri) beserta `-mt-0.5` supaya
+lebih dekat ke teks komentar; (2) tombol tambah itu **hilang** begitu orang
+yang sedang melihat sudah bereaksi; (3) beberapa keping-per-emoji diganti
+satu keping penghitung (emoji-emoji yang dipakai, tanpa diulang + jumlah
+orang) yang saat ditekan membuka daftar siapa saja, lengkap dengan pilihan
+"Hapus reaksi" untuk baris milik sendiri.
+
+`SmileyIcon` (SVG, baru ditambah di susulan pertama) dibuang lagi dari
+`icons.tsx` — tidak terpakai di tempat lain, dan emoji literal tidak butuh
+ikon buatan sendiri. Keping-per-emoji yang bisa ditekan siapa saja untuk
+toggle langsung (rancangan pertama `ReactionBar`) diganti: sekarang cuma
+ADA satu keping (dipasang cuma kalau `comment.reactions.length > 0`), dan
+menekannya membuka daftar (`role="dialog"`, pola yang sama persis dengan
+daftar penampil di `LiveIndicator`/`BoardView.tsx` — avatar + nama, bisa
+diklik untuk membuka profil publik lewat `useOpenProfile`) alih-alih
+langsung men-toggle. Tombol 😊 sendiri kini dipasangi syarat `!mine`:
+tersembunyi begitu `comment.reactions` memuat baris milik user yang
+sedang login — konsisten dengan aturan server "satu orang satu reaksi per
+komentar" dari susulan pertama: satu-satunya jalan mengganti pilihan
+sekarang lewat "Hapus reaksi" di daftar (tombolnya memanggil `onReact`
+dengan emoji yang sama seperti pilihan sendiri, yang di server berarti
+menghapus — bukan endpoint baru), baru tombol 😊 muncul lagi untuk
+memilih ulang.
+
+Dua pop-up berdiri sendiri-sendiri (bukan berbagi satu `ref` pembungkus
+seperti rancangan pertama): keping penghitung dan tombol 😊 masing-masing
+punya wadah `relative` dan `useDismiss`-nya sendiri, supaya daftar reaksi
+selalu menggantung pas di bawah kepingnya sendiri — bukan di bawah tombol
+😊 yang posisinya bisa berbeda (dan yang malah hilang begitu ada reaksi).
+
+Diuji lewat Playwright: tombol 😊 terlihat sebelum bereaksi; tepat nol
+tombol 😊 di DOM sesudahnya; keping penghitung menampilkan cincin aksen;
+daftar terbuka menampilkan avatar+nama+tombol "Hapus reaksi"; menekannya
+mengosongkan reaksi dan memunculkan kembali tepat satu tombol 😊.
+`npx tsc --noEmit` bersih, `vite build` sukses.

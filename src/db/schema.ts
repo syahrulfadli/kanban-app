@@ -357,6 +357,44 @@ export const cardComments = sqliteTable(
   (t) => [index("card_comments_card_idx").on(t.cardId, t.createdAt)],
 );
 
+/**
+ * Emoji reaksi yang bisa dipasang ke komentar — himpunan tetap, kunci
+ * simbolik langsung berupa karakternya sendiri (bukan nama warna seperti
+ * LABEL_COLORS, karena tidak ada peta rupa yang perlu ditiadakan — emoji
+ * sudah rupanya sendiri). Terbatas dengan sengaja: baris reaksi di bawah
+ * komentar harus tetap terbaca sepintas, bukan berubah jadi galeri emoji
+ * bebas yang panjangnya tak terduga.
+ */
+export const REACTION_EMOJIS = ["👍", "❤️", "😂", "🎉", "👀", "🙏"] as const;
+export type ReactionEmoji = (typeof REACTION_EMOJIS)[number];
+
+/**
+ * Satu orang, satu komentar, **satu** baris — `emoji` sengaja di luar kunci
+ * gabungannya (beda dari rancangan pertama, yang mengikutkan emoji ke kunci
+ * dan diam-diam mengizinkan satu orang menumpuk beberapa emoji sekaligus di
+ * komentar yang sama). Kunci `(comment_id, user_id)` inilah yang membuat
+ * "satu orang satu reaksi per komentar" berlaku di lapisan basis data, bukan
+ * cuma dijaga kode pemanggilnya: memilih emoji baru menimpa barisnya sendiri
+ * (UPDATE), memilih emoji yang sama lagi menghapusnya (lihat
+ * POST /cards/comments/:id/reactions) — sakelar dengan paling banyak satu
+ * posisi menyala, bukan tumpukan baris "suka" yang terus bertambah seperti
+ * CardWatch.
+ */
+export const commentReactions = sqliteTable(
+  "comment_reactions",
+  {
+    commentId: text("comment_id")
+      .notNull()
+      .references(() => cardComments.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    emoji: text("emoji", { enum: REACTION_EMOJIS }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.commentId, t.userId] })],
+);
+
 export const checklistItems = sqliteTable(
   "checklist_items",
   {
@@ -739,6 +777,7 @@ export type Column = typeof columns.$inferSelect;
 export type Card = typeof cards.$inferSelect;
 export type Label = typeof labels.$inferSelect;
 export type CardComment = typeof cardComments.$inferSelect;
+export type CommentReaction = typeof commentReactions.$inferSelect;
 export type ChecklistItem = typeof checklistItems.$inferSelect;
 export type CardAttachment = typeof cardAttachments.$inferSelect;
 export type CardParticipant = typeof cardParticipants.$inferSelect;

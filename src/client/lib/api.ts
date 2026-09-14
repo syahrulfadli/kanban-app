@@ -20,6 +20,7 @@ import type {
   ChecklistItem,
   Column,
   ColumnColor,
+  CommentReactionDetail,
   Invitation,
   InvitationCreated,
   InvitePreview,
@@ -31,6 +32,7 @@ import type {
   NotificationFeed,
   NotificationSettings,
   PushSettings,
+  ReactionEmoji,
   Role,
   UserBrief,
   WorkspaceSummary,
@@ -253,6 +255,10 @@ export const api = {
     send<CardCommentDetail>(`/cards/comments/${id}`, "PATCH", { body }),
   deleteComment: (id: string, options?: SendOptions) =>
     send<void>(`/cards/comments/${id}`, "DELETE", undefined, options),
+  /** Sakelar: menekan emoji yang sama lagi melepasnya. Jawabannya deretan
+      reaksi lengkap komentar itu, bukan cuma baris yang berubah. */
+  toggleReaction: (commentId: string, emoji: ReactionEmoji) =>
+    send<CommentReactionDetail[]>(`/cards/comments/${commentId}/reactions`, "POST", { emoji }),
 
   /* kotak masuk notifikasi */
   getNotifications: (filter: NotificationFilter = {}) =>

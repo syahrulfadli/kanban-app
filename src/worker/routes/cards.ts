@@ -17,7 +17,9 @@ import {
   cards,
   checklistItems,
   columns,
+  commentReactions,
   labels,
+  REACTION_EMOJIS,
   user,
   workspaceMembers,
   workspaces,
@@ -59,7 +61,13 @@ import {
   MAX_ATTACHMENT_BASE64,
   MAX_ATTACHMENTS_PER_CARD,
 } from "../../shared/types";
-import type { CardDetail, CardSearchHit, CardSummary, UserBrief } from "../../shared/types";
+import type {
+  CardDetail,
+  CardSearchHit,
+  CardSummary,
+  CommentReactionDetail,
+  UserBrief,
+} from "../../shared/types";
 
 /**
  * Sebanyak apa hasil pencarian dijawab sekaligus.
@@ -75,6 +83,19 @@ const SEARCH_LIMIT = 20;
    akan mencocokkan huruf apa pun — dan "%" mencocokkan segalanya. */
 const escapeLike = (value: string) => value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
 
+/** Baris reaksi mentah (satu per emoji per orang) → deretan per komentar. */
+function groupReactions(
+  rows: { commentId: string; emoji: CommentReactionDetail["emoji"]; user: UserBrief }[],
+): Map<string, CommentReactionDetail[]> {
+  const map = new Map<string, CommentReactionDetail[]>();
+  for (const { commentId, emoji, user } of rows) {
+    const list = map.get(commentId);
+    if (list) list.push({ emoji, user });
+    else map.set(commentId, [{ emoji, user }]);
+  }
+  return map;
+}
+
 /** Kartu + segala yang menggantung padanya — payload untuk dialog kartu. */
 async function buildCardDetail(
   db: Db,
@@ -84,77 +105,95 @@ async function buildCardDetail(
   viewerId: string,
   columnTitle: string,
 ): Promise<CardDetail> {
-  const [card, extrasMap, items, comments, attachmentRows, activities] = await Promise.all([
-    db.select().from(cards).where(eq(cards.id, cardId)).get(),
+  const [card, extrasMap, items, comments, reactionRows, attachmentRows, activities] =
+    await Promise.all([
+      db.select().from(cards).where(eq(cards.id, cardId)).get(),
 
-    loadCardExtras(db, { cardId }, viewerId),
+      loadCardExtras(db, { cardId }, viewerId),
 
-    db
-      .select()
-      .from(checklistItems)
-      .where(eq(checklistItems.cardId, cardId))
-      .orderBy(asc(checklistItems.position))
-      .all(),
+      db
+        .select()
+        .from(checklistItems)
+        .where(eq(checklistItems.cardId, cardId))
+        .orderBy(asc(checklistItems.position))
+        .all(),
 
-    db
-      .select({
-        comment: cardComments,
-        author: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          image: user.image,
-        },
-      })
-      .from(cardComments)
-      .innerJoin(user, eq(cardComments.userId, user.id))
-      .where(eq(cardComments.cardId, cardId))
-      .orderBy(asc(cardComments.createdAt))
-      .all(),
+      db
+        .select({
+          comment: cardComments,
+          author: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            image: user.image,
+          },
+        })
+        .from(cardComments)
+        .innerJoin(user, eq(cardComments.userId, user.id))
+        .where(eq(cardComments.cardId, cardId))
+        .orderBy(asc(cardComments.createdAt))
+        .all(),
 
-    /* Left join, bukan inner: pengunggah yang sudah keluar dari tim
-       menyisakan `user_id` null, dan lampirannya tetap harus tampil. Kolom
-       `data` (base64) sengaja tidak ikut ditarik — isi berkas ditarik
-       terpisah lewat /api/attachments/:id saat benar-benar dibutuhkan. */
-    db
-      .select({
-        id: cardAttachments.id,
-        cardId: cardAttachments.cardId,
-        filename: cardAttachments.filename,
-        mime: cardAttachments.mime,
-        size: cardAttachments.size,
-        createdAt: cardAttachments.createdAt,
-        uploader: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          image: user.image,
-        },
-      })
-      .from(cardAttachments)
-      .leftJoin(user, eq(cardAttachments.userId, user.id))
-      .where(eq(cardAttachments.cardId, cardId))
-      .orderBy(asc(cardAttachments.createdAt))
-      .all(),
+      /* Ditarik lewat komentarnya (bukan `eq(commentReactions.cardId, ...)` —
+         tabel ini tidak punya kolom itu, ditarik satu langkah lewat comment_id),
+         sekaligus untuk semua komentar kartu ini, lalu dikelompokkan di JS di
+         bawah — satu query tetap, tidak peduli berapa komentar atau reaksinya. */
+      db
+        .select({
+          commentId: commentReactions.commentId,
+          emoji: commentReactions.emoji,
+          user: { id: user.id, name: user.name, email: user.email, image: user.image },
+        })
+        .from(commentReactions)
+        .innerJoin(cardComments, eq(commentReactions.commentId, cardComments.id))
+        .innerJoin(user, eq(commentReactions.userId, user.id))
+        .where(eq(cardComments.cardId, cardId))
+        .orderBy(asc(commentReactions.createdAt))
+        .all(),
 
-    /* Left join, bukan inner: pelaku yang sudah keluar dari tim menyisakan
-       `user_id` null, dan barisnya tetap harus muncul di lini masa. */
-    db
-      .select({
-        activity: cardActivities,
-        actor: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          image: user.image,
-        },
-      })
-      .from(cardActivities)
-      .leftJoin(user, eq(cardActivities.userId, user.id))
-      .where(eq(cardActivities.cardId, cardId))
-      .orderBy(asc(cardActivities.createdAt))
-      .all(),
-  ]);
+      /* Left join, bukan inner: pengunggah yang sudah keluar dari tim
+         menyisakan `user_id` null, dan lampirannya tetap harus tampil. Kolom
+         `data` (base64) sengaja tidak ikut ditarik — isi berkas ditarik
+         terpisah lewat /api/attachments/:id saat benar-benar dibutuhkan. */
+      db
+        .select({
+          id: cardAttachments.id,
+          cardId: cardAttachments.cardId,
+          filename: cardAttachments.filename,
+          mime: cardAttachments.mime,
+          size: cardAttachments.size,
+          createdAt: cardAttachments.createdAt,
+          uploader: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            image: user.image,
+          },
+        })
+        .from(cardAttachments)
+        .leftJoin(user, eq(cardAttachments.userId, user.id))
+        .where(eq(cardAttachments.cardId, cardId))
+        .orderBy(asc(cardAttachments.createdAt))
+        .all(),
+
+      /* Left join, bukan inner: pelaku yang sudah keluar dari tim menyisakan
+         `user_id` null, dan barisnya tetap harus muncul di lini masa. */
+      db
+        .select({
+          activity: cardActivities,
+          actor: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            image: user.image,
+          },
+        })
+        .from(cardActivities)
+        .leftJoin(user, eq(cardActivities.userId, user.id))
+        .where(eq(cardActivities.cardId, cardId))
+        .orderBy(asc(cardActivities.createdAt))
+        .all(),
+    ]);
 
   if (!card) throw new Error("Kartu hilang di tengah pembacaan");
 
@@ -164,6 +203,8 @@ async function buildCardDetail(
   const byId = (id: string | null): UserBrief | null =>
     (id && extras.participants.find((p) => p.id === id)) || null;
 
+  const reactionsByComment = groupReactions(reactionRows);
+
   return {
     ...card,
     ...extras,
@@ -171,7 +212,11 @@ async function buildCardDetail(
     columnTitle,
     workspaceId,
     checklistItems: items,
-    comments: comments.map(({ comment, author }) => ({ ...comment, author })),
+    comments: comments.map(({ comment, author }) => ({
+      ...comment,
+      author,
+      reactions: reactionsByComment.get(comment.id) ?? [],
+    })),
     attachments: attachmentRows.map(({ uploader, ...rest }) => ({
       ...rest,
       uploader: uploader?.id ? uploader : null,
@@ -310,6 +355,70 @@ const app = new Hono<AppEnv>()
 
     return c.body(null, 204);
   })
+
+  /**
+   * Sakelar dengan paling banyak satu posisi menyala per orang per komentar —
+   * bukan tambah/hapus terpisah, dan bukan tumpukan emoji: menekan emoji yang
+   * sama lagi melepasnya, menekan emoji lain menggantinya (satu UPDATE, bukan
+   * INSERT kedua). Skema sendiri yang menjaga ini (kunci `(comment_id,
+   * user_id)` di `commentReactions`, lihat catatan di schema.ts) — baris di
+   * bawah ini cuma mengikuti, tidak menegakkan sendirian dari kode.
+   *
+   * Siapa pun anggota workspace boleh bereaksi — bukan cuma penulisnya,
+   * `requireComment` sudah menjawab hak itu — jadi tidak ada `assertAuthor`
+   * di sini seperti pada sunting/hapus komentar.
+   *
+   * Sengaja tidak lewat `markCardActivity`: bereaksi bukan suntingan kartu
+   * (sama seperti Awasi di `setWatching` — lihat CardModal.tsx), jadi tidak
+   * menandai siapa pun sebagai peserta, tidak menyentuh `updatedAt`/`updatedBy`
+   * kartu, dan tidak menulis apa pun ke lini masa. Jawabannya deretan lengkap
+   * reaksi komentar ini sesudahnya, supaya klien tinggal menimpa alih-alih
+   * mereka-reka sakelarnya sendiri.
+   */
+  .post(
+    "/comments/:commentId/reactions",
+    zValidator("json", z.object({ emoji: z.enum(REACTION_EMOJIS) })),
+    async (c) => {
+      const db = c.get("db");
+      const userId = c.get("user").id;
+      const { emoji } = c.req.valid("json");
+      const { comment, boardId } = await requireComment(db, c.req.param("commentId"), userId);
+
+      const mine = and(eq(commentReactions.commentId, comment.id), eq(commentReactions.userId, userId));
+      const existing = await db
+        .select({ emoji: commentReactions.emoji })
+        .from(commentReactions)
+        .where(mine)
+        .get();
+
+      if (existing?.emoji === emoji) {
+        await db.delete(commentReactions).where(mine);
+      } else if (existing) {
+        await db.update(commentReactions).set({ emoji, createdAt: new Date() }).where(mine);
+      } else {
+        await db
+          .insert(commentReactions)
+          .values({ commentId: comment.id, userId, emoji, createdAt: new Date() });
+      }
+
+      await touchBoard(c, boardId);
+
+      const rows = await db
+        .select({
+          commentId: commentReactions.commentId,
+          emoji: commentReactions.emoji,
+          user: { id: user.id, name: user.name, email: user.email, image: user.image },
+        })
+        .from(commentReactions)
+        .innerJoin(user, eq(commentReactions.userId, user.id))
+        .where(eq(commentReactions.commentId, comment.id))
+        .orderBy(asc(commentReactions.createdAt))
+        .all();
+
+      const reactions: CommentReactionDetail[] = rows.map(({ emoji, user }) => ({ emoji, user }));
+      return c.json(reactions);
+    },
+  )
 
   .patch(
     "/checklist/:itemId",
@@ -1119,7 +1228,7 @@ const app = new Hono<AppEnv>()
         comment: comment.body,
       });
 
-      return c.json({ ...comment, author: toBrief(sessionUser) }, 201);
+      return c.json({ ...comment, author: toBrief(sessionUser), reactions: [] }, 201);
     },
   )
 

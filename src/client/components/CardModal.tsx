@@ -32,6 +32,7 @@ import type {
   ChecklistItem,
   Label,
   LabelColor,
+  ReactionEmoji,
   UserBrief,
 } from "../../shared/types";
 
@@ -711,6 +712,51 @@ export function CardModal({
     });
   };
 
+  /**
+   * Pasang, ganti, atau lepas satu emoji pada satu komentar — paling banyak
+   * SATU reaksiku sendiri per komentar, tidak pernah bertumpuk (skema
+   * `commentReactions` di server menegakkan ini lewat kunci `(comment_id,
+   * user_id)` — lihat catatan di schema.ts; ini cuma menirunya di layar).
+   * Menekan emoji yang sudah kupasang melepasnya; menekan emoji lain
+   * menggantinya, bukan menambah baris kedua. Sengaja tidak lewat `run`:
+   * sama seperti Awasi di `setWatching`, bereaksi bukan suntingan kartu —
+   * tidak ada baris baru di lini masa, tidak ada "diubah oleh" yang bergeser.
+   *
+   * Ditebak dulu di layar (baris ini muncul/berganti/hilang seketika saat
+   * ditekan), lalu ditimpa dengan jawaban server begitu datang — bukan
+   * karena tebakannya diragukan, tapi supaya dua orang yang menekan emoji
+   * yang sama nyaris bersamaan tetap berakhir di deretan yang sama persis,
+   * bukan dua versi yang saling menyalip.
+   */
+  const toggleReaction = async (comment: CardCommentDetail, emoji: ReactionEmoji) => {
+    const withoutMine = comment.reactions.filter((r) => r.user.id !== currentUser.id);
+    const hadThisOne = comment.reactions.some(
+      (r) => r.emoji === emoji && r.user.id === currentUser.id,
+    );
+    const guess = hadThisOne ? withoutMine : [...withoutMine, { emoji, user: currentUser }];
+
+    const patch = (reactions: typeof comment.reactions) =>
+      setDetail((prev) =>
+        prev
+          ? {
+              ...prev,
+              comments: prev.comments.map((c) => (c.id === comment.id ? { ...c, reactions } : c)),
+            }
+          : prev,
+      );
+
+    patch(guess);
+
+    try {
+      const reactions = await api.toggleReaction(comment.id, emoji);
+      patch(reactions);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t.cardModal.saveError);
+      await load();
+    }
+  };
+
   return (
     /* Pembungkus sengaja tidak menggulir: kalau ia menggulir, kelam di
        dalamnya ikut tergeser dan menyisakan pita terang di tepi. Yang
@@ -1053,6 +1099,7 @@ export function CardModal({
                   onAdd={addComment}
                   onEdit={editComment}
                   onDelete={deleteComment}
+                  onReact={toggleReaction}
                 />
               </div>
               )}

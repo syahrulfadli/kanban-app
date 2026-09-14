@@ -155,6 +155,9 @@ export const id = {
       "Komentar yang terhapus tidak bisa dipulihkan setelah jendela urung tutup.",
     deleteConfirmLabel: "Hapus komentar",
     deletedToast: "Komentar dihapus",
+    reactAria: "Beri reaksi",
+    reactionsListAria: (count: number) => `${count} reaksi`,
+    removeReaction: "Hapus reaksi",
   },
 
   cardModal: {

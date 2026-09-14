@@ -5,6 +5,7 @@ import { Markdown } from "./Markdown";
 import { MarkdownField } from "./MarkdownField";
 import { PencilIcon, TrashIcon } from "./icons";
 import { useOpenProfile } from "./ProfilePopover";
+import { useDismiss } from "../hooks/useDismiss";
 import { useStoredFlag } from "../hooks/useStoredFlag";
 import { useLanguage, useT } from "../hooks/useLanguage";
 import { describeActivity } from "../lib/activity";
@@ -12,7 +13,12 @@ import { cn } from "../lib/cn";
 import { labelTint } from "../lib/people";
 import { formatDateTime, formatRelative } from "../lib/format";
 import type { ChannelStatus } from "../lib/realtime";
-import type { CardActivityDetail, CardCommentDetail } from "../../shared/types";
+import {
+  REACTION_EMOJIS,
+  type CardActivityDetail,
+  type CardCommentDetail,
+  type ReactionEmoji,
+} from "../../shared/types";
 
 interface Props {
   comments: CardCommentDetail[];
@@ -27,6 +33,8 @@ interface Props {
   onAdd: (body: string) => void;
   onEdit: (comment: CardCommentDetail, body: string) => void;
   onDelete: (comment: CardCommentDetail) => void;
+  /** Siapa pun anggota workspace boleh bereaksi, bukan cuma penulisnya. */
+  onReact: (comment: CardCommentDetail, emoji: ReactionEmoji) => void;
 }
 
 /** Followup dianggap tersunting kalau jaraknya dari pembuatan lebih dari sedetik. */
@@ -123,6 +131,162 @@ function ActivityRow({ activity, workspaceId }: { activity: CardActivityDetail; 
   );
 }
 
+/**
+ * Satu keping penghitung (bukan satu keping per emoji) plus tombol
+ * tambahnya, keduanya bersandar ke kanan.
+ *
+ * Penghitung menampilkan emoji yang dipakai (tanpa diulang) dan jumlah
+ * orangnya, dan itulah satu-satunya cara membaca deretan reaksi — ditekan
+ * untuk membuka daftar siapa saja yang memberinya, bukan langsung menyalin
+ * emoji tertentu (beda dari rancangan pertama, tempat tiap keping emoji
+ * bisa ditekan siapa saja untuk toggle miliknya sendiri). Tombol tambahnya
+ * (😊) sendiri hanya muncul sebelum orang yang sedang melihat bereaksi —
+ * begitu sudah, satu-satunya jalan mengubahnya adalah melepas dulu lewat
+ * "Hapus reaksi" di daftar, lalu tombolnya muncul lagi. Konsisten dengan
+ * aturan server: satu orang paling banyak satu reaksi per komentar.
+ */
+function ReactionBar({
+  comment,
+  currentUserId,
+  workspaceId,
+  onReact,
+}: {
+  comment: CardCommentDetail;
+  currentUserId: string;
+  workspaceId: string;
+  onReact: (comment: CardCommentDetail, emoji: ReactionEmoji) => void;
+}) {
+  const t = useT();
+  const openProfile = useOpenProfile();
+  const [listOpen, setListOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const counterRef = useRef<HTMLDivElement>(null);
+  const listPanelRef = useRef<HTMLDivElement>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const pickerPanelRef = useRef<HTMLDivElement>(null);
+  useDismiss(listOpen, () => setListOpen(false), [counterRef, listPanelRef]);
+  useDismiss(pickerOpen, () => setPickerOpen(false), [pickerRef, pickerPanelRef]);
+
+  const total = comment.reactions.length;
+  const mine = comment.reactions.find((r) => r.user.id === currentUserId);
+
+  // Emoji yang dipakai, tanpa diulang, urut kemunculan pertama —
+  // comment.reactions sendiri sudah datang terurut waktu dipasang dari server.
+  const distinctEmojis: ReactionEmoji[] = [];
+  for (const r of comment.reactions) {
+    if (!distinctEmojis.includes(r.emoji)) distinctEmojis.push(r.emoji);
+  }
+
+  return (
+    <div className="-mt-0.5 flex items-center justify-end gap-1.5">
+      {total > 0 && (
+        <div ref={counterRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setListOpen((v) => !v)}
+            aria-haspopup="dialog"
+            aria-expanded={listOpen}
+            aria-label={t.cardFollowup.reactionsListAria(total)}
+            title={t.cardFollowup.reactionsListAria(total)}
+            className={cn(
+              "chip cursor-pointer transition-colors hover:bg-line-soft",
+              mine && "outline-2 outline-offset-1 outline-accent",
+            )}
+          >
+            <span>{distinctEmojis.join("")}</span>
+            <span className="tabular-nums">{total}</span>
+          </button>
+
+          {listOpen && (
+            <div
+              ref={listPanelRef}
+              role="dialog"
+              aria-label={t.cardFollowup.reactionsListAria(total)}
+              className="sheet absolute top-full right-0 z-20 mt-1.5 w-60 rounded-2xl p-1.5"
+            >
+              <ul className="flex flex-col">
+                {comment.reactions.map((r) => (
+                  <li key={r.user.id} className="flex items-center gap-2 rounded-xl px-2.5 py-1.5">
+                    <button
+                      type="button"
+                      onClick={(e) => openProfile(r.user, workspaceId, e.currentTarget)}
+                      className="rounded-full transition-opacity hover:opacity-80"
+                    >
+                      <Avatar person={r.user} size="sm" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => openProfile(r.user, workspaceId, e.currentTarget)}
+                      className="min-w-0 flex-1 truncate text-left text-sm hover:underline"
+                    >
+                      {r.user.name}
+                    </button>
+                    <span aria-hidden>{r.emoji}</span>
+                    {r.user.id === currentUserId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onReact(comment, r.emoji);
+                          setListOpen(false);
+                        }}
+                        aria-label={t.cardFollowup.removeReaction}
+                        title={t.cardFollowup.removeReaction}
+                        className="grid size-6 shrink-0 cursor-pointer place-items-center rounded-full text-muted transition-colors hover:bg-danger/10 hover:text-danger"
+                      >
+                        <TrashIcon className="size-3.5" />
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!mine && (
+        <div ref={pickerRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setPickerOpen((v) => !v)}
+            aria-haspopup="dialog"
+            aria-expanded={pickerOpen}
+            aria-label={t.cardFollowup.reactAria}
+            title={t.cardFollowup.reactAria}
+            className="grid size-6 cursor-pointer place-items-center rounded-full text-sm transition-colors hover:bg-line-soft"
+          >
+            😊
+          </button>
+
+          {pickerOpen && (
+            <div
+              ref={pickerPanelRef}
+              role="dialog"
+              aria-label={t.cardFollowup.reactAria}
+              className="sheet absolute top-full right-0 z-20 mt-1.5 flex gap-0.5 rounded-2xl p-1.5"
+            >
+              {REACTION_EMOJIS.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => {
+                    onReact(comment, emoji);
+                    setPickerOpen(false);
+                  }}
+                  aria-label={emoji}
+                  className="grid size-8 cursor-pointer place-items-center rounded-full text-lg transition-transform hover:scale-110"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function CardFollowup({
   comments,
   activities,
@@ -132,6 +296,7 @@ export function CardFollowup({
   onAdd,
   onEdit,
   onDelete,
+  onReact,
 }: Props) {
   const [editing, setEditing] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<CardCommentDetail | null>(null);
@@ -263,6 +428,15 @@ export function CardFollowup({
                       />
                     ) : (
                       <Markdown source={comment.body} className="mt-0.5 text-sm text-ink-soft" />
+                    )}
+
+                    {editing !== comment.id && (
+                      <ReactionBar
+                        comment={comment}
+                        currentUserId={currentUserId}
+                        workspaceId={workspaceId}
+                        onReact={onReact}
+                      />
                     )}
 
                     {mine && editing !== comment.id && (

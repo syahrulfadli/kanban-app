@@ -106,6 +106,20 @@
       "when": 1788857076261,
       "tag": "0014_nifty_fantastic_four",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1789375844707,
+      "tag": "0015_striped_silver_centurion",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1789378306008,
+      "tag": "0016_mushy_martin_li",
+      "breakpoints": true
     }
   ]
 }

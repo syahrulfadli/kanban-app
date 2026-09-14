@@ -151,6 +151,9 @@ export const en = {
     deleteConfirmBody: "A deleted comment can't be recovered once the undo window closes.",
     deleteConfirmLabel: "Delete comment",
     deletedToast: "Comment deleted",
+    reactAria: "Add reaction",
+    reactionsListAria: (count: number) => `${count} reactions`,
+    removeReaction: "Remove reaction",
   },
 
   cardModal: {

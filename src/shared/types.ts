@@ -13,10 +13,12 @@ import type {
   ChecklistItem,
   Column,
   ColumnColor,
+  CommentReaction,
   Invitation,
   Label,
   LabelColor,
   NotificationKind,
+  ReactionEmoji,
   Role,
   Workspace,
 } from "../db/schema";
@@ -26,6 +28,7 @@ import {
   BOARD_GRADIENTS,
   COLUMN_COLORS,
   LABEL_COLORS,
+  REACTION_EMOJIS,
 } from "../db/schema";
 
 export type {
@@ -43,14 +46,23 @@ export type {
   ChecklistItem,
   Column,
   ColumnColor,
+  CommentReaction,
   Invitation,
   Label,
   LabelColor,
   NotificationKind,
+  ReactionEmoji,
   Role,
   Workspace,
 };
-export { BOARD_BACKGROUND_KINDS, BOARD_BLUR_LEVELS, BOARD_GRADIENTS, COLUMN_COLORS, LABEL_COLORS };
+export {
+  BOARD_BACKGROUND_KINDS,
+  BOARD_BLUR_LEVELS,
+  BOARD_GRADIENTS,
+  COLUMN_COLORS,
+  LABEL_COLORS,
+  REACTION_EMOJIS,
+};
 
 /** Workspace beserta peran user yang sedang login di dalamnya. */
 export interface WorkspaceSummary extends Workspace {
@@ -106,8 +118,16 @@ export interface CardSummary extends Card {
   watching: boolean;
 }
 
+/** Satu tanda emoji di bawah komentar, lengkap dengan siapa yang memasangnya. */
+export interface CommentReactionDetail {
+  emoji: ReactionEmoji;
+  user: UserBrief;
+}
+
 export interface CardCommentDetail extends CardComment {
   author: UserBrief;
+  /** Urut waktu dipasang — deretannya sendiri yang harus stabil, bukan cuma hitungannya. */
+  reactions: CommentReactionDetail[];
 }
 
 /** Satu catatan perubahan, lengkap dengan pelakunya. */
