@@ -6,7 +6,11 @@
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
     // Vite plugin yang mengatur direktori build; SPA fallback ke index.html
-    "not_found_handling": "single-page-application"
+    "not_found_handling": "single-page-application",
+    // Tanpa ini, request *navigasi* ke /api (mis. klik tautan unduh lampiran)
+    // dijawab index.html oleh SPA fallback sebelum sempat sampai ke Worker.
+    // fetch()/<img> tidak kena karena bukan navigasi.
+    "run_worker_first": ["/api/*"]
   },
   "observability": {
     "enabled": true

@@ -1347,8 +1347,10 @@ export const attachments = new Hono<AppEnv>().get("/:id", async (c) => {
   // Berkas non-gambar diunduh, bukan dirender inline — tidak ada pratinjau
   // untuk tipe ini, dan ini menutup risiko peramban menafsirkan isinya.
   if (!isAttachmentImage(attachment.mime)) {
+    // `filename*` supaya peramban men-decode-nya — di `filename` biasa,
+    // "Laporan Q1.xls" tersimpan apa adanya sebagai "Laporan%20Q1.xls".
     headers["Content-Disposition"] =
-      `attachment; filename="${encodeURIComponent(attachment.filename)}"`;
+      `attachment; filename*=UTF-8''${encodeURIComponent(attachment.filename)}`;
   }
 
   return c.body(bytes, 200, headers);
